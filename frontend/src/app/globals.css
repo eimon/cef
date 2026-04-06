@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  /* ── CEF brand tokens ── */
+  --color-cef-primary: #818cf8;
+  --color-cef-base: #06090f;
+  --color-cef-surface: #0c1120;
+  --color-cef-success: #34d399;
+  --color-cef-warning: #fbbf24;
+  --color-cef-danger: #f87171;
+}
+
+/* ── Root variables ─────────────────────────── */
+:root {
+  --background: #06090f;
+  --foreground: rgb(255 255 255 / 0.90);
+  color-scheme: dark;
+}
+
+/* ── Base body ──────────────────────────────── */
+body {
+  background-color: #06090f;
+  background-image:
+    radial-gradient(ellipse 140% 60% at 50% -10%, rgb(99 102 241 / 0.09), transparent),
+    radial-gradient(ellipse 60% 30% at 85% 110%, rgb(129 140 248 / 0.04), transparent);
+  color: rgb(255 255 255 / 0.90);
+  font-family: var(--font-geist-sans), -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Glass utilities ────────────────────────── */
+
+/* Base glass: very subtle transparency, used for cards and panels */
+.glass {
+  background: rgb(255 255 255 / 0.04);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+/* Elevated glass: slightly more opaque, for hovered cards, secondary surfaces */
+.glass-elevated {
+  background: rgb(255 255 255 / 0.07);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgb(255 255 255 / 0.11);
+}
+
+/* Modal glass: dark tinted, for dialogs and overlays */
+.glass-modal {
+  background: rgb(6 9 15 / 0.88);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgb(255 255 255 / 0.09);
+}
+
+/* Sidebar glass: slightly more opaque for the nav */
+.glass-sidebar {
+  background: rgb(8 12 22 / 0.94);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-color: rgb(255 255 255 / 0.07);
+}
+
+/* ── Form controls ──────────────────────────── */
+input,
+textarea,
+select {
+  color: rgb(255 255 255 / 0.90);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgb(255 255 255 / 0.28);
+}
+
+option {
+  background: #0c1120;
+  color: rgb(255 255 255 / 0.90);
+}
+
+/* ── Scrollbar ──────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.10);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.20);
+}
+
+/* ── Custom Slider (Profitability) ──────────── */
+.slider-custom {
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+.slider-custom::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #818cf8, #a855f7);
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.3);
+  transition: all 0.2s ease;
+}
+
+.slider-custom::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(129, 140, 248, 0.4);
+}
+
+.slider-custom::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #818cf8, #a855f7);
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.3);
+  transition: all 0.2s ease;
+}
+
+.slider-custom::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(129, 140, 248, 0.4);
+}

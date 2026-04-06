@@ -1,0 +1,65 @@
+services:
+  web:
+    build: .
+    container_name: cef_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-supersecretkey}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@db:5432/cef_db
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: cef_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      # - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - INTERNAL_API_URL=http://cef_api:8000
+      - JWT_SECRET_KEY=${SECRET_KEY:-supersecretkey}
+      - ALGORITHM=${ALGORITHM:-HS256}
+    depends_on:
+      - web
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: cef_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: cef_db
+      TZ: UTC
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cef_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
