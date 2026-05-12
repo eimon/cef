@@ -6,18 +6,20 @@ import { revalidatePath } from "next/cache";
 import { User, UserRole } from "@/types/api";
 
 const createUserSchema = z.object({
-    username: z.string().min(1, "Username is required"),
-    email: z.string().email("Invalid email address"),
-    phone: z.string().min(1, "Phone is required"),
-    full_name: z.string().optional(),
+    email: z.string().email("Email inválido"),
+    telefono: z.string().optional(),
+    nombre: z.string().optional(),
+    apellido: z.string().optional(),
+    dni: z.string().optional(),
     role: z.nativeEnum(UserRole),
-    password: z.string().min(6, "Password must be at least 6 characters"),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
 const updateUserSchema = z.object({
-    full_name: z.string().optional(),
+    nombre: z.string().optional(),
+    apellido: z.string().optional(),
     role: z.nativeEnum(UserRole).optional(),
-    password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
+    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional().or(z.literal("")),
 });
 
 export type UserFormState = {
@@ -38,10 +40,11 @@ export async function getUsers(): Promise<User[]> {
 
 export async function createUser(prevState: UserFormState, formData: FormData): Promise<UserFormState> {
     const validatedFields = createUserSchema.safeParse({
-        username: formData.get("username"),
         email: formData.get("email"),
-        phone: formData.get("phone"),
-        full_name: formData.get("full_name") || undefined,
+        telefono: formData.get("telefono") || undefined,
+        nombre: formData.get("nombre") || undefined,
+        apellido: formData.get("apellido") || undefined,
+        dni: formData.get("dni") || undefined,
         role: formData.get("role"),
         password: formData.get("password"),
     });
@@ -77,7 +80,8 @@ export async function updateUser(
     const rawPassword = formData.get("password") as string;
 
     const validatedFields = updateUserSchema.safeParse({
-        full_name: formData.get("full_name") || undefined,
+        nombre: formData.get("nombre") || undefined,
+        apellido: formData.get("apellido") || undefined,
         role: formData.get("role") || undefined,
         password: rawPassword || undefined,
     });

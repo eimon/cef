@@ -1,18 +1,20 @@
 export enum UserRole {
     ADMIN = "admin",
-    RECEPTION = "reception",
-    CLIENT = "client",
+    RECEPCION = "recepcion",
+    CLIENTE = "cliente",
 }
 
 export interface User {
-    id: string; // uuid
-    username: string;
+    id: string;
     email: string;
-    phone: string;
-    full_name: string;
+    telefono: string | null;
+    nombre: string | null;
+    apellido: string | null;
+    fecha_nacimiento: string | null;
+    dni: string | null;
     role: string | UserRole;
-    is_active: boolean;
-    created_at: string; // datetime
+    activo: boolean;
+    created_at: string;
 }
 export interface AuthResponse {
     access_token: string;

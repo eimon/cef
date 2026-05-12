@@ -4,9 +4,10 @@ import ChangePasswordForm from "@/components/ChangePasswordForm";
 
 interface UserProfile {
     id: string;
-    username: string;
     email: string;
-    full_name: string;
+    telefono: string | null;
+    nombre: string | null;
+    apellido: string | null;
     role: string;
     created_at: string;
 }
@@ -35,9 +36,9 @@ export default async function ProfilePage() {
                     </div>
                     <div>
                         <p className="text-white/90 font-semibold text-lg">
-                            {profile?.full_name ?? profile?.username ?? "—"}
+                            {[profile?.nombre, profile?.apellido].filter(Boolean).join(" ") || "—"}
                         </p>
-                        <p className="text-white/40 text-sm">@{profile?.username}</p>
+                        <p className="text-white/40 text-sm">{profile?.email}</p>
                     </div>
                 </div>
 

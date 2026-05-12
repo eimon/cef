@@ -212,7 +212,7 @@ Disponibles en cualquier Client Component.
 
 | Enum | Valores |
 |---|---|
-| `UserRole` | `ADMIN`, `RECEPTION`, `CLIENT` |
+| `UserRole` | `ADMIN`, `RECEPCION`, `CLIENT` |
 
 ## Features Implementadas
 

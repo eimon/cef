@@ -32,18 +32,18 @@ export default function LoginPage() {
 
                         <div>
                             <label
-                                htmlFor="username"
+                                htmlFor="email"
                                 className="block text-xs font-medium text-white/55 mb-1.5 uppercase tracking-wider"
                             >
-                                Usuario
+                                Email
                             </label>
                             <input
-                                id="username"
-                                name="username"
-                                type="text"
+                                id="email"
+                                name="email"
+                                type="email"
                                 required
                                 className="w-full px-4 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.10] text-white/90 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
-                                placeholder="Usuario"
+                                placeholder="correo@ejemplo.com"
                             />
                         </div>
 
