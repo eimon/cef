@@ -6,7 +6,7 @@ import Link from "next/link";
 export default async function DashboardHome() {
     const user: User | null = await serverApi("/auth/perfil").then(r => r.ok ? r.json() : null).catch(() => null);
 
-    const firstName = (user?.full_name?.split(" ")[0]) || user?.username || "";
+    const firstName = user?.nombre || "";
     const now = new Date();
     const monthName = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(now);
 

@@ -14,14 +14,14 @@ interface UsersTableProps {
 
 const roleBadgeClass: Record<string, string> = {
     [UserRole.ADMIN]: "bg-cef-danger/12 text-cef-danger",
-    [UserRole.RECEPTION]: "bg-cef-primary/12 text-cef-primary",
-    [UserRole.CLIENT]: "bg-cef-success/12 text-cef-success",
+    [UserRole.RECEPCION]: "bg-cef-primary/12 text-cef-primary",
+    [UserRole.CLIENTE]: "bg-cef-success/12 text-cef-success",
 };
 
 const roleLabels: Record<string, string> = {
     [UserRole.ADMIN]: "Administrador",
-    [UserRole.RECEPTION]: "Recepción",
-    [UserRole.CLIENT]: "Cliente",
+    [UserRole.RECEPCION]: "Recepción",
+    [UserRole.CLIENTE]: "Cliente",
 };
 
 function UserCardMenu({
@@ -81,7 +81,7 @@ export default function UsersTable({ users }: UsersTableProps) {
     const { confirm } = useConfirm();
 
     const handleDelete = async (user: User) => {
-        if (!await confirm(`¿Estás seguro de que deseas eliminar al usuario ${user.username}? Esta acción no se puede deshacer.`)) return;
+        if (!await confirm(`¿Estás seguro de que deseas eliminar al usuario ${user.email}? Esta acción no se puede deshacer.`)) return;
 
         setIsDeleting(user.id);
         const result = await deleteUser(user.id);
@@ -107,15 +107,17 @@ export default function UsersTable({ users }: UsersTableProps) {
                         {/* Row 1: name + badges + menu */}
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center flex-wrap gap-1.5 min-w-0">
-                                <span className="text-sm font-semibold text-white/85">{user.full_name || "—"}</span>
+                                <span className="text-sm font-semibold text-white/85">
+                                    {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
+                                </span>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-white/[0.06] text-white/45"}`}>
                                     {roleLabels[user.role] ?? user.role}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${user.is_active
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${user.activo
                                     ? "bg-cef-success/12 text-cef-success"
                                     : "bg-white/[0.05] text-white/35"
                                     }`}>
-                                    {user.is_active ? "Activo" : "Inactivo"}
+                                    {user.activo ? "Activo" : "Inactivo"}
                                 </span>
                             </div>
                             <UserCardMenu
@@ -125,11 +127,15 @@ export default function UsersTable({ users }: UsersTableProps) {
                             />
                         </div>
 
-                        {/* Row 2: email + username */}
+                        {/* Row 2: email + telefono */}
                         <div className="flex items-center gap-3 text-xs text-white/40">
                             <span>{user.email}</span>
-                            <span className="text-white/20">·</span>
-                            <span className="font-mono text-white/35">{user.username}</span>
+                            {user.telefono && (
+                                <>
+                                    <span className="text-white/20">·</span>
+                                    <span>{user.telefono}</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -142,13 +148,13 @@ export default function UsersTable({ users }: UsersTableProps) {
                         <thead className="bg-white/[0.03]">
                             <tr>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
-                                    Nombre Completo
+                                    Nombre
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
                                     Email
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
-                                    Usuario
+                                    Teléfono
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
                                     Rol
@@ -165,13 +171,13 @@ export default function UsersTable({ users }: UsersTableProps) {
                             {users.map((user) => (
                                 <tr key={user.id} className="hover:bg-white/[0.03] transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/80">
-                                        {user.full_name || "—"}
+                                        {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-white/50">
                                         {user.email}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white/50 font-mono">
-                                        {user.username}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white/50">
+                                        {user.telefono || "—"}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-white/[0.06] text-white/45"}`}>
@@ -179,11 +185,11 @@ export default function UsersTable({ users }: UsersTableProps) {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.activo
                                             ? "bg-cef-success/12 text-cef-success"
                                             : "bg-white/[0.05] text-white/35"
                                             }`}>
-                                            {user.is_active ? "Activo" : "Inactivo"}
+                                            {user.activo ? "Activo" : "Inactivo"}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">

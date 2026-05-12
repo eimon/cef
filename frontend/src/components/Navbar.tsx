@@ -38,7 +38,7 @@ export default async function Navbar() {
                         {user ? (
                             <div className="relative flex items-center space-x-3">
                                 <div className="hidden md:flex flex-col items-end">
-                                    <span className="text-sm font-medium text-white/85">{user.full_name}</span>
+                                    <span className="text-sm font-medium text-white/85">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</span>
                                     <span className="text-xs text-white/40 capitalize">{user.role.toLowerCase()}</span>
                                 </div>
 
@@ -52,7 +52,7 @@ export default async function Navbar() {
 
                                     <div className="absolute right-0 mt-2 w-48 glass-modal rounded-xl shadow-2xl py-1 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 origin-top-right">
                                         <div className="px-4 py-3 border-b border-white/[0.08] md:hidden">
-                                            <p className="text-sm font-medium text-white/85">{user.full_name}</p>
+                                            <p className="text-sm font-medium text-white/85">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</p>
                                             <p className="text-xs text-white/40">{user.email}</p>
                                         </div>
 

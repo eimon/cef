@@ -11,8 +11,8 @@ const labelCls = "block text-xs font-medium text-white/55 mb-1.5 uppercase track
 
 const roleLabels: Record<string, string> = {
     [UserRole.ADMIN]: "Administrador",
-    [UserRole.RECEPTION]: "Recepción",
-    [UserRole.CLIENT]: "Cliente",
+    [UserRole.RECEPCION]: "Recepción",
+    [UserRole.CLIENTE]: "Cliente",
 };
 
 export default function AddUserDialog() {
@@ -57,25 +57,30 @@ export default function AddUserDialog() {
                             )}
 
                             <div>
-                                <label className={labelCls}>Usuario</label>
-                                <input name="username" type="text" required className={inputCls} />
-                            </div>
-
-                            <div>
                                 <label className={labelCls}>Email</label>
                                 <input name="email" type="email" required className={inputCls} />
                             </div>
 
-                            <div>
-                                <label className={labelCls}>Teléfono</label>
-                                <input name="phone" type="tel" required className={inputCls} />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelCls}>
+                                        Nombre <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
+                                    </label>
+                                    <input name="nombre" type="text" className={inputCls} />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>
+                                        Apellido <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
+                                    </label>
+                                    <input name="apellido" type="text" className={inputCls} />
+                                </div>
                             </div>
 
                             <div>
                                 <label className={labelCls}>
-                                    Nombre Completo <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
+                                    Teléfono <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
                                 </label>
-                                <input name="full_name" type="text" className={inputCls} />
+                                <input name="telefono" type="tel" className={inputCls} />
                             </div>
 
                             <div>

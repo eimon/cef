@@ -17,8 +17,8 @@ const labelCls = "block text-xs font-medium text-white/55 mb-1.5 uppercase track
 
 const roleLabels: Record<string, string> = {
     [UserRole.ADMIN]: "Administrador",
-    [UserRole.RECEPTION]: "Recepción",
-    [UserRole.CLIENT]: "Cliente",
+    [UserRole.RECEPCION]: "Recepción",
+    [UserRole.CLIENTE]: "Cliente",
 };
 
 export default function EditUserDialog({ user, isOpen, onClose }: EditUserDialogProps) {
@@ -52,16 +52,29 @@ export default function EditUserDialog({ user, isOpen, onClose }: EditUserDialog
                         </div>
                     )}
 
-                    <div>
-                        <label className={labelCls}>
-                            Nombre Completo <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
-                        </label>
-                        <input
-                            name="full_name"
-                            type="text"
-                            defaultValue={user.full_name ?? ""}
-                            className={inputCls}
-                        />
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>
+                                Nombre <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
+                            </label>
+                            <input
+                                name="nombre"
+                                type="text"
+                                defaultValue={user.nombre ?? ""}
+                                className={inputCls}
+                            />
+                        </div>
+                        <div>
+                            <label className={labelCls}>
+                                Apellido <span className="text-white/25 normal-case tracking-normal">(opcional)</span>
+                            </label>
+                            <input
+                                name="apellido"
+                                type="text"
+                                defaultValue={user.apellido ?? ""}
+                                className={inputCls}
+                            />
+                        </div>
                     </div>
 
                     <div>
