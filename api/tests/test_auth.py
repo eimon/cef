@@ -3,59 +3,44 @@ import pytest
 
 # ---------- Register ----------
 
-async def test_register_success(client):
+async def test_register_success(client, admin_headers):
     resp = await client.post("/auth/register", json={
-        "username": "newuser",
-        "email": "new@test.com",
+        "email": "nuevo@test.com",
+        "telefono": "1122334455",
         "password": "secret123",
-        "full_name": "New User",
-    })
+        "nombre": "Nuevo",
+        "apellido": "Usuario",
+        "role": "recepcion",
+    }, headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["username"] == "newuser"
-    assert data["email"] == "new@test.com"
+    assert data["email"] == "nuevo@test.com"
     assert "id" in data
 
 
-async def test_register_duplicate_email(client):
+async def test_register_duplicate_email(client, admin_headers):
     payload = {
-        "username": "user1",
         "email": "dup@test.com",
         "password": "secret123",
+        "role": "recepcion",
     }
-    resp1 = await client.post("/auth/register", json=payload)
+    resp1 = await client.post("/auth/register", json=payload, headers=admin_headers)
     assert resp1.status_code == 200
 
-    payload["username"] = "user2"
-    resp2 = await client.post("/auth/register", json=payload)
-    assert resp2.status_code == 409
-
-
-async def test_register_duplicate_username(client):
-    payload = {
-        "username": "sameuser",
-        "email": "a@test.com",
-        "password": "secret123",
-    }
-    resp1 = await client.post("/auth/register", json=payload)
-    assert resp1.status_code == 200
-
-    payload["email"] = "b@test.com"
-    resp2 = await client.post("/auth/register", json=payload)
+    resp2 = await client.post("/auth/register", json=payload, headers=admin_headers)
     assert resp2.status_code == 409
 
 
 # ---------- Login ----------
 
-async def test_login_success(client):
+async def test_login_success(client, admin_headers):
     await client.post("/auth/register", json={
-        "username": "loginuser",
         "email": "login@test.com",
         "password": "secret123",
-    })
-    # OAuth2 form uses "username" field — the app looks up by username column
-    resp = await client.post("/auth/login", data={
-        "username": "loginuser",
+        "role": "recepcion",
+    }, headers=admin_headers)
+    resp = await client.post("/auth/login", json={
+        "email": "login@test.com",
         "password": "secret123",
     })
     assert resp.status_code == 200
@@ -64,28 +49,28 @@ async def test_login_success(client):
     assert data["token_type"] == "bearer"
 
 
-async def test_login_wrong_password(client):
+async def test_login_wrong_password(client, admin_headers):
     await client.post("/auth/register", json={
-        "username": "wrongpw",
         "email": "wrongpw@test.com",
         "password": "correct",
-    })
-    resp = await client.post("/auth/login", data={
-        "username": "wrongpw",
+        "role": "recepcion",
+    }, headers=admin_headers)
+    resp = await client.post("/auth/login", json={
+        "email": "wrongpw@test.com",
         "password": "incorrect",
     })
     assert resp.status_code == 401
 
 
 async def test_login_nonexistent_user(client):
-    resp = await client.post("/auth/login", data={
-        "username": "nobody",
+    resp = await client.post("/auth/login", json={
+        "email": "nobody@test.com",
         "password": "whatever",
     })
     assert resp.status_code == 401
 
 
-# ---------- Profile ----------
+# ---------- Perfil ----------
 
 async def test_perfil_authenticated(client, admin_headers):
     resp = await client.get("/auth/perfil", headers=admin_headers)

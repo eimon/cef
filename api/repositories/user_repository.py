@@ -1,63 +1,61 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from models.user import User
-from schemas.user import UserCreate, UserUpdate
-from core.enums import UserRole
+from models.usuario import Usuario
+from schemas.usuario import UsuarioCreate, UsuarioUpdate
 from core.security import get_password_hash
 import uuid
+
 
 class UserRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_by_id(self, user_id: uuid.UUID) -> User | None:
-        result = await self.db.execute(select(User).where(User.id == user_id))
+    async def get_by_id(self, usuario_id: uuid.UUID) -> Usuario | None:
+        result = await self.db.execute(select(Usuario).where(Usuario.id == usuario_id))
         return result.scalars().first()
 
-    async def get_by_email(self, email: str) -> User | None:
-        result = await self.db.execute(select(User).where(User.email == email))
-        return result.scalars().first()
-    
-    async def get_by_username(self, username: str) -> User | None:
-        result = await self.db.execute(select(User).where(User.username == username))
+    async def get_by_email(self, email: str) -> Usuario | None:
+        result = await self.db.execute(select(Usuario).where(Usuario.email == email))
         return result.scalars().first()
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> list[User]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> list[Usuario]:
         result = await self.db.execute(
-            select(User).where(User.is_active == True).offset(skip).limit(limit)
+            select(Usuario).where(Usuario.activo == True).offset(skip).limit(limit)
         )
         return list(result.scalars().all())
 
-    async def update(self, user_id: uuid.UUID, data: UserUpdate) -> User | None:
-        user = await self.get_by_id(user_id)
-        if not user:
+    async def update(self, usuario_id: uuid.UUID, data: UsuarioUpdate) -> Usuario | None:
+        usuario = await self.get_by_id(usuario_id)
+        if not usuario:
             return None
         update_fields = data.model_dump(exclude_unset=True)
         if 'password' in update_fields:
-            user.hashed_password = get_password_hash(update_fields.pop('password'))
+            usuario.hashed_password = get_password_hash(update_fields.pop('password'))
         for key, value in update_fields.items():
-            setattr(user, key, value)
+            setattr(usuario, key, value)
         await self.db.flush()
-        await self.db.refresh(user)
-        return user
+        await self.db.refresh(usuario)
+        return usuario
 
-    async def delete(self, user_id: uuid.UUID) -> User | None:
-        user = await self.get_by_id(user_id)
-        if not user:
+    async def delete(self, usuario_id: uuid.UUID) -> Usuario | None:
+        usuario = await self.get_by_id(usuario_id)
+        if not usuario:
             return None
-        await self.db.delete(user)
-        return user
+        await self.db.delete(usuario)
+        return usuario
 
-    async def create(self, user_create: UserCreate, hashed_password: str) -> User:
-        db_user = User(
-            username=user_create.username,
-            email=user_create.email,
-            phone=user_create.phone,
+    async def create(self, data: UsuarioCreate, hashed_password: str) -> Usuario:
+        usuario = Usuario(
+            email=data.email,
+            telefono=data.telefono,
+            nombre=data.nombre,
+            apellido=data.apellido,
+            fecha_nacimiento=data.fecha_nacimiento,
+            dni=data.dni,
             hashed_password=hashed_password,
-            full_name=user_create.full_name,
-            role=user_create.role
+            role=data.role,
         )
-        self.db.add(db_user)
-        await self.db.flush()  # Flush to get DB-generated values
-        await self.db.refresh(db_user)  # Refresh to load defaults
-        return db_user
+        self.db.add(usuario)
+        await self.db.flush()
+        await self.db.refresh(usuario)
+        return usuario

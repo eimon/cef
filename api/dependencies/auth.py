@@ -8,7 +8,7 @@ from core.config import settings
 from core.database import get_db
 from core.roles import role_hierarchy
 from repositories.user_repository import UserRepository
-from models.user import User as Usuario
+from models.usuario import Usuario
 from exceptions.general import UnauthorizedException, ForbiddenException
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/login')

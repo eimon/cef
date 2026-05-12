@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from core.config import settings
 import models  # noqa: F401 — registers all ORM models before routers trigger configure_mappers()
-from routers import auth, users
+from routers import auth, usuarios
 from exceptions.handlers import register_exception_handlers
 import logging
 
@@ -14,7 +14,7 @@ app = FastAPI(
 )
 register_exception_handlers(app)
 app.include_router(auth.router)
-app.include_router(users.router)
+app.include_router(usuarios.router)
 
 @app.get("/")
 async def root():

@@ -14,7 +14,7 @@ class RefreshTokenRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create(self, user_id: uuid.UUID, device_hint: str | None = None) -> tuple[RefreshToken, str]:
+    async def create(self, usuario_id: uuid.UUID, device_hint: str | None = None) -> tuple[RefreshToken, str]:
         """Creates a new refresh token. Returns (orm_obj, raw_token_string).
         The raw token is only available at creation time — store it securely."""
         raw_token, token_hash = generate_refresh_token()
@@ -22,7 +22,7 @@ class RefreshTokenRepository:
 
         obj = RefreshToken(
             token_hash=token_hash,
-            user_id=user_id,
+            usuario_id=usuario_id,
             expires_at=expires_at,
             device_hint=device_hint,
         )
@@ -53,11 +53,11 @@ class RefreshTokenRepository:
         await self.db.refresh(old_token)
         return old_token
 
-    async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
+    async def revoke_all_for_user(self, usuario_id: uuid.UUID) -> None:
         """Revokes all active tokens for the user. Used on replay attack detection."""
         await self.db.execute(
             update(RefreshToken)
-            .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+            .where(RefreshToken.usuario_id == usuario_id, RefreshToken.revoked_at.is_(None))
             .values(revoked_at=datetime.now(timezone.utc))
         )
         await self.db.flush()

@@ -3,17 +3,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from schemas.user import UserUpdate, UserResponse
+from schemas.usuario import UsuarioUpdate, UsuarioResponse
 from services.user_service import UserService
 from core.database import get_db
 from dependencies.auth import has_role
-from models.user import User as Usuario
+from models.usuario import Usuario
 from core.roles import Role
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=List[UsuarioResponse])
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
@@ -23,29 +23,29 @@ async def list_users(
     return await UserService(db).list(skip, limit)
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/{usuario_id}", response_model=UsuarioResponse)
 async def get_user(
-    user_id: UUID,
+    usuario_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_USER_LIST)),
 ):
-    return await UserService(db).get(user_id)
+    return await UserService(db).get(usuario_id)
 
 
-@router.put("/{user_id}", response_model=UserResponse)
+@router.put("/{usuario_id}", response_model=UsuarioResponse)
 async def update_user(
-    user_id: UUID,
-    data: UserUpdate,
+    usuario_id: UUID,
+    data: UsuarioUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_USER_UPDATE)),
 ):
-    return await UserService(db).update(user_id, data)
+    return await UserService(db).update(usuario_id, data)
 
 
-@router.delete("/{user_id}", status_code=204)
+@router.delete("/{usuario_id}", status_code=204)
 async def delete_user(
-    user_id: UUID,
+    usuario_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_USER_DELETE)),
 ):
-    await UserService(db).delete(user_id, current_user.id)
+    await UserService(db).delete(usuario_id, current_user.id)

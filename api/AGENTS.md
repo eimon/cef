@@ -205,17 +205,17 @@ async def list_all(
 ```python
 class Role(str, Enum):
     ROLE_ADMIN = "ROLE_ADMIN"
-    ROLE_RECEPTION = "ROLE_RECEPTION"
+    ROLE_RECEPCION = "ROLE_RECEPCION"
     ROLE_CLIENT = "ROLE_CLIENT"
 ```
 
-Jerarquía: `ADMIN` incluye todos los permisos; `RECEPTION` incluye `ROLE_RECEPTION` y `ROLE_CLIENT`; `CLIENT` solo `ROLE_CLIENT`.
+Jerarquía: `ADMIN` incluye todos los permisos; `RECEPCION` incluye `ROLE_RECEPCION` y `ROLE_CLIENT`; `CLIENT` solo `ROLE_CLIENT`.
 
 Al agregar nuevos roles para nuevos dominios, añadirlos al enum `Role` y a `role_hierarchy` en `core/roles.py`.
 
 ## Enums de Dominio (`core/enums.py`)
 
-Actualmente definido y en uso: `UserRole` (`ADMIN`, `RECEPTION`, `CLIENT`).
+Actualmente definido y en uso: `UserRole` (`ADMIN`, `RECEPCION`, `CLIENT`).
 
 ## Seguridad (`core/security.py`)
 

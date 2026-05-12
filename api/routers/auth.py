@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, Request
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from schemas.user import UserCreate, UserResponse, Token, RefreshRequest, LogoutRequest, ChangePasswordRequest
+from schemas.usuario import UsuarioCreate, UsuarioResponse, Token, RefreshRequest, LogoutRequest, ChangePasswordRequest, LoginRequest
 from services.auth_service import AuthService
 from services.refresh_token_service import RefreshTokenService
 from core.database import get_db
 from dependencies.auth import get_current_user
-from models.user import User as Usuario
+from models.usuario import Usuario
 from core.roles import Role
 from dependencies.auth import has_role
 
@@ -19,9 +18,9 @@ def _device_hint(request: Request) -> str | None:
     return user_agent[:255] if user_agent else None
 
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", response_model=UsuarioResponse)
 async def register(
-    user_in: UserCreate,
+    user_in: UsuarioCreate,
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
@@ -32,13 +31,13 @@ async def register(
 @router.post("/login", response_model=Token)
 async def login(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    body: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """Login and get access + refresh token pair."""
     return await AuthService(db).authenticate_user(
-        form_data.username,
-        form_data.password,
+        body.email,
+        body.password,
         device_hint=_device_hint(request),
     )
 
@@ -67,7 +66,7 @@ async def logout(
     return {"detail": "Sesión cerrada"}
 
 
-@router.put("/perfil", response_model=UserResponse)
+@router.put("/perfil", response_model=UsuarioResponse)
 async def update_perfil(
     body: ChangePasswordRequest,
     db: AsyncSession = Depends(get_db),
@@ -79,7 +78,7 @@ async def update_perfil(
     )
 
 
-@router.get("/perfil", response_model=UserResponse)
+@router.get("/perfil", response_model=UsuarioResponse)
 async def perfil(current_user: Usuario = Depends(get_current_user)):
     """Get current user profile."""
     return current_user

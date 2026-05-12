@@ -2,49 +2,64 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from uuid import UUID
 from core.enums import UserRole
-from datetime import datetime
+from datetime import datetime, date
 
-# Shared properties
-class UserBase(BaseModel):
-    username: str
+
+class LoginRequest(BaseModel):
     email: EmailStr
-    phone: str
-    full_name: Optional[str] = None
-    role: str
-
-# Properties to receive via API on creation
-class UserCreate(UserBase):
     password: str
 
-# Properties to receive via API on update
-class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
+
+class UsuarioBase(BaseModel):
+    email: EmailStr
+    telefono: Optional[str] = None
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    dni: Optional[str] = None
+    role: str
+
+
+class UsuarioCreate(UsuarioBase):
+    password: str
+
+
+class UsuarioUpdate(BaseModel):
+    telefono: Optional[str] = None
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    dni: Optional[str] = None
     password: Optional[str] = None
     role: Optional[UserRole] = None
 
-# Properties to return to client
-class UserResponse(UserBase):
+
+class UsuarioResponse(UsuarioBase):
     id: UUID
-    is_active: bool
+    activo: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
 
-# Token generic response
+
 class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
 
+
 class TokenData(BaseModel):
     email: Optional[str] = None
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+
 class LogoutRequest(BaseModel):
     refresh_token: str
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

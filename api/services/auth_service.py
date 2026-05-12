@@ -1,6 +1,6 @@
 import uuid
-from models.user import User
-from schemas.user import UserCreate, Token
+from models.usuario import Usuario
+from schemas.usuario import UsuarioCreate, Token
 from repositories.user_repository import UserRepository
 from core.security import verify_password, get_password_hash
 from exceptions.general import ConflictException, UnauthorizedException, BadRequestException
@@ -13,42 +13,36 @@ class AuthService:
         self.db = db
         self.user_repo = UserRepository(db)
 
-    async def register_user(self, user_create: UserCreate) -> User:
-        """Register a new user. Business logic and validations go here."""
-        if await self.user_repo.get_by_email(user_create.email):
+    async def register_user(self, data: UsuarioCreate) -> Usuario:
+        if await self.user_repo.get_by_email(data.email):
             raise ConflictException("Email ya registrado")
-
-        hashed_password = get_password_hash(user_create.password)
-        return await self.user_repo.create(user_create, hashed_password)
+        hashed_password = get_password_hash(data.password)
+        return await self.user_repo.create(data, hashed_password)
 
     async def authenticate_user(
-        self, username: str, password: str, device_hint: str | None = None
+        self, email: str, password: str, device_hint: str | None = None
     ) -> Token:
-        """Authenticate user and return access + refresh token pair."""
-        user = await self.user_repo.get_by_username(username)
-
-        if not user or not user.hashed_password:
-            raise UnauthorizedException("Usuario o contraseña incorrectos")
-
-        if not verify_password(password, user.hashed_password):
-            raise UnauthorizedException("Usuario o contraseña incorrectos")
-
-        role = user.role.value if hasattr(user.role, "value") else user.role
+        usuario = await self.user_repo.get_by_email(email)
+        if not usuario or not usuario.hashed_password:
+            raise UnauthorizedException("Email o contraseña incorrectos")
+        if not verify_password(password, usuario.hashed_password):
+            raise UnauthorizedException("Email o contraseña incorrectos")
+        role = usuario.role.value if hasattr(usuario.role, "value") else usuario.role
         return await RefreshTokenService(self.db).create_token_pair(
-            user_id=user.id,
+            usuario_id=usuario.id,
             role=role,
             device_hint=device_hint,
         )
 
     async def change_password(
-        self, user_id: uuid.UUID, current_password: str, new_password: str
-    ) -> User:
-        user = await self.user_repo.get_by_id(user_id)
-        if not user:
+        self, usuario_id: uuid.UUID, current_password: str, new_password: str
+    ) -> Usuario:
+        usuario = await self.user_repo.get_by_id(usuario_id)
+        if not usuario:
             raise UnauthorizedException("Usuario no encontrado")
-        if not verify_password(current_password, user.hashed_password):
+        if not verify_password(current_password, usuario.hashed_password):
             raise BadRequestException("Contraseña actual incorrecta")
-        user.hashed_password = get_password_hash(new_password)
+        usuario.hashed_password = get_password_hash(new_password)
         await self.db.flush()
-        await self.db.refresh(user)
-        return user
+        await self.db.refresh(usuario)
+        return usuario

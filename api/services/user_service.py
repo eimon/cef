@@ -1,5 +1,5 @@
-from models.user import User
-from schemas.user import UserUpdate
+from models.usuario import Usuario
+from schemas.usuario import UsuarioUpdate
 from repositories.user_repository import UserRepository
 from exceptions.general import NotFoundException, BadRequestException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,25 +11,25 @@ class UserService:
         self.db = db
         self.repo = UserRepository(db)
 
-    async def list(self, skip: int = 0, limit: int = 100) -> list[User]:
+    async def list(self, skip: int = 0, limit: int = 100) -> list[Usuario]:
         return await self.repo.get_all(skip, limit)
 
-    async def get(self, user_id: uuid.UUID) -> User:
-        user = await self.repo.get_by_id(user_id)
-        if not user:
+    async def get(self, usuario_id: uuid.UUID) -> Usuario:
+        usuario = await self.repo.get_by_id(usuario_id)
+        if not usuario:
             raise NotFoundException("Usuario no encontrado")
-        return user
+        return usuario
 
-    async def update(self, user_id: uuid.UUID, data: UserUpdate) -> User:
-        user = await self.repo.update(user_id, data)
-        if not user:
+    async def update(self, usuario_id: uuid.UUID, data: UsuarioUpdate) -> Usuario:
+        usuario = await self.repo.update(usuario_id, data)
+        if not usuario:
             raise NotFoundException("Usuario no encontrado")
-        return user
+        return usuario
 
-    async def delete(self, user_id: uuid.UUID, current_user_id: uuid.UUID) -> User:
-        if user_id == current_user_id:
-            raise BadRequestException("No puedes eliminar tu propio usuario")
-        user = await self.repo.delete(user_id)
-        if not user:
+    async def delete(self, usuario_id: uuid.UUID, current_usuario_id: uuid.UUID) -> Usuario:
+        if usuario_id == current_usuario_id:
+            raise BadRequestException("No podés eliminar tu propio usuario")
+        usuario = await self.repo.delete(usuario_id)
+        if not usuario:
             raise NotFoundException("Usuario no encontrado")
-        return user
+        return usuario

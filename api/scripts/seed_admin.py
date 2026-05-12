@@ -8,29 +8,25 @@ from sqlalchemy.future import select
 from core.database import AsyncSessionLocal
 from core.enums import UserRole
 from core.security import get_password_hash
-from models.user import User
+from models.usuario import Usuario
 
 
 async def seed_admin() -> None:
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User).where(User.username == "admin"))
-        existing = result.scalars().first()
-
-        if existing:
-            print("Admin user already exists, skipping.")
+        result = await session.execute(select(Usuario).where(Usuario.email == "admin@cef.ar"))
+        if result.scalars().first():
+            print("Admin ya existe, omitiendo.")
             return
 
-        admin = User(
-            username="admin",
+        session.add(Usuario(
             email="admin@cef.ar",
-            phone="123456789",
+            telefono="1100000001",
             hashed_password=get_password_hash("admin"),
-            full_name="Administrador",
+            nombre="Administrador",
             role=UserRole.ADMIN,
-        )
-        session.add(admin)
+        ))
         await session.commit()
-        print("Admin user created successfully.")
+        print("Admin creado.")
 
 
 if __name__ == "__main__":
