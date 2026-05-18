@@ -1,7 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
-import { ClaseTemplate } from "@/types/api";
+import { ClaseTemplate, ClaseSemana } from "@/types/api";
 
 export async function getClases(): Promise<ClaseTemplate[]> {
     try {
@@ -22,5 +22,16 @@ export async function getClase(claseId: string): Promise<ClaseTemplate | null> {
     } catch (error) {
         console.error("Get Clase Error:", error);
         return null;
+    }
+}
+
+export async function getClasesSemana(fecha: string): Promise<ClaseSemana[]> {
+    try {
+        const res = await serverApi("/clases/semana", { params: { fecha } });
+        if (!res.ok) return [];
+        return res.json();
+    } catch (error) {
+        console.error("Get Clases Semana Error:", error);
+        return [];
     }
 }

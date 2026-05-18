@@ -49,3 +49,27 @@ export interface ClaseTemplate {
     created_at: string;
     updated_at: string | null;
 }
+
+export interface InstanciaSemana {
+    id: string;
+    fecha: string;
+    cancelada: boolean;
+}
+
+export interface ClaseSemana {
+    id: string;
+    nombre: string;
+    descripcion: string | null;
+    dia_semana: DiaSemana;
+    hora_inicio: string;
+    hora_fin: string;
+    capacidad_maxima: number;
+    precio_individual: number;
+    precio_suscripcion: number;
+    profesor_id: string | null;
+    sala_id: string | null;
+    profesor_nombre: string | null;
+    sala_nombre: string | null;
+    fecha_en_semana: string;
+    instancia: InstanciaSemana | null;
+}
