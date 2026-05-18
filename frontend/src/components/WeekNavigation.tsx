@@ -58,18 +58,18 @@ export default function WeekNavigation({ monday }: { monday: string }) {
             <button
                 type="button"
                 onClick={() => navigate(addDays(monday, -7))}
-                className="p-2 rounded-lg text-white/50 hover:text-white/90 hover:bg-white/[0.06] transition-all"
+                className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
                 aria-label="Semana anterior"
             >
                 <ChevronLeft size={18} />
             </button>
 
             <div className="flex flex-col items-center min-w-[200px]">
-                <span className="text-sm font-medium text-white/80 capitalize leading-tight">
+                <span className="text-sm font-medium text-slate-700 capitalize leading-tight">
                     {formatWeekRange(monday)}
                 </span>
                 {isCurrentWeek && (
-                    <span className="text-[10px] font-semibold text-cef-primary/80 uppercase tracking-wider mt-0.5">
+                    <span className="text-[10px] font-semibold text-cef-primary uppercase tracking-wider mt-0.5">
                         Semana actual
                     </span>
                 )}
@@ -78,7 +78,7 @@ export default function WeekNavigation({ monday }: { monday: string }) {
             <button
                 type="button"
                 onClick={() => navigate(addDays(monday, 7))}
-                className="p-2 rounded-lg text-white/50 hover:text-white/90 hover:bg-white/[0.06] transition-all"
+                className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
                 aria-label="Semana siguiente"
             >
                 <ChevronRight size={18} />
@@ -88,7 +88,7 @@ export default function WeekNavigation({ monday }: { monday: string }) {
                 <button
                     type="button"
                     onClick={() => navigate(currentMonday)}
-                    className="ml-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.05] border border-white/[0.07] transition-all"
+                    className="ml-1 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition-all"
                 >
                     Hoy
                 </button>

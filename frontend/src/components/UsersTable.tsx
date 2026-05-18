@@ -13,9 +13,9 @@ interface UsersTableProps {
 }
 
 const roleBadgeClass: Record<string, string> = {
-    [UserRole.ADMIN]: "bg-cef-danger/12 text-cef-danger",
-    [UserRole.RECEPCION]: "bg-cef-primary/12 text-cef-primary",
-    [UserRole.CLIENTE]: "bg-cef-success/12 text-cef-success",
+    [UserRole.ADMIN]: "bg-cef-danger/10 text-cef-danger",
+    [UserRole.RECEPCION]: "bg-cef-primary/10 text-cef-primary",
+    [UserRole.CLIENTE]: "bg-cef-success/10 text-cef-success",
 };
 
 const roleLabels: Record<string, string> = {
@@ -49,7 +49,7 @@ function UserCardMenu({
         <button
             onClick={() => { setOpen(false); onClick(); }}
             disabled={disabled}
-            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-white/[0.06] transition-colors disabled:opacity-40 ${className}`}
+            className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left hover:bg-slate-100 transition-colors disabled:opacity-40 ${className}`}
         >
             {label}
         </button>
@@ -59,15 +59,15 @@ function UserCardMenu({
         <div ref={ref} className="relative">
             <button
                 onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-                className="p-1.5 text-white/40 hover:text-white/70 hover:bg-white/[0.06] rounded-lg transition-colors"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
                 {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical size={16} />}
             </button>
 
             {open && (
-                <div className="absolute right-0 top-8 z-30 w-40 glass-modal rounded-xl shadow-2xl border border-white/[0.08] overflow-hidden py-1">
-                    {item("Editar", onEdit, "text-cef-primary/80")}
-                    {item("Eliminar", onDelete, "text-cef-danger/80", isDeleting)}
+                <div className="absolute right-0 top-8 z-30 w-40 glass-modal rounded-xl overflow-hidden py-1">
+                    {item("Editar", onEdit, "text-cef-primary")}
+                    {item("Eliminar", onDelete, "text-cef-danger", isDeleting)}
                 </div>
             )}
         </div>
@@ -92,8 +92,8 @@ export default function UsersTable({ users }: UsersTableProps) {
 
     if (users.length === 0) {
         return (
-            <div className="text-center py-12 glass rounded-xl border-dashed border border-white/[0.08]">
-                <p className="text-white/35 text-sm">No se encontraron usuarios.</p>
+            <div className="text-center py-12 glass rounded-xl border-dashed">
+                <p className="text-slate-400 text-sm">No se encontraron usuarios.</p>
             </div>
         );
     }
@@ -107,15 +107,15 @@ export default function UsersTable({ users }: UsersTableProps) {
                         {/* Row 1: name + badges + menu */}
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center flex-wrap gap-1.5 min-w-0">
-                                <span className="text-sm font-semibold text-white/85">
+                                <span className="text-sm font-semibold text-slate-700">
                                     {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-white/[0.06] text-white/45"}`}>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
                                     {roleLabels[user.role] ?? user.role}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${user.activo
-                                    ? "bg-cef-success/12 text-cef-success"
-                                    : "bg-white/[0.05] text-white/35"
+                                    ? "bg-cef-success/10 text-cef-success"
+                                    : "bg-slate-100 text-slate-400"
                                     }`}>
                                     {user.activo ? "Activo" : "Inactivo"}
                                 </span>
@@ -128,11 +128,11 @@ export default function UsersTable({ users }: UsersTableProps) {
                         </div>
 
                         {/* Row 2: email + telefono */}
-                        <div className="flex items-center gap-3 text-xs text-white/40">
+                        <div className="flex items-center gap-3 text-xs text-slate-400">
                             <span>{user.email}</span>
                             {user.telefono && (
                                 <>
-                                    <span className="text-white/20">·</span>
+                                    <span className="text-slate-200">·</span>
                                     <span>{user.telefono}</span>
                                 </>
                             )}
@@ -144,50 +144,50 @@ export default function UsersTable({ users }: UsersTableProps) {
             {/* ── Desktop: table ── */}
             <div className="hidden md:block glass rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-white/[0.06]">
-                        <thead className="bg-white/[0.03]">
+                    <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50">
                             <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Nombre
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Email
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Teléfono
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Rol
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white/35 uppercase tracking-wider">
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Estado
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-white/35 uppercase tracking-wider">
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Acciones
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/[0.05]">
+                        <tbody className="divide-y divide-slate-100">
                             {users.map((user) => (
-                                <tr key={user.id} className="hover:bg-white/[0.03] transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white/80">
+                                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
                                         {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white/50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.email}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white/50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.telefono || "—"}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-white/[0.06] text-white/45"}`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
                                             {roleLabels[user.role] ?? user.role}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.activo
-                                            ? "bg-cef-success/12 text-cef-success"
-                                            : "bg-white/[0.05] text-white/35"
+                                            ? "bg-cef-success/10 text-cef-success"
+                                            : "bg-slate-100 text-slate-400"
                                             }`}>
                                             {user.activo ? "Activo" : "Inactivo"}
                                         </span>

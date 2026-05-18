@@ -3,29 +3,34 @@
 import { useActionState } from "react";
 import { login, LoginState } from "@/actions/auth";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
     const initialState: LoginState = { error: "", success: false };
     const [state, formAction, isPending] = useActionState(login, initialState);
 
     return (
-        <div className="flex items-center justify-center min-h-screen p-4">
-            <div className="w-full max-w-md glass-modal rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-center min-h-screen p-4 bg-slate-50">
+            <div className="w-full max-w-md glass-modal rounded-2xl overflow-hidden">
                 <div className="p-8">
                     <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-cef-primary/15 text-cef-primary mb-4">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                                <polyline points="9 22 9 12 15 12 15 22" />
-                            </svg>
+                        <div className="flex justify-center mb-5">
+                            <div className="relative h-14 w-64">
+                                <Image
+                                    src="/Logo_horizontal.png"
+                                    alt="CEF"
+                                    fill
+                                    className="object-contain"
+                                    priority
+                                />
+                            </div>
                         </div>
-                        <h1 className="text-2xl font-bold text-white/90 mb-1 tracking-tight">CEF</h1>
-                        <p className="text-white/45 text-sm">Ingresá con tu cuenta</p>
+                        <p className="text-slate-400 text-sm">Ingresá con tu cuenta</p>
                     </div>
 
                     <form action={formAction} className="space-y-5">
                         {state?.error && (
-                            <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger/90 p-3 rounded-lg text-sm text-center">
+                            <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm text-center">
                                 {state.error}
                             </div>
                         )}
@@ -33,7 +38,7 @@ export default function LoginPage() {
                         <div>
                             <label
                                 htmlFor="email"
-                                className="block text-xs font-medium text-white/55 mb-1.5 uppercase tracking-wider"
+                                className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider"
                             >
                                 Email
                             </label>
@@ -42,7 +47,7 @@ export default function LoginPage() {
                                 name="email"
                                 type="email"
                                 required
-                                className="w-full px-4 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.10] text-white/90 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
+                                className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
                                 placeholder="correo@ejemplo.com"
                             />
                         </div>
@@ -50,7 +55,7 @@ export default function LoginPage() {
                         <div>
                             <label
                                 htmlFor="password"
-                                className="block text-xs font-medium text-white/55 mb-1.5 uppercase tracking-wider"
+                                className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider"
                             >
                                 Contraseña
                             </label>
@@ -59,7 +64,7 @@ export default function LoginPage() {
                                 name="password"
                                 type="password"
                                 required
-                                className="w-full px-4 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.10] text-white/90 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
+                                className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
                                 placeholder="••••••••"
                             />
                         </div>
@@ -81,10 +86,10 @@ export default function LoginPage() {
                     </form>
                 </div>
 
-                <div className="bg-white/[0.02] border-t border-white/[0.06] px-8 py-4 text-center">
-                    <p className="text-xs text-white/35">
+                <div className="bg-slate-50 border-t border-slate-200 px-8 py-4 text-center">
+                    <p className="text-xs text-slate-400">
                         ¿No tenés cuenta?{" "}
-                        <span className="text-cef-primary/80 font-medium">
+                        <span className="text-cef-primary font-medium">
                             Contactá al administrador
                         </span>
                     </p>

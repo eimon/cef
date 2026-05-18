@@ -27,43 +27,43 @@ export default async function ProfilePage() {
 
     return (
         <div className="space-y-6 max-w-2xl">
-            <h1 className="text-2xl font-bold text-white/90">Perfil</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Perfil</h1>
 
             <div className="glass rounded-2xl p-6 space-y-4">
-                <div className="flex items-center gap-3 pb-4 border-b border-white/[0.08]">
-                    <div className="w-12 h-12 rounded-full bg-cef-primary/20 flex items-center justify-center">
+                <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                    <div className="w-12 h-12 rounded-full bg-cef-primary/10 flex items-center justify-center">
                         <User size={22} className="text-cef-primary" />
                     </div>
                     <div>
-                        <p className="text-white/90 font-semibold text-lg">
+                        <p className="text-slate-800 font-semibold text-lg">
                             {[profile?.nombre, profile?.apellido].filter(Boolean).join(" ") || "—"}
                         </p>
-                        <p className="text-white/40 text-sm">{profile?.email}</p>
+                        <p className="text-slate-400 text-sm">{profile?.email}</p>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
-                        <Mail size={15} className="text-white/30 shrink-0" />
+                        <Mail size={15} className="text-slate-300 shrink-0" />
                         <div>
-                            <p className="text-xs text-white/40 uppercase tracking-wider">Email</p>
-                            <p className="text-white/80 text-sm">{profile?.email ?? "—"}</p>
+                            <p className="text-xs text-slate-400 uppercase tracking-wider">Email</p>
+                            <p className="text-slate-700 text-sm">{profile?.email ?? "—"}</p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Shield size={15} className="text-white/30 shrink-0" />
+                        <Shield size={15} className="text-slate-300 shrink-0" />
                         <div>
-                            <p className="text-xs text-white/40 uppercase tracking-wider">Rol</p>
-                            <p className="text-white/80 text-sm capitalize">{profile?.role ?? "—"}</p>
+                            <p className="text-xs text-slate-400 uppercase tracking-wider">Rol</p>
+                            <p className="text-slate-700 text-sm capitalize">{profile?.role ?? "—"}</p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <Calendar size={15} className="text-white/30 shrink-0" />
+                        <Calendar size={15} className="text-slate-300 shrink-0" />
                         <div>
-                            <p className="text-xs text-white/40 uppercase tracking-wider">Miembro desde</p>
-                            <p className="text-white/80 text-sm">
+                            <p className="text-xs text-slate-400 uppercase tracking-wider">Miembro desde</p>
+                            <p className="text-slate-700 text-sm">
                                 {profile?.created_at
                                     ? new Date(profile.created_at).toLocaleDateString()
                                     : "—"}
@@ -74,7 +74,7 @@ export default async function ProfilePage() {
             </div>
 
             <div className="glass rounded-2xl p-6 space-y-4">
-                <h2 className="text-base font-semibold text-white/80">Cambiar contraseña</h2>
+                <h2 className="text-base font-semibold text-slate-700">Cambiar contraseña</h2>
                 <ChangePasswordForm />
             </div>
         </div>

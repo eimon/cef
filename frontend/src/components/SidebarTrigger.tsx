@@ -10,7 +10,7 @@ export default function SidebarTrigger() {
         <button
             type="button"
             onClick={toggle}
-            className="p-2 rounded-lg text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors lg:hidden"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors lg:hidden"
             aria-label="Abrir menú"
         >
             <Menu size={20} />

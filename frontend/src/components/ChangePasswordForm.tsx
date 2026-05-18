@@ -5,8 +5,8 @@ import { changePassword, ChangePasswordState } from "@/actions/profile";
 import { Loader2, CheckCircle } from "lucide-react";
 
 const inputCls =
-    "w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.10] text-white/90 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
-const labelCls = "block text-xs font-medium text-white/55 mb-1.5 uppercase tracking-wider";
+    "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
+const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
 export default function ChangePasswordForm() {
     const initialState: ChangePasswordState = {};
@@ -18,13 +18,13 @@ export default function ChangePasswordForm() {
     return (
         <form action={formAction} className="space-y-4">
             {errorMessage && (
-                <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger/90 p-3 rounded-lg text-sm">
+                <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
                     {errorMessage}
                 </div>
             )}
 
             {state.success && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-lg text-sm flex items-center gap-2">
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-lg text-sm flex items-center gap-2">
                     <CheckCircle size={15} />
                     Contraseña actualizada correctamente
                 </div>

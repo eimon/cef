@@ -4,6 +4,7 @@ import { User } from "@/types/api";
 import { User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 import { logout } from "@/actions/auth";
 import Link from "next/link";
+import Image from "next/image";
 
 export default async function Navbar() {
     let user: User | null = null;
@@ -18,7 +19,7 @@ export default async function Navbar() {
     }
 
     return (
-        <nav className="bg-[#06090f]/80 backdrop-blur-2xl border-b border-white/[0.08] sticky top-0 z-50">
+        <nav className="bg-white/95 backdrop-blur-xl border-b border-slate-200 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
 
@@ -26,8 +27,14 @@ export default async function Navbar() {
                     <div className="flex items-center">
                         <SidebarTrigger />
                         <div className="flex-shrink-0 flex items-center ml-4 lg:ml-0">
-                            <Link href="/" className="text-xl font-bold text-cef-primary tracking-tight">
-                                CEF
+                            <Link href="/" className="relative h-9 w-44 block">
+                                <Image
+                                    src="/Logo_horizontal.png"
+                                    alt="CEF"
+                                    fill
+                                    className="object-contain object-left"
+                                    priority
+                                />
                             </Link>
                         </div>
                     </div>
@@ -38,27 +45,27 @@ export default async function Navbar() {
                         {user ? (
                             <div className="relative flex items-center space-x-3">
                                 <div className="hidden md:flex flex-col items-end">
-                                    <span className="text-sm font-medium text-white/85">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</span>
-                                    <span className="text-xs text-white/40 capitalize">{user.role.toLowerCase()}</span>
+                                    <span className="text-sm font-medium text-slate-700">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</span>
+                                    <span className="text-xs text-slate-400 capitalize">{user.role.toLowerCase()}</span>
                                 </div>
 
                                 <div className="relative group">
-                                    <button className="flex items-center space-x-2 p-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.10] transition-colors">
-                                        <div className="h-8 w-8 rounded-lg bg-cef-primary/15 flex items-center justify-center text-cef-primary">
+                                    <button className="flex items-center space-x-2 p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
+                                        <div className="h-8 w-8 rounded-lg bg-cef-primary/10 flex items-center justify-center text-cef-primary">
                                             <UserIcon size={16} />
                                         </div>
-                                        <ChevronDown size={13} className="text-white/40" />
+                                        <ChevronDown size={13} className="text-slate-400" />
                                     </button>
 
                                     <div className="absolute right-0 mt-2 w-48 glass-modal rounded-xl shadow-2xl py-1 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 origin-top-right">
-                                        <div className="px-4 py-3 border-b border-white/[0.08] md:hidden">
-                                            <p className="text-sm font-medium text-white/85">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</p>
-                                            <p className="text-xs text-white/40">{user.email}</p>
+                                        <div className="px-4 py-3 border-b border-slate-200 md:hidden">
+                                            <p className="text-sm font-medium text-slate-700">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</p>
+                                            <p className="text-xs text-slate-400">{user.email}</p>
                                         </div>
 
                                         <Link
                                             href="/profile"
-                                            className="block px-4 py-2 text-sm text-white/65 hover:bg-white/[0.06] hover:text-white/90 transition-colors"
+                                            className="block px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
                                         >
                                             Mi Perfil
                                         </Link>
@@ -66,7 +73,7 @@ export default async function Navbar() {
                                         <form action={logout} className="w-full">
                                             <button
                                                 type="submit"
-                                                className="w-full text-left px-4 py-2 text-sm text-cef-danger/75 hover:bg-cef-danger/[0.08] hover:text-cef-danger flex items-center transition-colors"
+                                                className="w-full text-left px-4 py-2 text-sm text-cef-danger/80 hover:bg-cef-danger/5 hover:text-cef-danger flex items-center transition-colors"
                                             >
                                                 <LogOut size={14} className="mr-2" />
                                                 Cerrar Sesión
@@ -76,7 +83,7 @@ export default async function Navbar() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-sm text-white/40">Iniciar Sesión</div>
+                            <div className="text-sm text-slate-400">Iniciar Sesión</div>
                         )}
                     </div>
 
