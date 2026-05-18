@@ -43,10 +43,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                     {toasts.map((toast) => (
                         <div
                             key={toast.id}
-                            className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm min-w-72 max-w-sm pointer-events-auto animate-in slide-in-from-bottom-2 duration-200 backdrop-blur-xl ${
+                            className={`flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm min-w-72 max-w-sm pointer-events-auto animate-in slide-in-from-bottom-2 duration-200 ${
                                 toast.type === "error"
-                                    ? "bg-cef-base/90 border-cef-danger/30 text-white/85"
-                                    : "bg-cef-base/90 border-cef-success/30 text-white/85"
+                                    ? "bg-slate-800 border-cef-danger/40 text-white/90"
+                                    : "bg-slate-800 border-cef-success/40 text-white/90"
                             }`}
                         >
                             {toast.type === "error" ? (
@@ -57,7 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                             <span className="flex-1">{toast.message}</span>
                             <button
                                 onClick={() => dismiss(toast.id)}
-                                className="text-white/30 hover:text-white/60 transition-colors shrink-0"
+                                className="text-white/40 hover:text-white/70 transition-colors shrink-0"
                             >
                                 <X size={14} />
                             </button>

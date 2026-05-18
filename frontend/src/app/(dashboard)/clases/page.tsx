@@ -26,8 +26,8 @@ export default async function ClasesPage({
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white/90 tracking-tight">Clases</h1>
-                    <p className="text-sm text-white/40 mt-1">Consultá horarios y cupos de cada clase.</p>
+                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Clases</h1>
+                    <p className="text-sm text-slate-400 mt-1">Consultá horarios y cupos de cada clase.</p>
                 </div>
                 <WeekNavigation monday={monday} />
             </div>
