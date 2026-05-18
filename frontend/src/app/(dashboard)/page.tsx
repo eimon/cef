@@ -1,6 +1,6 @@
 import { serverApi } from "@/lib/server-api";
 import { User } from "@/types/api";
-import { Users, LayoutDashboard } from "lucide-react";
+import { Users, LayoutDashboard, BookOpen } from "lucide-react";
 import Link from "next/link";
 
 export default async function DashboardHome() {
@@ -38,13 +38,13 @@ export default async function DashboardHome() {
                     <p className="text-sm text-white/40 mt-2">Administra los usuarios del sistema, sus roles y accesos.</p>
                 </Link>
 
-                <div className="glass rounded-2xl p-6 border border-white/[0.05] opacity-60">
-                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-4">
-                        <LayoutDashboard className="text-white/40" size={24} />
+                <Link href="/clases" className="glass rounded-2xl p-6 hover:bg-white/[0.07] transition-all group border border-white/[0.05]">
+                    <div className="w-12 h-12 rounded-xl bg-cef-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <BookOpen className="text-cef-primary" size={24} />
                     </div>
-                    <h3 className="text-lg font-semibold text-white/60">Configuración</h3>
-                    <p className="text-sm text-white/40 mt-2">Próximamente: Ajustes generales del sistema.</p>
-                </div>
+                    <h3 className="text-lg font-semibold text-white/90">Clases del Gimnasio</h3>
+                    <p className="text-sm text-white/40 mt-2">Consultá horarios, cupos y detalles de cada clase.</p>
+                </Link>
             </div>
 
         </div>
