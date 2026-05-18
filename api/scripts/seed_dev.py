@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.future import select
 from core.database import AsyncSessionLocal
-from core.enums import UserRole, DiaSemana
+from core.enums import UserRole, DiaSemana, Disciplina
 from core.security import get_password_hash
 from models.usuario import Usuario
 from models.profesor import Profesor
@@ -105,6 +105,7 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
         {
             "nombre": "Yoga",
             "descripcion": "Clase de yoga para todos los niveles",
+            "disciplina": Disciplina.YOGA,
             "dia_semana": DiaSemana.LUNES,
             "hora_inicio": time(9, 0),
             "hora_fin": time(10, 0),
@@ -115,6 +116,7 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
         {
             "nombre": "Funcional",
             "descripcion": "Entrenamiento funcional de alta intensidad",
+            "disciplina": Disciplina.FUNCIONAL,
             "dia_semana": DiaSemana.MIERCOLES,
             "hora_inicio": time(18, 0),
             "hora_fin": time(19, 0),
@@ -125,6 +127,7 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
         {
             "nombre": "Pilates",
             "descripcion": "Pilates mat para fortalecimiento y flexibilidad",
+            "disciplina": Disciplina.PILATES,
             "dia_semana": DiaSemana.VIERNES,
             "hora_inicio": time(10, 0),
             "hora_fin": time(11, 0),
@@ -141,7 +144,11 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
             )
         )).scalars().first()
         if existe:
-            print(f"  [skip] clase '{data['nombre']}'")
+            if existe.disciplina != data["disciplina"]:
+                existe.disciplina = data["disciplina"]
+                print(f"  [upd]  clase '{data['nombre']}' — disciplina actualizada")
+            else:
+                print(f"  [skip] clase '{data['nombre']}'")
             continue
         session.add(ClaseTemplate(profesor_id=profesor.id, sala_id=sala.id, **data))
         print(f"  [ok]   clase '{data['nombre']}'")

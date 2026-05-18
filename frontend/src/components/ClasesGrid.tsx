@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Clock, CalendarDays } from "lucide-react";
-import { ClaseSemana, DiaSemana } from "@/types/api";
+import { ClaseSemana, DiaSemana, Disciplina } from "@/types/api";
 import ClaseDetailDialog from "@/components/ClaseDetailDialog";
 
 const DIA_LABELS: Record<string, string> = {
@@ -23,6 +23,12 @@ const DIA_COLORS: Record<string, string> = {
     viernes: "from-rose-500/30 via-rose-500/10 to-transparent",
     sabado: "from-violet-500/30 via-violet-500/10 to-transparent",
     domingo: "from-slate-500/30 via-slate-500/10 to-transparent",
+};
+
+const DISCIPLINA_LABELS: Record<Disciplina, string> = {
+    [Disciplina.YOGA]: "Yoga",
+    [Disciplina.PILATES]: "Pilates",
+    [Disciplina.FUNCIONAL]: "Funcional",
 };
 
 const DIAS_ORDER: DiaSemana[] = [
@@ -46,6 +52,10 @@ function formatFechaCorta(fechaStr: string): string {
 
 export default function ClasesGrid({ clases }: { clases: ClaseSemana[] }) {
     const [selectedClase, setSelectedClase] = useState<ClaseSemana | null>(null);
+    const [filtro, setFiltro] = useState<Disciplina | null>(null);
+
+    const disciplinas = Array.from(new Set(clases.map((c) => c.disciplina))) as Disciplina[];
+    const clasesFiltradas = filtro ? clases.filter((c) => c.disciplina === filtro) : clases;
 
     if (clases.length === 0) {
         return (
@@ -57,9 +67,39 @@ export default function ClasesGrid({ clases }: { clases: ClaseSemana[] }) {
 
     return (
         <>
+            {disciplinas.length > 1 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => setFiltro(null)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                            filtro === null
+                                ? "bg-cef-primary/20 text-cef-primary border border-cef-primary/30"
+                                : "bg-white/[0.04] text-white/50 border border-white/[0.07] hover:text-white/80 hover:bg-white/[0.07]"
+                        }`}
+                    >
+                        Todas
+                    </button>
+                    {disciplinas.map((d) => (
+                        <button
+                            key={d}
+                            type="button"
+                            onClick={() => setFiltro(filtro === d ? null : d)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                                filtro === d
+                                    ? "bg-cef-primary/20 text-cef-primary border border-cef-primary/30"
+                                    : "bg-white/[0.04] text-white/50 border border-white/[0.07] hover:text-white/80 hover:bg-white/[0.07]"
+                            }`}
+                        >
+                            {DISCIPLINA_LABELS[d]}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="space-y-10">
                 {DIAS_ORDER.map((dia) => {
-                    const clasesDelDia = clases.filter((c) => c.dia_semana === dia);
+                    const clasesDelDia = clasesFiltradas.filter((c) => c.dia_semana === dia);
                     if (clasesDelDia.length === 0) return null;
 
                     const accentBg = DIA_COLORS[dia] ?? "from-white/10 to-transparent";
