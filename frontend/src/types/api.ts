@@ -21,6 +21,12 @@ export interface AuthResponse {
     token_type: string;
 }
 
+export enum Disciplina {
+    YOGA = "yoga",
+    PILATES = "pilates",
+    FUNCIONAL = "funcional",
+}
+
 export enum DiaSemana {
     LUNES = "lunes",
     MARTES = "martes",
@@ -35,6 +41,7 @@ export interface ClaseTemplate {
     id: string;
     nombre: string;
     descripcion: string | null;
+    disciplina: Disciplina;
     dia_semana: DiaSemana;
     hora_inicio: string;
     hora_fin: string;
@@ -60,6 +67,7 @@ export interface ClaseSemana {
     id: string;
     nombre: string;
     descripcion: string | null;
+    disciplina: Disciplina;
     dia_semana: DiaSemana;
     hora_inicio: string;
     hora_fin: string;
