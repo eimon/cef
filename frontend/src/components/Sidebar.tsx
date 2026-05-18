@@ -1,12 +1,13 @@
 "use client";
 
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, Users, LogOut, UserCog } from "lucide-react";
+import { X, Home, Users, LogOut, UserCog, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
 
 const navigation = [
+    { name: "Clases", href: "/clases", icon: BookOpen, adminOnly: false },
     { name: "Usuarios", href: "/users", icon: UserCog, adminOnly: true },
 ];
 
