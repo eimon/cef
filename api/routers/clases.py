@@ -1,15 +1,27 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
 from schemas.clase_template import ClaseTemplateResponse
+from schemas.clase_semana import ClaseSemanaResponse
 from services.clase_template_service import ClaseTemplateService
 from core.database import get_db
 from dependencies.auth import get_current_user
 from models.usuario import Usuario
 
 router = APIRouter(prefix="/clases", tags=["clases"])
+
+
+@router.get("/semana", response_model=List[ClaseSemanaResponse])
+async def get_clases_semana(
+    fecha: date = Query(..., description="Cualquier fecha dentro de la semana (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await ClaseTemplateService(db).get_semana(fecha)
 
 
 @router.get("/", response_model=List[ClaseTemplateResponse])
@@ -19,7 +31,7 @@ async def list_clases(
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    return await ClaseTemplateService(db).list(skip, limit)
+    return await ClaseTemplateService(db).list_all(skip, limit)
 
 
 @router.get("/{clase_id}", response_model=ClaseTemplateResponse)
