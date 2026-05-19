@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getClasesSemana } from "@/actions/clases";
 import ClasesGrid from "@/components/ClasesGrid";
 import WeekNavigation from "@/components/WeekNavigation";
+import { getUserRole } from "@/lib/auth";
 
 function getMonday(dateStr?: string): string {
     const date = dateStr ? new Date(dateStr + "T12:00:00") : new Date();
@@ -23,7 +24,10 @@ export default async function ClasesPage({
     const monday = getMonday(fecha);
     const currentMonday = getMonday();
     if (monday < currentMonday) redirect("/clases");
-    const clases = await getClasesSemana(monday);
+    const [clases, userRole] = await Promise.all([
+        getClasesSemana(monday),
+        getUserRole(),
+    ]);
 
     return (
         <div className="space-y-6">
@@ -35,7 +39,7 @@ export default async function ClasesPage({
                 <WeekNavigation monday={monday} />
             </div>
 
-            <ClasesGrid clases={clases} />
+            <ClasesGrid clases={clases} userRole={userRole} />
         </div>
     );
 }
