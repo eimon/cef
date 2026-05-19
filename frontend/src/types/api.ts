@@ -63,6 +63,13 @@ export interface InstanciaSemana {
     cancelada: boolean;
 }
 
+export interface InscripcionResponse {
+    asistencia_id: string;
+    pago_id: string;
+    monto: number;
+    clase_instancia_id: string;
+}
+
 export interface ClaseSemana {
     id: string;
     nombre: string;
