@@ -8,6 +8,8 @@ from repositories.inscripcion_repository import InscripcionRepository
 from schemas.inscripcion import InscripcionIndividualCreate, InscripcionResponse
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
+from models.clase_instancia import ClaseInstancia
+from models.clase_template import ClaseTemplate
 
 
 class InscripcionService:
@@ -15,39 +17,46 @@ class InscripcionService:
         self.db = db
         self.repo = InscripcionRepository(db)
 
-    async def _validar_elegibilidad(self, current_user: Usuario, instancia_id: uuid.UUID) -> tuple:
-        """Validates all conditions for individual enrollment. Returns (instancia, template).
-        Raises domain exceptions on failure."""
-        instancia = await self.repo.get_instancia_with_template(instancia_id)
-        if not instancia:
+    async def _validar_elegibilidad(
+        self, current_user: Usuario, clase_template_id: uuid.UUID, fecha: date
+    ) -> tuple[ClaseInstancia | None, ClaseTemplate]:
+        """Validates all conditions for individual enrollment. Returns (instancia_or_None, template).
+        Instancia may be None if it doesn't exist yet (created during payment)."""
+        template = await self.repo.get_template(clase_template_id)
+        if not template:
             raise NotFoundException("Clase no encontrada")
 
-        if instancia.cancelada:
-            raise BadRequestException("Esta clase fue cancelada y no acepta inscripciones")
-
-        if instancia.fecha <= date.today():
+        if fecha <= date.today():
             raise BadRequestException("Solo podés inscribirte a clases futuras")
 
-        if await self.repo.has_existing_enrollment(current_user.id, instancia_id):
-            raise ConflictException("Ya estás inscripto en esta clase")
+        instancia = await self.repo.get_instancia(clase_template_id, fecha)
 
-        cupo_disponible = instancia.cupo_oculto - await self.repo.count_individual_asistencias(instancia_id)
-        if cupo_disponible <= 0:
-            raise BadRequestException("No hay cupo disponible para inscripción individual en esta clase")
+        if instancia:
+            if instancia.cancelada:
+                raise BadRequestException("Esta clase fue cancelada y no acepta inscripciones")
 
-        if await self.repo.has_active_suscripcion(current_user.id, instancia.fecha):
+            if await self.repo.has_existing_enrollment(current_user.id, instancia.id):
+                raise ConflictException("Ya estás inscripto en esta clase")
+
+            if instancia.cupo <= 0:
+                raise BadRequestException("No hay cupo disponible para inscripción individual en esta clase")
+        else:
+            cupo_reservado = await self.repo.count_active_suscripciones(clase_template_id, fecha)
+            if template.capacidad_maxima - cupo_reservado <= 0:
+                raise BadRequestException("No hay cupo disponible para inscripción individual en esta clase")
+
+        if await self.repo.has_active_suscripcion(current_user.id, clase_template_id, fecha):
             raise ConflictException(
-                "Tenés una suscripción activa que ya cubre esta fecha. "
+                "Tenés una suscripción activa para esta clase. "
                 "No es necesario inscribirte individualmente."
             )
 
-        template = instancia.clase_template
         if await self.repo.has_schedule_conflict(
             current_user.id,
-            instancia.fecha,
+            fecha,
             template.hora_inicio,
             template.hora_fin,
-            exclude_instancia_id=instancia_id,
+            exclude_instancia_id=instancia.id if instancia else None,
         ):
             raise ConflictException(
                 "Ya tenés otra inscripción en el mismo horario para esta fecha"
@@ -55,17 +64,20 @@ class InscripcionService:
 
         return instancia, template
 
-    async def check_elegibilidad(self, current_user: Usuario, instancia_id: uuid.UUID) -> None:
-        """Validates enrollment conditions without creating anything."""
-        await self._validar_elegibilidad(current_user, instancia_id)
+    async def check_elegibilidad(
+        self, current_user: Usuario, clase_template_id: uuid.UUID, fecha: date
+    ) -> None:
+        await self._validar_elegibilidad(current_user, clase_template_id, fecha)
 
     async def inscribir_individual(
         self,
         current_user: Usuario,
         data: InscripcionIndividualCreate,
     ) -> InscripcionResponse:
-        instancia_id = uuid.UUID(str(data.clase_instancia_id))
-        instancia, template = await self._validar_elegibilidad(current_user, instancia_id)
+        clase_template_id = uuid.UUID(str(data.clase_template_id))
+        fecha = data.fecha
+
+        instancia, template = await self._validar_elegibilidad(current_user, clase_template_id, fecha)
 
         precio = Decimal(str(template.precio_individual))
         monto_minimo = precio / 2
@@ -79,13 +91,18 @@ class InscripcionService:
                 f"El monto no puede superar el precio de la clase: ${float(precio):.2f}"
             )
 
+        if instancia is None:
+            cupo_reservado = await self.repo.count_active_suscripciones(clase_template_id, fecha)
+            cupo_disponible = template.capacidad_maxima - cupo_reservado
+            instancia = await self.repo.get_or_create_instancia(clase_template_id, fecha, cupo_disponible)
+
         asistencia, pago = await self.repo.create_inscripcion_individual(
-            current_user.id, instancia_id, data.monto
+            current_user.id, instancia, data.monto
         )
 
         return InscripcionResponse(
             asistencia_id=asistencia.id,
             pago_id=pago.id,
             monto=float(pago.monto),
-            clase_instancia_id=instancia_id,
+            clase_instancia_id=instancia.id,
         )

@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -14,11 +15,12 @@ router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
 
 @router.get("/individual/check", status_code=200)
 async def check_elegibilidad_individual(
-    clase_instancia_id: UUID = Query(...),
+    clase_template_id: UUID = Query(...),
+    fecha: date = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    await InscripcionService(db).check_elegibilidad(current_user, clase_instancia_id)
+    await InscripcionService(db).check_elegibilidad(current_user, clase_template_id, fecha)
     return {"elegible": True}
 
 

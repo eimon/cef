@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getClasesSemana } from "@/actions/clases";
 import ClasesGrid from "@/components/ClasesGrid";
 import WeekNavigation from "@/components/WeekNavigation";
@@ -20,6 +21,8 @@ export default async function ClasesPage({
 }) {
     const { fecha } = await searchParams;
     const monday = getMonday(fecha);
+    const currentMonday = getMonday();
+    if (monday < currentMonday) redirect("/clases");
     const clases = await getClasesSemana(monday);
 
     return (

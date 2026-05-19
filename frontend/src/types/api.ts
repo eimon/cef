@@ -61,6 +61,7 @@ export interface InstanciaSemana {
     id: string;
     fecha: string;
     cancelada: boolean;
+    cupo: number;
 }
 
 export interface InscripcionResponse {
@@ -68,6 +69,50 @@ export interface InscripcionResponse {
     pago_id: string;
     monto: number;
     clase_instancia_id: string;
+}
+
+export enum EstadoPago {
+    PENDIENTE = "pendiente",
+    PAGADO = "pagado",
+    ANULADO = "anulado",
+}
+
+export interface MiClaseIndividual {
+    asistencia_id: string;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    profesor_nombre: string | null;
+    sala_nombre: string | null;
+    monto_pagado: number | null;
+    estado_pago: EstadoPago | null;
+    asistio: boolean;
+    cancelo: boolean;
+}
+
+export interface InstanciaEnSuscripcion {
+    instancia_id: string;
+    fecha: string;
+    cancelada: boolean;
+}
+
+export interface MiSuscripcion {
+    id: string;
+    clase_template_id: string;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    dia_semana: DiaSemana;
+    hora_inicio: string;
+    hora_fin: string;
+    profesor_nombre: string | null;
+    sala_nombre: string | null;
+    fecha_inicio: string;
+    fecha_fin: string;
+    monto: number;
+    activo: boolean;
+    instancias: InstanciaEnSuscripcion[];
 }
 
 export interface ClaseSemana {
@@ -86,5 +131,6 @@ export interface ClaseSemana {
     profesor_nombre: string | null;
     sala_nombre: string | null;
     fecha_en_semana: string;
+    cupo_disponible: number;
     instancia: InstanciaSemana | null;
 }
