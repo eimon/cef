@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, BookOpen } from "lucide-react";
 import { ClaseSemana } from "@/types/api";
 import { checkElegibilidadIndividual, inscribirseIndividual } from "@/actions/inscripciones";
 import MockPaymentModal from "@/components/MockPaymentModal";
@@ -51,10 +52,12 @@ export default function ClaseDetailDialog({
     clase,
     isOpen,
     onClose,
+    userRole,
 }: {
     clase: ClaseSemana | null;
     isOpen: boolean;
     onClose: () => void;
+    userRole: string | null;
 }) {
     const [step, setStep] = useState<Step>("detail");
     const [paymentType, setPaymentType] = useState<"full" | "partial">("full");
@@ -125,7 +128,7 @@ export default function ClaseDetailDialog({
         handleClose();
     }
 
-    return (
+    return createPortal(
         <>
             {/* Backdrop */}
             <button
@@ -221,81 +224,95 @@ export default function ClaseDetailDialog({
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                                <div className="glass rounded-xl p-4 flex flex-col justify-between space-y-4 group">
-                                    <div>
-                                        <div className="flex items-center gap-1.5 text-slate-400 mb-1">
-                                            <DollarSign size={14} />
-                                            <span className="text-[10px] font-medium uppercase tracking-wider">Clase particular</span>
+                            {userRole === "cliente" ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                    <div className="glass rounded-xl p-4 flex flex-col justify-between space-y-4 group">
+                                        <div>
+                                            <div className="flex items-center gap-1.5 text-slate-400 mb-1">
+                                                <DollarSign size={14} />
+                                                <span className="text-[10px] font-medium uppercase tracking-wider">Clase particular</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-slate-800 tracking-tight">
+                                                {formatPrice(clase.precio_individual)}
+                                            </p>
+                                            <p className="text-[11px] text-slate-400 mt-0.5">Pago único por clase</p>
                                         </div>
-                                        <p className="text-lg font-bold text-slate-800 tracking-tight">
-                                            {formatPrice(clase.precio_individual)}
-                                        </p>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">Pago único por clase</p>
-                                    </div>
-                                    {canEnroll ? (
-                                        <div className="space-y-2">
+                                        {canEnroll ? (
+                                            <div className="space-y-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleInscribirse}
+                                                    disabled={checkLoading}
+                                                    className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                >
+                                                    {checkLoading ? (
+                                                        <>
+                                                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            Verificando...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>Inscribirme</span>
+                                                            <ChevronRight size={14} />
+                                                        </>
+                                                    )}
+                                                </button>
+                                                {checkError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{checkError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
                                             <button
                                                 type="button"
-                                                onClick={handleInscribirse}
-                                                disabled={checkLoading}
-                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                disabled
+                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5"
                                             >
-                                                {checkLoading ? (
-                                                    <>
-                                                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Verificando...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>Inscribirme</span>
-                                                        <ChevronRight size={14} />
-                                                    </>
-                                                )}
+                                                {clase.instancia?.cancelada
+                                                    ? <span>Clase cancelada</span>
+                                                    : <span>Clase pasada</span>
+                                                }
                                             </button>
-                                            {checkError && (
-                                                <div className="flex items-start gap-1.5">
-                                                    <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
-                                                    <p className="text-[11px] text-cef-danger leading-tight">{checkError}</p>
-                                                </div>
-                                            )}
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-xl p-4 border border-cef-primary/30 bg-cef-primary/5 flex flex-col justify-between space-y-4 group">
+                                        <div>
+                                            <div className="flex items-center gap-1.5 text-cef-primary/70 mb-1">
+                                                <DollarSign size={14} />
+                                                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Suscripción mensual</span>
+                                            </div>
+                                            <p className="text-lg font-bold text-cef-primary tracking-tight">
+                                                {formatPrice(clase.precio_suscripcion)}
+                                                <span className="text-xs text-slate-400 font-normal ml-1">/ mes</span>
+                                            </p>
+                                            <p className="text-[11px] text-slate-400 mt-0.5">Acceso mensual garantizado</p>
                                         </div>
-                                    ) : (
                                         <button
                                             type="button"
                                             disabled
-                                            className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5"
+                                            className="w-full py-2.5 px-3 rounded-lg bg-cef-primary/10 border border-cef-primary/20 text-xs font-semibold text-cef-primary/60 cursor-not-allowed group-hover:border-cef-primary/30 transition-all flex items-center justify-center gap-1.5"
                                         >
-                                            {clase.instancia?.cancelada
-                                                ? <span>Clase cancelada</span>
-                                                : <span>Clase pasada</span>
-                                            }
+                                            <span>Suscribirme</span>
+                                            <span className="text-[10px] bg-cef-primary/15 px-1.5 py-0.5 rounded text-cef-primary/80 font-normal">Próximamente</span>
                                         </button>
-                                    )}
-                                </div>
-
-                                <div className="rounded-xl p-4 border border-cef-primary/30 bg-cef-primary/5 flex flex-col justify-between space-y-4 group">
-                                    <div>
-                                        <div className="flex items-center gap-1.5 text-cef-primary/70 mb-1">
-                                            <DollarSign size={14} />
-                                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Suscripción mensual</span>
-                                        </div>
-                                        <p className="text-lg font-bold text-cef-primary tracking-tight">
-                                            {formatPrice(clase.precio_suscripcion)}
-                                            <span className="text-xs text-slate-400 font-normal ml-1">/ mes</span>
-                                        </p>
-                                        <p className="text-[11px] text-slate-400 mt-0.5">Acceso mensual garantizado</p>
                                     </div>
+                                </div>
+                            ) : (
+                                <div className="pt-2">
                                     <button
                                         type="button"
                                         disabled
-                                        className="w-full py-2.5 px-3 rounded-lg bg-cef-primary/10 border border-cef-primary/20 text-xs font-semibold text-cef-primary/60 cursor-not-allowed group-hover:border-cef-primary/30 transition-all flex items-center justify-center gap-1.5"
+                                        className="w-full py-3 px-4 rounded-xl bg-slate-100 border border-slate-200 text-sm font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-2"
                                     >
-                                        <span>Suscribirme</span>
-                                        <span className="text-[10px] bg-cef-primary/15 px-1.5 py-0.5 rounded text-cef-primary/80 font-normal">Próximamente</span>
+                                        <BookOpen size={16} />
+                                        <span>Ver currícula</span>
+                                        <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-normal ml-1">Próximamente</span>
                                     </button>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     )}
 
@@ -422,6 +439,7 @@ export default function ClaseDetailDialog({
                 onClose={handlePaymentClose}
                 onPay={handlePay}
             />
-        </>
+        </>,
+        document.body
     );
 }

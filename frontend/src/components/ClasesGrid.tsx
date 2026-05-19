@@ -50,7 +50,7 @@ function formatFechaCorta(fechaStr: string): string {
     return `${parseInt(dia)}/${parseInt(mes)}`;
 }
 
-export default function ClasesGrid({ clases }: { clases: ClaseSemana[] }) {
+export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]; userRole: string | null }) {
     const [selectedClase, setSelectedClase] = useState<ClaseSemana | null>(null);
     const [filtro, setFiltro] = useState<Disciplina | null>(null);
 
@@ -176,6 +176,7 @@ export default function ClasesGrid({ clases }: { clases: ClaseSemana[] }) {
                 clase={selectedClase}
                 isOpen={selectedClase !== null}
                 onClose={() => setSelectedClase(null)}
+                userRole={userRole}
             />
         </>
     );
