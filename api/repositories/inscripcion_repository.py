@@ -59,7 +59,6 @@ class InscripcionRepository:
             clase_template_id=clase_template_id,
             fecha=fecha,
             cupo=cupo_disponible,
-            cupo_oculto=0,
         )
         self.db.add(instancia)
         await self.db.flush()

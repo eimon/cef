@@ -14,8 +14,6 @@ class ClaseInstancia(Base):
     fecha = Column(Date, nullable=False)
     # cupo regular para suscriptos
     cupo = Column(Integer, nullable=False)
-    # cupo liberado cuando un suscripto cancela una clase puntual; disponible para clases individuales por única vez
-    cupo_oculto = Column(Integer, nullable=False, default=0)
     cancelada = Column(Boolean, default=False)
     motivo_cancelacion = Column(String(500), nullable=True)
     activo = Column(Boolean, default=True)

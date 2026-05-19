@@ -15,9 +15,9 @@ export default function LoginPage() {
                 <div className="p-8">
                     <div className="text-center mb-8">
                         <div className="flex justify-center mb-5">
-                            <div className="relative h-14 w-64">
+                            <div className="relative h-40 w-64">
                                 <Image
-                                    src="/Logo_horizontal.png"
+                                    src="/Logo.png"
                                     alt="CEF"
                                     fill
                                     className="object-contain"
@@ -25,7 +25,6 @@ export default function LoginPage() {
                                 />
                             </div>
                         </div>
-                        <p className="text-slate-400 text-sm">Ingresá con tu cuenta</p>
                     </div>
 
                     <form action={formAction} className="space-y-5">
