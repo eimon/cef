@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { serverApi } from "@/lib/server-api";
 import { InscripcionResponse } from "@/types/api";
 
@@ -10,10 +11,11 @@ export type InscripcionState = {
 };
 
 export async function checkElegibilidadIndividual(
-    claseInstanciaId: string,
+    claseTemplateId: string,
+    fecha: string,
 ): Promise<InscripcionState> {
     const res = await serverApi("/inscripciones/individual/check", {
-        params: { clase_instancia_id: claseInstanciaId },
+        params: { clase_template_id: claseTemplateId, fecha },
     });
 
     if (!res.ok) {
@@ -25,12 +27,13 @@ export async function checkElegibilidadIndividual(
 }
 
 export async function inscribirseIndividual(
-    claseInstanciaId: string,
+    claseTemplateId: string,
+    fecha: string,
     monto: number,
 ): Promise<InscripcionState> {
     const res = await serverApi("/inscripciones/individual", {
         method: "POST",
-        body: JSON.stringify({ clase_instancia_id: claseInstanciaId, monto }),
+        body: JSON.stringify({ clase_template_id: claseTemplateId, fecha, monto }),
     });
 
     if (!res.ok) {
@@ -39,5 +42,7 @@ export async function inscribirseIndividual(
     }
 
     const data: InscripcionResponse = await res.json();
+    revalidatePath("/clases");
+    revalidatePath("/mis-clases");
     return { success: true, data };
 }

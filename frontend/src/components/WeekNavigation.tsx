@@ -58,7 +58,8 @@ export default function WeekNavigation({ monday }: { monday: string }) {
             <button
                 type="button"
                 onClick={() => navigate(addDays(monday, -7))}
-                className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
+                disabled={isCurrentWeek}
+                className="p-2 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:hover:text-slate-500 disabled:hover:bg-transparent"
                 aria-label="Semana anterior"
             >
                 <ChevronLeft size={18} />

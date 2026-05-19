@@ -19,13 +19,52 @@ class InscripcionRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_instancia_with_template(self, instancia_id: uuid.UUID) -> ClaseInstancia | None:
+    async def get_template(self, clase_template_id: uuid.UUID) -> ClaseTemplate | None:
         result = await self.db.execute(
-            select(ClaseInstancia)
-            .options(selectinload(ClaseInstancia.clase_template))
-            .where(ClaseInstancia.id == instancia_id, ClaseInstancia.activo == True)
+            select(ClaseTemplate).where(
+                ClaseTemplate.id == clase_template_id,
+                ClaseTemplate.activo == True,
+            )
         )
         return result.scalars().first()
+
+    async def get_instancia(self, clase_template_id: uuid.UUID, fecha: date) -> ClaseInstancia | None:
+        result = await self.db.execute(
+            select(ClaseInstancia).where(
+                ClaseInstancia.clase_template_id == clase_template_id,
+                ClaseInstancia.fecha == fecha,
+                ClaseInstancia.activo == True,
+            )
+        )
+        return result.scalars().first()
+
+    async def count_active_suscripciones(self, clase_template_id: uuid.UUID, fecha: date) -> int:
+        result = await self.db.execute(
+            select(func.count()).where(
+                Suscripcion.clase_template_id == clase_template_id,
+                Suscripcion.fecha_inicio <= fecha,
+                Suscripcion.fecha_fin >= fecha,
+                Suscripcion.activo == True,
+            )
+        )
+        return result.scalar() or 0
+
+    async def get_or_create_instancia(
+        self, clase_template_id: uuid.UUID, fecha: date, cupo_disponible: int
+    ) -> ClaseInstancia:
+        instancia = await self.get_instancia(clase_template_id, fecha)
+        if instancia:
+            return instancia
+        instancia = ClaseInstancia(
+            clase_template_id=clase_template_id,
+            fecha=fecha,
+            cupo=cupo_disponible,
+            cupo_oculto=0,
+        )
+        self.db.add(instancia)
+        await self.db.flush()
+        await self.db.refresh(instancia)
+        return instancia
 
     async def count_individual_asistencias(self, instancia_id: uuid.UUID) -> int:
         result = await self.db.execute(
@@ -55,7 +94,6 @@ class InscripcionRepository:
         hora_fin: time,
         exclude_instancia_id: uuid.UUID | None = None,
     ) -> bool:
-        """Check if user has another individual asistencia that overlaps with the given time on the same date."""
         query = (
             select(Asistencia)
             .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
@@ -74,11 +112,13 @@ class InscripcionRepository:
         result = await self.db.execute(query)
         return result.scalars().first() is not None
 
-    async def has_active_suscripcion(self, usuario_id: uuid.UUID, fecha: date) -> bool:
-        """Check if user has an active subscription covering the given date."""
+    async def has_active_suscripcion(
+        self, usuario_id: uuid.UUID, clase_template_id: uuid.UUID, fecha: date
+    ) -> bool:
         result = await self.db.execute(
             select(Suscripcion).where(
                 Suscripcion.usuario_id == usuario_id,
+                Suscripcion.clase_template_id == clase_template_id,
                 Suscripcion.fecha_inicio <= fecha,
                 Suscripcion.fecha_fin >= fecha,
                 Suscripcion.activo == True,
@@ -89,14 +129,16 @@ class InscripcionRepository:
     async def create_inscripcion_individual(
         self,
         usuario_id: uuid.UUID,
-        instancia_id: uuid.UUID,
+        instancia: ClaseInstancia,
         monto: Decimal,
     ) -> tuple[Asistencia, Pago]:
         from datetime import datetime, timezone
 
+        instancia.cupo -= 1
+
         asistencia = Asistencia(
             usuario_id=usuario_id,
-            clase_instancia_id=instancia_id,
+            clase_instancia_id=instancia.id,
             tipo=TipoInscripcion.INDIVIDUAL,
             asistio=False,
             cancelo=False,
@@ -107,7 +149,7 @@ class InscripcionRepository:
 
         pago = Pago(
             usuario_id=usuario_id,
-            clase_instancia_id=instancia_id,
+            clase_instancia_id=instancia.id,
             monto=monto,
             fecha_pago=datetime.now(timezone.utc),
             estado=EstadoPago.PAGADO,

@@ -25,6 +25,7 @@ from models.profesor import Profesor
 from models.sala import Sala
 from models.clase_template import ClaseTemplate
 from models.clase_instancia import ClaseInstancia
+from models.suscripciones import Suscripcion
 
 
 async def _seed_admin(session) -> None:
@@ -154,41 +155,6 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
         session.add(ClaseTemplate(profesor_id=profesor.id, sala_id=sala.id, **data))
         print(f"  [ok]   clase '{data['nombre']}'")
 
-
-async def _seed_instancias(session) -> None:
-    """Create future ClaseInstancia records for testing individual enrollment."""
-    templates = (await session.execute(select(ClaseTemplate))).scalars().all()
-    today = date.today()
-    # Create instances for the next 4 weeks
-    for template in templates:
-        for weeks_ahead in range(1, 5):
-            # Find next occurrence of this day of week
-            dia_offset = {
-                DiaSemana.LUNES: 0, DiaSemana.MARTES: 1, DiaSemana.MIERCOLES: 2,
-                DiaSemana.JUEVES: 3, DiaSemana.VIERNES: 4, DiaSemana.SABADO: 5,
-                DiaSemana.DOMINGO: 6,
-            }[template.dia_semana]
-            monday = today - timedelta(days=today.weekday()) + timedelta(weeks=weeks_ahead)
-            fecha = monday + timedelta(days=dia_offset)
-
-            existe = (await session.execute(
-                select(ClaseInstancia).where(
-                    ClaseInstancia.clase_template_id == template.id,
-                    ClaseInstancia.fecha == fecha,
-                )
-            )).scalars().first()
-            if existe:
-                print(f"  [skip] instancia '{template.nombre}' {fecha}")
-                continue
-            session.add(ClaseInstancia(
-                clase_template_id=template.id,
-                fecha=fecha,
-                cupo=template.capacidad_maxima,
-                cupo_oculto=5,
-            ))
-            print(f"  [ok]   instancia '{template.nombre}' {fecha}")
-
-
 async def seed_dev() -> None:
     print("Iniciando seed de desarrollo...")
     async with AsyncSessionLocal() as session:
@@ -197,7 +163,8 @@ async def seed_dev() -> None:
         profesor = await _seed_profesor(session)
         sala = await _seed_sala(session)
         await _seed_clases(session, profesor, sala)
-        await _seed_instancias(session)
+        # await _seed_instancias(session)
+        # await _seed_suscripciones(session)
         await session.commit()
     print("Listo.")
 

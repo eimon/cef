@@ -1,13 +1,16 @@
 from datetime import date, timedelta
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+import uuid
+
 from repositories.clase_template_repository import ClaseTemplateRepository
 from repositories.clase_instancia_repository import ClaseInstanciaRepository
 from schemas.clase_template import ClaseTemplateResponse
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException
 from core.enums import DiaSemana
-from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
+from models.suscripciones import Suscripcion
 
 _DIA_OFFSET: dict[DiaSemana, int] = {
     DiaSemana.LUNES: 0,
@@ -68,11 +71,33 @@ class ClaseTemplateService:
 
         instancia_map = {(i.clase_template_id, i.fecha): i for i in instancias}
 
+        # Batch-fetch all active suscripciones for templates that have no instancia
+        template_ids = [t.id for t in templates]
+        subs_result = await self.db.execute(
+            select(Suscripcion).where(
+                Suscripcion.clase_template_id.in_(template_ids),
+                Suscripcion.activo == True,
+            )
+        )
+        subs = subs_result.scalars().all()
+
+        def count_subs(template_id: uuid.UUID, fecha_clase: date) -> int:
+            return sum(
+                1 for s in subs
+                if s.clase_template_id == template_id
+                and s.fecha_inicio <= fecha_clase <= s.fecha_fin
+            )
+
         result = []
         for template in templates:
             offset = _DIA_OFFSET[template.dia_semana]
             fecha_clase = week_start + timedelta(days=offset)
             instancia = instancia_map.get((template.id, fecha_clase))
+
+            if instancia:
+                cupo_disponible = instancia.cupo
+            else:
+                cupo_disponible = template.capacidad_maxima - count_subs(template.id, fecha_clase)
 
             result.append(ClaseSemanaResponse(
                 id=template.id,
@@ -93,10 +118,12 @@ class ClaseTemplateService:
                 ),
                 sala_nombre=template.sala.nombre if template.sala else None,
                 fecha_en_semana=fecha_clase,
+                cupo_disponible=cupo_disponible,
                 instancia=InstanciaSemanaResponse(
                     id=instancia.id,
                     fecha=instancia.fecha,
                     cancelada=instancia.cancelada,
+                    cupo=instancia.cupo,
                 ) if instancia else None,
             ))
 

@@ -9,6 +9,7 @@ class InstanciaSemanaResponse(BaseModel):
     id: UUID4
     fecha: date
     cancelada: bool
+    cupo: int
 
     class Config:
         from_attributes = True
@@ -30,4 +31,5 @@ class ClaseSemanaResponse(BaseModel):
     profesor_nombre: Optional[str] = None
     sala_nombre: Optional[str] = None
     fecha_en_semana: date
+    cupo_disponible: int
     instancia: Optional[InstanciaSemanaResponse] = None

@@ -67,8 +67,7 @@ export default function ClaseDetailDialog({
     if (!isOpen || !clase) return null;
 
     const canEnroll =
-        !!clase.instancia &&
-        !clase.instancia.cancelada &&
+        !clase.instancia?.cancelada &&
         isFutureDate(clase.fecha_en_semana);
 
     const precio = clase.precio_individual;
@@ -90,10 +89,10 @@ export default function ClaseDetailDialog({
     }
 
     async function handleInscribirse() {
-        if (!clase?.instancia) return;
+        if (!clase) return;
         setCheckLoading(true);
         setCheckError("");
-        const result = await checkElegibilidadIndividual(clase.instancia.id);
+        const result = await checkElegibilidadIndividual(clase.id, clase.fecha_en_semana);
         setCheckLoading(false);
         if (result.error) {
             setCheckError(result.error);
@@ -117,8 +116,8 @@ export default function ClaseDetailDialog({
     }
 
     async function handlePay() {
-        if (!clase?.instancia) return { error: "Clase sin instancia" };
-        return await inscribirseIndividual(clase.instancia.id, selectedMonto);
+        if (!clase) return { error: "Clase no disponible" };
+        return await inscribirseIndividual(clase.id, clase.fecha_en_semana, selectedMonto);
     }
 
     function handlePaymentClose() {
@@ -209,7 +208,7 @@ export default function ClaseDetailDialog({
                                         <span className="text-xs font-medium uppercase tracking-wider text-[10px]">Cupo</span>
                                     </div>
                                     <p className="text-sm font-semibold text-slate-800">
-                                        {clase.capacidad_maxima} personas
+                                        {clase.cupo_disponible} disponibles
                                     </p>
                                 </div>
                             </div>
@@ -267,11 +266,9 @@ export default function ClaseDetailDialog({
                                             disabled
                                             className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5"
                                         >
-                                            {!clase.instancia
-                                                ? <span>Sin cupo individual</span>
-                                                : clase.instancia.cancelada
-                                                    ? <span>Clase cancelada</span>
-                                                    : <span>Clase pasada</span>
+                                            {clase.instancia?.cancelada
+                                                ? <span>Clase cancelada</span>
+                                                : <span>Clase pasada</span>
                                             }
                                         </button>
                                     )}

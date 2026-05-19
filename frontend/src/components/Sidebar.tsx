@@ -1,19 +1,23 @@
 "use client";
 
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, LogOut, UserCog, BookOpen } from "lucide-react";
+import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
 
 const navigation = [
-    { name: "Clases", href: "/clases", icon: BookOpen, adminOnly: false },
-    { name: "Usuarios", href: "/users", icon: UserCog, adminOnly: true },
+    { name: "Clases", href: "/clases", icon: BookOpen, adminOnly: false, clientOnly: false },
+    { name: "Mis Clases", href: "/mis-clases", icon: CalendarCheck, adminOnly: false, clientOnly: true },
+    { name: "Usuarios", href: "/users", icon: UserCog, adminOnly: true, clientOnly: false },
 ];
 
 export default function Sidebar({ userRole }: { userRole: string | null }) {
     const { isOpen, close } = useSidebar();
-    const visibleNavigation = navigation.filter(item => !item.adminOnly || userRole === "admin");
+    const visibleNavigation = navigation.filter(item =>
+        (!item.adminOnly || userRole === "admin") &&
+        (!item.clientOnly || userRole === "cliente")
+    );
     const pathname = usePathname();
 
     return (
