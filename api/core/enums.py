@@ -7,6 +7,11 @@ class UserRole(str, enum.Enum):
     CLIENTE = "cliente"
 
 
+class TipoInscripcion(str, enum.Enum):
+    INDIVIDUAL = "individual"
+    SUSCRIPCION = "suscripcion"
+
+
 class EstadoPago(str, enum.Enum):
     PENDIENTE = "pendiente"
     PAGADO = "pagado"
