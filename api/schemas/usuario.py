@@ -17,11 +17,27 @@ class UsuarioBase(BaseModel):
     apellido: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     dni: Optional[str] = None
+    genero: Optional[str] = None
     role: str
 
 
 class UsuarioCreate(UsuarioBase):
     password: str
+
+
+class PublicSignupRequest(BaseModel):
+    email: EmailStr
+    telefono: Optional[str] = None
+    nombre: str = Field(..., min_length=1, max_length=100)
+    apellido: str = Field(..., min_length=1, max_length=100)
+    fecha_nacimiento: Optional[date] = None
+    dni: Optional[str] = Field(None, max_length=20)
+    genero: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=8)
+
+
+class PublicSignupResponse(BaseModel):
+    detail: str
 
 
 class UsuarioUpdate(BaseModel):
@@ -30,6 +46,7 @@ class UsuarioUpdate(BaseModel):
     apellido: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     dni: Optional[str] = None
+    genero: Optional[str] = None
     password: Optional[str] = None
     role: Optional[UserRole] = None
 
@@ -47,6 +64,20 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class VerifyEmailResponse(BaseModel):
+    detail: str
+    onboarding_token: str
+
+
+class PublicFichaMedicaRequest(BaseModel):
+    token: str
+    cuerpo_ficha: str = Field(..., min_length=10)
 
 
 class TokenData(BaseModel):

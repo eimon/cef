@@ -4,19 +4,121 @@ import { z } from "zod";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-const SERVER_API_URL =
+const RAW_SERVER_API_URL =
     process.env.INTERNAL_API_URL ??
     process.env.NEXT_PUBLIC_API_URL ??
     "http://localhost:8000";
+const SERVER_API_URL = RAW_SERVER_API_URL.replace(/\/$/, "");
 
 const loginSchema = z.object({
-    email: z.string().email("Email inválido"),
-    password: z.string().min(1, "La contraseña es requerida"),
+    email: z.string().email("Email invalido"),
+    password: z.string().min(1, "La contrasena es requerida"),
 });
+
+const signupSchema = z
+    .object({
+        email: z.string().email("Email invalido"),
+        telefono: z.string().optional(),
+        nombre: z.string().min(1, "El nombre es requerido"),
+        apellido: z.string().min(1, "El apellido es requerido"),
+        fecha_nacimiento: z.string().optional(),
+        dni: z.string().optional(),
+        genero: z.string().min(1, "El genero es requerido"),
+        password: z.string().min(8, "La contrasena debe tener al menos 8 caracteres"),
+        confirmPassword: z.string().min(1, "Confirma tu contrasena"),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+        message: "Las contrasenas no coinciden",
+        path: ["confirmPassword"],
+    });
+
+const medicalRecordSchema = z
+    .object({
+        token: z.string().min(1, "Token invalido"),
+        emergency_name: z.string().min(2, "Indica el nombre del contacto de emergencia"),
+        emergency_relationship: z.string().min(2, "Indica la relacion del contacto de emergencia"),
+        emergency_phone: z.string().min(3, "Indica el telefono del contacto de emergencia"),
+        medical_conditions: z.array(z.string()).min(1, "Selecciona al menos una opcion en antecedentes medicos"),
+        medical_other: z.string().optional(),
+        smoked: z.string().min(1, "Indica si fuma o ha fumado"),
+        alcohol: z.string().min(1, "Indica si consume alcohol"),
+        recent_symptoms: z.string().min(1, "Indica si tuvo sintomas recientes"),
+        sleep_hours: z.string().min(1, "Indica las horas de sueño promedio"),
+        sleep_difficulty: z.string().min(1, "Indica si tiene dificultad para dormir"),
+        diet_supplements: z.string().min(1, "Indica si sigue alguna dieta especial o suplementacion"),
+        surgery_descriptions: z.array(z.string()).default([]),
+        surgery_dates: z.array(z.string()).default([]),
+        surgery_complications: z.array(z.string()).default([]),
+        allergies: z.string().optional(),
+        current_medication: z.string().optional(),
+        physical_activity: z.string().min(1, "Indica si realiza actividad fisica actualmente"),
+        activity_frequency: z.string().optional(),
+        goals: z.array(z.string()).min(1, "Selecciona al menos un objetivo principal"),
+        consent: z.literal("on", {
+            error: "Debes aceptar el consentimiento y declaracion jurada",
+        }),
+    })
+    .refine(
+        (data) => !data.medical_conditions.includes("Otros") || Boolean(data.medical_other?.trim()),
+        {
+            message: "Completa el detalle de otros antecedentes medicos",
+            path: ["medical_other"],
+        }
+    );
 
 export type LoginState = {
     error?: string;
     success?: boolean;
+};
+
+export type SignupState = {
+    error?: string;
+    success?: boolean;
+    message?: string;
+    values?: SignupFormValues;
+};
+
+export type MedicalRecordState = {
+    error?: string;
+    success?: boolean;
+    values?: MedicalRecordFormValues;
+};
+
+export type SignupFormValues = {
+    email?: string;
+    telefono?: string;
+    nombre?: string;
+    apellido?: string;
+    fecha_nacimiento?: string;
+    dni?: string;
+    genero?: string;
+};
+
+export type MedicalRecordSurgeryValues = {
+    description?: string;
+    date?: string;
+    complications?: string;
+};
+
+export type MedicalRecordFormValues = {
+    emergency_name?: string;
+    emergency_relationship?: string;
+    emergency_phone?: string;
+    medical_conditions?: string[];
+    medical_other?: string;
+    smoked?: string;
+    alcohol?: string;
+    recent_symptoms?: string;
+    sleep_hours?: string;
+    sleep_difficulty?: string;
+    diet_supplements?: string;
+    surgeries?: MedicalRecordSurgeryValues[];
+    allergies?: string;
+    current_medication?: string;
+    physical_activity?: string;
+    activity_frequency?: string;
+    goals?: string[];
+    consent?: boolean;
 };
 
 const cookieBase = {
@@ -25,11 +127,68 @@ const cookieBase = {
     path: "/",
 };
 
+async function setAuthCookies(accessToken: string, refreshToken: string) {
+    const cookieStore = await cookies();
+
+    cookieStore.set("access_token", accessToken, {
+        ...cookieBase,
+        httpOnly: false,
+        maxAge: 30 * 60,
+    });
+
+    cookieStore.set("refresh_token", refreshToken, {
+        ...cookieBase,
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 60,
+    });
+}
+
+function getFormString(formData: FormData, name: string): string {
+    return String(formData.get(name) || "");
+}
+
+function buildMedicalRecordValues(formData: FormData): MedicalRecordFormValues {
+    const surgeryDescriptions = formData.getAll("surgery_description").map(String);
+    const surgeryDates = formData.getAll("surgery_date").map(String);
+    const surgeryComplications = formData.getAll("surgery_complications").map(String);
+    const surgeryCount = Math.max(
+        1,
+        surgeryDescriptions.length,
+        surgeryDates.length,
+        surgeryComplications.length
+    );
+
+    return {
+        emergency_name: getFormString(formData, "emergency_name"),
+        emergency_relationship: getFormString(formData, "emergency_relationship"),
+        emergency_phone: getFormString(formData, "emergency_phone"),
+        medical_conditions: formData.getAll("medical_conditions").map(String),
+        medical_other: getFormString(formData, "medical_other"),
+        smoked: getFormString(formData, "smoked"),
+        alcohol: getFormString(formData, "alcohol"),
+        recent_symptoms: getFormString(formData, "recent_symptoms"),
+        sleep_hours: getFormString(formData, "sleep_hours"),
+        sleep_difficulty: getFormString(formData, "sleep_difficulty"),
+        diet_supplements: getFormString(formData, "diet_supplements"),
+        surgeries: Array.from({ length: surgeryCount }).map((_, index) => ({
+            description: surgeryDescriptions[index] || "",
+            date: surgeryDates[index] || "",
+            complications: surgeryComplications[index] || "",
+        })),
+        allergies: getFormString(formData, "allergies"),
+        current_medication: getFormString(formData, "current_medication"),
+        physical_activity: getFormString(formData, "physical_activity"),
+        activity_frequency: getFormString(formData, "activity_frequency"),
+        goals: formData.getAll("goals").map(String),
+        consent: formData.get("consent") === "on",
+    };
+}
+
 export async function login(prevState: LoginState, formData: FormData): Promise<LoginState> {
     const validatedFields = loginSchema.safeParse(Object.fromEntries(formData.entries()));
 
     if (!validatedFields.success) {
-        return { error: "Invalid input fields" };
+        return { error: validatedFields.error.issues[0].message };
     }
 
     const { email, password } = validatedFields.data;
@@ -43,32 +202,192 @@ export async function login(prevState: LoginState, formData: FormData): Promise<
 
         if (!res.ok) {
             const data = await res.json().catch(() => null);
-            return { error: data?.detail || "Authentication failed" };
+            return { error: data?.detail || "No pudimos iniciar sesion" };
         }
 
         const data = await res.json();
-        const cookieStore = await cookies();
-
-        // access_token: not httpOnly so axios (client-side) can read from document.cookie
-        cookieStore.set("access_token", data.access_token, {
-            ...cookieBase,
-            httpOnly: false,
-            maxAge: 30 * 60, // 30 min — matches JWT expiry
-        });
-
-        // refresh_token: httpOnly, only the server can read it
-        cookieStore.set("refresh_token", data.refresh_token, {
-            ...cookieBase,
-            httpOnly: true,
-            maxAge: 60 * 60 * 24 * 60, // 60 days
-        });
+        await setAuthCookies(data.access_token, data.refresh_token);
     } catch (error) {
         console.error("Login Error:", error);
-        return { error: "Something went wrong. Please try again." };
+        return { error: "No pudimos iniciar sesion. Intentalo nuevamente." };
     }
 
     redirect("/");
-    return { success: true };
+}
+
+export async function signup(prevState: SignupState, formData: FormData): Promise<SignupState> {
+    const values: SignupFormValues = {
+        email: String(formData.get("email") || ""),
+        telefono: String(formData.get("telefono") || ""),
+        nombre: String(formData.get("nombre") || ""),
+        apellido: String(formData.get("apellido") || ""),
+        fecha_nacimiento: String(formData.get("fecha_nacimiento") || ""),
+        dni: String(formData.get("dni") || ""),
+        genero: String(formData.get("genero") || ""),
+    };
+
+    const validatedFields = signupSchema.safeParse({
+        email: formData.get("email"),
+        telefono: formData.get("telefono") || undefined,
+        nombre: formData.get("nombre"),
+        apellido: formData.get("apellido"),
+        fecha_nacimiento: formData.get("fecha_nacimiento") || undefined,
+        dni: formData.get("dni") || undefined,
+        genero: formData.get("genero"),
+        password: formData.get("password"),
+        confirmPassword: formData.get("confirmPassword"),
+    });
+
+    if (!validatedFields.success) {
+        return { error: validatedFields.error.issues[0].message, values };
+    }
+
+    const payload = {
+        email: validatedFields.data.email,
+        telefono: validatedFields.data.telefono,
+        nombre: validatedFields.data.nombre,
+        apellido: validatedFields.data.apellido,
+        fecha_nacimiento: validatedFields.data.fecha_nacimiento,
+        dni: validatedFields.data.dni,
+        genero: validatedFields.data.genero,
+        password: validatedFields.data.password,
+    };
+
+    try {
+        const res = await fetch(`${SERVER_API_URL}/auth/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { error: data?.detail || "No pudimos crear tu cuenta", values };
+        }
+
+        return {
+            success: true,
+            message: data?.detail || "Te enviamos un email para confirmar tu cuenta",
+        };
+    } catch (error) {
+        console.error("Signup Error:", error);
+        return { error: "No pudimos crear tu cuenta. Intentalo nuevamente.", values };
+    }
+}
+
+export async function completeMedicalRecord(
+    prevState: MedicalRecordState,
+    formData: FormData
+): Promise<MedicalRecordState> {
+    const values = buildMedicalRecordValues(formData);
+
+    const validatedFields = medicalRecordSchema.safeParse({
+        token: formData.get("token"),
+        emergency_name: values.emergency_name,
+        emergency_relationship: values.emergency_relationship,
+        emergency_phone: values.emergency_phone,
+        medical_conditions: values.medical_conditions || [],
+        medical_other: values.medical_other || undefined,
+        smoked: values.smoked,
+        alcohol: values.alcohol,
+        recent_symptoms: values.recent_symptoms,
+        sleep_hours: values.sleep_hours,
+        sleep_difficulty: values.sleep_difficulty,
+        diet_supplements: values.diet_supplements,
+        surgery_descriptions: values.surgeries?.map((surgery) => surgery.description || "") || [],
+        surgery_dates: values.surgeries?.map((surgery) => surgery.date || "") || [],
+        surgery_complications: values.surgeries?.map((surgery) => surgery.complications || "") || [],
+        allergies: values.allergies || undefined,
+        current_medication: values.current_medication || undefined,
+        physical_activity: values.physical_activity,
+        activity_frequency: values.activity_frequency || undefined,
+        goals: values.goals || [],
+        consent: formData.get("consent"),
+    });
+
+    if (!validatedFields.success) {
+        return { error: validatedFields.error.issues[0].message, values };
+    }
+
+    const { token } = validatedFields.data;
+    const surgeries = validatedFields.data.surgery_descriptions
+        .map((description, index) => ({
+            descripcion: description,
+            fecha: validatedFields.data.surgery_dates[index] || "",
+            complicaciones_secuelas: validatedFields.data.surgery_complications[index] || "",
+        }))
+        .filter((surgery) =>
+            Boolean(
+                surgery.descripcion.trim() ||
+                surgery.fecha.trim() ||
+                surgery.complicaciones_secuelas.trim()
+            )
+        );
+    const cuerpoFicha = JSON.stringify(
+        {
+            contacto_emergencia: {
+                nombre: validatedFields.data.emergency_name,
+                relacion: validatedFields.data.emergency_relationship,
+                telefono: validatedFields.data.emergency_phone,
+            },
+            antecedentes_medicos: {
+                afecciones: validatedFields.data.medical_conditions,
+                especifique_otros: validatedFields.data.medical_other || "",
+            },
+            informacion_adicional_salud: {
+                fuma_o_ha_fumado: validatedFields.data.smoked,
+                consume_alcohol: validatedFields.data.alcohol,
+                mareos_falta_aire_o_dolor_pecho: validatedFields.data.recent_symptoms,
+                horas_sueno_promedio: validatedFields.data.sleep_hours,
+                dificultad_para_dormir: validatedFields.data.sleep_difficulty,
+                dieta_especial_o_suplementacion: validatedFields.data.diet_supplements,
+            },
+            historial_cirugias: surgeries,
+            alergias_y_medicacion: {
+                alergias: validatedFields.data.allergies || "",
+                medicacion_actual: validatedFields.data.current_medication || "",
+            },
+            actividad_fisica_y_objetivos: {
+                realiza_actividad_fisica_actualmente: validatedFields.data.physical_activity,
+                frecuencia: validatedFields.data.activity_frequency || "",
+                objetivo_principal: validatedFields.data.goals,
+            },
+            consentimiento_y_declaracion_jurada: {
+                aceptado: true,
+                texto:
+                    "Declaro que la información proporcionada es verdadera y completa. Me comprometo a informar cualquier cambio en mi estado de salud y asumo la responsabilidad de realizar actividad física bajo mi propio riesgo.",
+            },
+        },
+        null,
+        2
+    );
+
+    try {
+        const res = await fetch(`${SERVER_API_URL}/auth/signup/ficha-medica`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                token,
+                cuerpo_ficha: cuerpoFicha,
+            }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            let errorMsg = "No pudimos guardar la ficha medica";
+            if (data?.detail) {
+                errorMsg = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
+            }
+            return { error: errorMsg, values };
+        }
+
+        await setAuthCookies(data.access_token, data.refresh_token);
+    } catch (error) {
+        console.error("Medical Record Error:", error);
+        return { error: "No pudimos guardar la ficha medica. Intentalo nuevamente.", values };
+    }
+
+    redirect("/");
 }
 
 export async function logout() {
@@ -76,7 +395,6 @@ export async function logout() {
     const refreshToken = cookieStore.get("refresh_token")?.value;
     const accessToken = cookieStore.get("access_token")?.value;
 
-    // Revoke refresh token on the backend (best-effort)
     if (refreshToken && accessToken) {
         try {
             await fetch(`${SERVER_API_URL}/auth/logout`, {
@@ -88,7 +406,7 @@ export async function logout() {
                 body: JSON.stringify({ refresh_token: refreshToken }),
             });
         } catch {
-            // Backend unavailable — still clear the local session
+            // Backend unavailable: clear the local session anyway.
         }
     }
 

@@ -1,7 +1,20 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from schemas.usuario import UsuarioCreate, UsuarioResponse, Token, RefreshRequest, LogoutRequest, ChangePasswordRequest, LoginRequest
+from schemas.usuario import (
+    UsuarioCreate,
+    UsuarioResponse,
+    Token,
+    RefreshRequest,
+    LogoutRequest,
+    ChangePasswordRequest,
+    LoginRequest,
+    PublicSignupRequest,
+    PublicSignupResponse,
+    VerifyEmailRequest,
+    VerifyEmailResponse,
+    PublicFichaMedicaRequest,
+)
 from services.auth_service import AuthService
 from services.refresh_token_service import RefreshTokenService
 from core.database import get_db
@@ -26,6 +39,42 @@ async def register(
 ):
     """Register a new user."""
     return await AuthService(db).register_user(user_in)
+
+
+@router.post("/signup", response_model=PublicSignupResponse, status_code=201)
+async def signup(
+    user_in: PublicSignupRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public signup. Creates an inactive client account and sends email verification."""
+    await AuthService(db).signup_user(user_in)
+    return {"detail": "Te enviamos un email para confirmar tu cuenta"}
+
+
+@router.post("/verify-email", response_model=VerifyEmailResponse)
+async def verify_email(
+    body: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify public signup email. Does not create a session."""
+    onboarding_token = await AuthService(db).verify_email(body.token)
+    return {
+        "detail": "Email confirmado. Completa tu ficha medica para activar la cuenta",
+        "onboarding_token": onboarding_token,
+    }
+
+
+@router.post("/signup/ficha-medica", response_model=Token)
+async def complete_signup_ficha_medica(
+    request: Request,
+    body: PublicFichaMedicaRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Complete medical record and issue the first session."""
+    return await AuthService(db).complete_public_signup(
+        body,
+        device_hint=_device_hint(request),
+    )
 
 
 @router.post("/login", response_model=Token)

@@ -1,5 +1,6 @@
 from models.usuario import Usuario
 from models.refresh_token import RefreshToken
+from models.registration_token import RegistrationToken
 from models.profesor import Profesor
 from models.suscripciones import Suscripcion
 from models.clase_template import ClaseTemplate
@@ -12,6 +13,7 @@ from models.sala import Sala
 __all__ = [
     "Usuario",
     "RefreshToken",
+    "RegistrationToken",
     "Profesor",
     "Suscripcion",
     "ClaseTemplate",

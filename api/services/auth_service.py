@@ -1,32 +1,119 @@
 import uuid
-from models.usuario import Usuario
-from schemas.usuario import UsuarioCreate, Token
-from repositories.user_repository import UserRepository
-from core.security import verify_password, get_password_hash
-from exceptions.general import ConflictException, UnauthorizedException, BadRequestException
-from services.refresh_token_service import RefreshTokenService
+from datetime import date, datetime, timezone
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from exceptions.general import ConflictException, UnauthorizedException, BadRequestException
+from models.usuario import Usuario
+from repositories.ficha_medica_repository import FichaMedicaRepository
+from repositories.registration_token_repository import RegistrationTokenRepository
+from repositories.user_repository import UserRepository
+from schemas.ficha_medica import FichaMedicaCreate
+from schemas.usuario import (
+    PublicFichaMedicaRequest,
+    PublicSignupRequest,
+    Token,
+    UsuarioCreate,
+)
+from services.email_service import EmailService
+from services.refresh_token_service import RefreshTokenService
+from core.security import verify_password, get_password_hash
 
 
 class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.user_repo = UserRepository(db)
+        self.registration_token_repo = RegistrationTokenRepository(db)
+        self.ficha_medica_repo = FichaMedicaRepository(db)
 
     async def register_user(self, data: UsuarioCreate) -> Usuario:
         if await self.user_repo.get_by_email(data.email):
             raise ConflictException("Email ya registrado")
+        await self._validate_unique_optional_fields(data.dni, data.telefono)
         hashed_password = get_password_hash(data.password)
         return await self.user_repo.create(data, hashed_password)
+
+    async def signup_user(self, data: PublicSignupRequest) -> None:
+        if await self.user_repo.get_by_email(data.email):
+            raise ConflictException("Email ya registrado")
+        await self._validate_unique_optional_fields(data.dni, data.telefono)
+
+        hashed_password = get_password_hash(data.password)
+        usuario = await self.user_repo.create_public_signup(data, hashed_password)
+        _, raw_token = await self.registration_token_repo.create(usuario.id)
+        await EmailService().send_verification_email(usuario.email, raw_token)
+
+    async def verify_email(self, raw_token: str) -> str:
+        token = await self._get_valid_registration_token(raw_token)
+
+        if token.completed_at is not None:
+            raise BadRequestException("El registro ya fue completado")
+
+        await self.registration_token_repo.mark_email_verified(token)
+        usuario = await self.user_repo.get_by_id(token.usuario_id)
+        if not usuario:
+            raise UnauthorizedException("Usuario no encontrado")
+
+        if usuario.email_verified_at is None:
+            usuario.email_verified_at = datetime.now(timezone.utc)
+            await self.db.flush()
+            await self.db.refresh(usuario)
+
+        return raw_token
+
+    async def complete_public_signup(
+        self,
+        data: PublicFichaMedicaRequest,
+        device_hint: str | None = None,
+    ) -> Token:
+        token = await self._get_valid_registration_token(data.token)
+
+        if token.email_verified_at is None:
+            raise BadRequestException("Primero tenes que confirmar tu email")
+        if token.completed_at is not None:
+            raise BadRequestException("El registro ya fue completado")
+
+        usuario = await self.user_repo.get_by_id(token.usuario_id)
+        if not usuario:
+            raise UnauthorizedException("Usuario no encontrado")
+
+        existing_ficha = await self.ficha_medica_repo.get_by_usuario_id(usuario.id)
+        if existing_ficha:
+            raise ConflictException("La ficha medica ya fue cargada")
+
+        ficha_data = FichaMedicaCreate(
+            usuario_id=usuario.id,
+            fecha=date.today(),
+            cuerpo_ficha=data.cuerpo_ficha,
+        )
+        await self.ficha_medica_repo.create(ficha_data)
+
+        usuario.activo = True
+        usuario.registration_completed_at = datetime.now(timezone.utc)
+        await self.registration_token_repo.mark_completed(token)
+        await self.db.flush()
+        await self.db.refresh(usuario)
+
+        role = usuario.role.value if hasattr(usuario.role, "value") else usuario.role
+        return await RefreshTokenService(self.db).create_token_pair(
+            usuario_id=usuario.id,
+            role=role,
+            device_hint=device_hint,
+        )
 
     async def authenticate_user(
         self, email: str, password: str, device_hint: str | None = None
     ) -> Token:
         usuario = await self.user_repo.get_by_email(email)
         if not usuario or not usuario.hashed_password:
-            raise UnauthorizedException("Email o contraseña incorrectos")
+            raise UnauthorizedException("Email o contrasena incorrectos")
         if not verify_password(password, usuario.hashed_password):
-            raise UnauthorizedException("Email o contraseña incorrectos")
+            raise UnauthorizedException("Email o contrasena incorrectos")
+        if not usuario.activo:
+            raise UnauthorizedException(
+                "Tu cuenta todavia no esta activada. Revisa tu email y completa la ficha medica."
+            )
         role = usuario.role.value if hasattr(usuario.role, "value") else usuario.role
         return await RefreshTokenService(self.db).create_token_pair(
             usuario_id=usuario.id,
@@ -41,8 +128,26 @@ class AuthService:
         if not usuario:
             raise UnauthorizedException("Usuario no encontrado")
         if not verify_password(current_password, usuario.hashed_password):
-            raise BadRequestException("Contraseña actual incorrecta")
+            raise BadRequestException("Contrasena actual incorrecta")
         usuario.hashed_password = get_password_hash(new_password)
         await self.db.flush()
         await self.db.refresh(usuario)
         return usuario
+
+    async def _validate_unique_optional_fields(
+        self,
+        dni: str | None,
+        telefono: str | None,
+    ) -> None:
+        if dni and await self.user_repo.get_by_dni(dni):
+            raise ConflictException("DNI ya registrado")
+        if telefono and await self.user_repo.get_by_telefono(telefono):
+            raise ConflictException("Telefono ya registrado")
+
+    async def _get_valid_registration_token(self, raw_token: str):
+        token = await self.registration_token_repo.get_by_raw_token(raw_token)
+        if not token:
+            raise UnauthorizedException("Token invalido")
+        if token.expires_at < datetime.now(timezone.utc):
+            raise UnauthorizedException("Token expirado")
+        return token

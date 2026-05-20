@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models.usuario import Usuario
-from schemas.usuario import UsuarioCreate, UsuarioUpdate
+from schemas.usuario import UsuarioCreate, UsuarioUpdate, PublicSignupRequest
+from core.enums import UserRole
 from core.security import get_password_hash
 import uuid
 
@@ -16,6 +17,14 @@ class UserRepository:
 
     async def get_by_email(self, email: str) -> Usuario | None:
         result = await self.db.execute(select(Usuario).where(Usuario.email == email))
+        return result.scalars().first()
+
+    async def get_by_dni(self, dni: str) -> Usuario | None:
+        result = await self.db.execute(select(Usuario).where(Usuario.dni == dni))
+        return result.scalars().first()
+
+    async def get_by_telefono(self, telefono: str) -> Usuario | None:
+        result = await self.db.execute(select(Usuario).where(Usuario.telefono == telefono))
         return result.scalars().first()
 
     async def get_all(self, skip: int = 0, limit: int = 100) -> list[Usuario]:
@@ -52,8 +61,27 @@ class UserRepository:
             apellido=data.apellido,
             fecha_nacimiento=data.fecha_nacimiento,
             dni=data.dni,
+            genero=data.genero,
             hashed_password=hashed_password,
             role=data.role,
+        )
+        self.db.add(usuario)
+        await self.db.flush()
+        await self.db.refresh(usuario)
+        return usuario
+
+    async def create_public_signup(self, data: PublicSignupRequest, hashed_password: str) -> Usuario:
+        usuario = Usuario(
+            email=data.email,
+            telefono=data.telefono,
+            nombre=data.nombre,
+            apellido=data.apellido,
+            fecha_nacimiento=data.fecha_nacimiento,
+            dni=data.dni,
+            genero=data.genero,
+            hashed_password=hashed_password,
+            role=UserRole.CLIENTE,
+            activo=False,
         )
         self.db.add(usuario)
         await self.db.flush()
