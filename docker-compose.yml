@@ -10,6 +10,10 @@ services:
       SECRET_KEY: ${SECRET_KEY:-supersecretkey}
       ALGORITHM: ${ALGORITHM:-HS256}
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@db:5432/cef_db
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: "${RESEND_FROM_EMAIL:-CEF <onboarding@resend.dev>}"
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
+      EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS: ${EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS:-24}
     depends_on:
       db:
         condition: service_healthy

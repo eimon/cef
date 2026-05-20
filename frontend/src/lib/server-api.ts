@@ -2,10 +2,12 @@ import { cookies } from "next/headers";
 
 // INTERNAL_API_URL is set at runtime in Docker (e.g. http://web:8000/api/v1).
 // Falls back to NEXT_PUBLIC_API_URL (baked at build time) or localhost for local dev.
-const SERVER_API_URL =
+const RAW_SERVER_API_URL =
     process.env.INTERNAL_API_URL ??
     process.env.NEXT_PUBLIC_API_URL ??
     "http://localhost:8000";
+
+const SERVER_API_URL = RAW_SERVER_API_URL.replace(/\/$/, "");
 
 type FetchOptions = RequestInit & {
     params?: Record<string, string>;

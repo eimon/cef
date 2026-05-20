@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { login, LoginState } from "@/actions/auth";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function LoginPage() {
     const initialState: LoginState = { error: "", success: false };
@@ -56,7 +57,7 @@ export default function LoginPage() {
                                 htmlFor="password"
                                 className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider"
                             >
-                                Contraseña
+                                Contrasena
                             </label>
                             <input
                                 id="password"
@@ -64,7 +65,7 @@ export default function LoginPage() {
                                 type="password"
                                 required
                                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
-                                placeholder="••••••••"
+                                placeholder="********"
                             />
                         </div>
 
@@ -87,10 +88,10 @@ export default function LoginPage() {
 
                 <div className="bg-slate-50 border-t border-slate-200 px-8 py-4 text-center">
                     <p className="text-xs text-slate-400">
-                        ¿No tenés cuenta?{" "}
-                        <span className="text-cef-primary font-medium">
-                            Contactá al administrador
-                        </span>
+                        No tenes cuenta?{" "}
+                        <Link href="/auth/register" className="text-cef-primary font-medium hover:text-cef-primary/80">
+                            Registrate
+                        </Link>
                     </p>
                 </div>
             </div>

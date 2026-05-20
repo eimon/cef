@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     # iCalendar
     DOMAIN: str = "cef.com.ar"
 
+    # Public registration email verification
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM_EMAIL: str = "CEF <onboarding@resend.dev>"
+    FRONTEND_PUBLIC_URL: str = "http://localhost:3000"
+    EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS: int = 24
+
     class Config:
         case_sensitive = True
 

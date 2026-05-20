@@ -18,12 +18,16 @@ class Usuario(Base):
     apellido = Column(String(100), nullable=True)
     fecha_nacimiento = Column(Date, nullable=True)
     dni = Column(String(20), unique=True, index=True, nullable=True)
+    genero = Column(String(50), nullable=True)
     role = Column(Enum(UserRole, name="userrole"), default=UserRole.RECEPCION, nullable=False)
     activo = Column(Boolean, default=True)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    registration_completed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     refresh_tokens = relationship("RefreshToken", back_populates="usuario", cascade="all, delete-orphan")
+    registration_tokens = relationship("RegistrationToken", back_populates="usuario", cascade="all, delete-orphan")
     suscripciones = relationship("Suscripcion", back_populates="usuario")
     pagos = relationship("Pago", back_populates="usuario")
     asistencias = relationship("Asistencia", back_populates="usuario")
@@ -31,3 +35,4 @@ class Usuario(Base):
 
 
 from models.refresh_token import RefreshToken  # noqa: F401, E402
+from models.registration_token import RegistrationToken  # noqa: F401, E402

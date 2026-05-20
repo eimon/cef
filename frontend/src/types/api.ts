@@ -12,12 +12,14 @@ export interface User {
     apellido: string | null;
     fecha_nacimiento: string | null;
     dni: string | null;
+    genero: string | null;
     role: string | UserRole;
     activo: boolean;
     created_at: string;
 }
 export interface AuthResponse {
     access_token: string;
+    refresh_token: string;
     token_type: string;
 }
 
