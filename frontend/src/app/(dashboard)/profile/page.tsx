@@ -5,6 +5,7 @@ import MedicalRecordEditForm from "@/components/MedicalRecordEditForm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import ChangeEmailForm from "@/components/ChangeEmailForm";
+import ProfilePasswordResetButton from "@/components/ProfilePasswordResetButton";
 import {
     Ambulance,
     CalendarDays,
@@ -32,7 +33,7 @@ const sectionOptions: {
     {
         id: "cuenta",
         label: "Cuenta",
-        description: "Email y acceso",
+        description: "Email y contraseña",
         icon: <Mail size={18} />,
     },
     {
@@ -171,7 +172,6 @@ function AccountSection({ profile }: { profile: User | null }) {
                 </div>
                 <div>
                     <h2 className="text-lg font-bold text-slate-800">Cuenta</h2>
-                    <p className="text-sm text-slate-400">Email identificador y acceso</p>
                 </div>
             </div>
 
@@ -184,7 +184,6 @@ function AccountSection({ profile }: { profile: User | null }) {
                         </div>
                         <div>
                             <h3 className="text-base font-semibold text-slate-800">Contraseña</h3>
-                            <p className="text-sm text-slate-500">Esta acción se habilitará pronto.</p>
                         </div>
                     </div>
 
@@ -195,15 +194,7 @@ function AccountSection({ profile }: { profile: User | null }) {
                                 <p className="mt-1 text-sm font-semibold text-slate-800">********</p>
                             </div>
 
-                            <button
-                                type="button"
-                                disabled
-                                title="Proximamente"
-                                className="inline-flex items-center gap-2 w-full cursor-not-allowed justify-center rounded-lg border border-slate-300 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-500 transition-all sm:w-auto"
-                            >
-                                <Pencil size={16} />
-                                Cambiar contraseña
-                            </button>
+                            <ProfilePasswordResetButton email={profile?.email} />
                         </div>
                     </div>
                 </div>
@@ -275,10 +266,6 @@ function MedicalRecordView({ record }: { record: MedicalRecordProfile | null }) 
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-                <p className="text-sm text-slate-500">Fecha de carga: {formatDate(record.fecha)}</p>
-            </div>
-
             <SectionCard title="Contacto de emergencia" icon={<Ambulance size={18} />}>
                 <div className="grid gap-3 sm:grid-cols-3">
                     <Field label="Nombre" value={valueOrFallback(emergency?.nombre)} />

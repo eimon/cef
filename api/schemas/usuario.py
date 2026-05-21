@@ -92,6 +92,23 @@ class EmailChangeConfirmResponse(BaseModel):
     email: EmailStr
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequestResponse(BaseModel):
+    detail: str
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    detail: str
+
+
 class PublicFichaMedicaRequest(BaseModel):
     token: str
     cuerpo_ficha: str = Field(..., min_length=10)

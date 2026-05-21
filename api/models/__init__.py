@@ -10,12 +10,14 @@ from models.pagos import Pago
 from models.ficha_medica import FichaMedica
 from models.sala import Sala
 from models.email_change_token import EmailChangeToken
+from models.password_reset_token import PasswordResetToken
 
 __all__ = [
     "Usuario",
     "RefreshToken",
     "RegistrationToken",
     "EmailChangeToken",
+    "PasswordResetToken",
     "Profesor",
     "Suscripcion",
     "ClaseTemplate",

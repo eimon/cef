@@ -17,6 +17,10 @@ from schemas.usuario import (
     EmailChangeRequestResponse,
     EmailChangeConfirmRequest,
     EmailChangeConfirmResponse,
+    PasswordResetRequest,
+    PasswordResetRequestResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
     PublicFichaMedicaRequest,
     UsuarioUpdate,
 )
@@ -79,6 +83,24 @@ async def request_email_change(
     """Request email change and send confirmation link to the new email."""
     await AuthService(db).request_email_change(current_user.id, body.new_email)
     return {"detail": "Te enviamos un email para confirmar el cambio de email"}
+
+@router.post("/password/forgot", response_model=PasswordResetRequestResponse)
+async def password_forgot(
+    body: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request a password reset link. Does not reveal whether the email exists."""
+    await AuthService(db).request_password_reset(body.email)
+    return {"detail": "Te enviamos un email con instrucciones para cambiar la contraseña"}
+
+@router.post("/password/reset", response_model=PasswordResetConfirmResponse)
+async def password_reset(
+    body: PasswordResetConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset password using token and new password."""
+    usuario = await AuthService(db).reset_password(body.token, body.new_password)
+    return {"detail": "Contraseña actualizada correctamente", "email": usuario.email}  # type: ignore
 
 
 @router.post("/email/change/confirm", response_model=EmailChangeConfirmResponse)
