@@ -75,6 +75,23 @@ class VerifyEmailResponse(BaseModel):
     onboarding_token: str
 
 
+class EmailChangeRequest(BaseModel):
+    new_email: EmailStr
+
+
+class EmailChangeRequestResponse(BaseModel):
+    detail: str
+
+
+class EmailChangeConfirmRequest(BaseModel):
+    token: str
+
+
+class EmailChangeConfirmResponse(BaseModel):
+    detail: str
+    email: EmailStr
+
+
 class PublicFichaMedicaRequest(BaseModel):
     token: str
     cuerpo_ficha: str = Field(..., min_length=10)

@@ -4,6 +4,7 @@ import PersonalDataEditForm from "@/components/PersonalDataEditForm";
 import MedicalRecordEditForm from "@/components/MedicalRecordEditForm";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import ChangeEmailForm from "@/components/ChangeEmailForm";
 import {
     Ambulance,
     CalendarDays,
@@ -13,6 +14,7 @@ import {
     IdCard,
     LockKeyhole,
     Mail,
+    Pencil,
     Phone,
     Pill,
     Stethoscope,
@@ -174,20 +176,36 @@ function AccountSection({ profile }: { profile: User | null }) {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Email" value={valueOrFallback(profile?.email)} icon={<Mail size={15} />} />
-                <div className="space-y-3">
-                    <Field label="Contrasena" value="********" icon={<LockKeyhole size={15} />} />
-                    <button
-                        type="button"
-                        disabled
-                        title="Proximamente"
-                        className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-cef-primary/20 bg-cef-primary/10 px-4 py-2.5 text-sm font-semibold text-cef-primary/60"
-                    >
-                        Cambiar contrasena
-                        <span className="rounded bg-cef-primary/15 px-1.5 py-0.5 text-[10px] font-normal text-cef-primary/80">
-                            Proximamente
-                        </span>
-                    </button>
+                <ChangeEmailForm currentEmail={profile?.email} />
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cef-primary/10 text-cef-primary">
+                            <LockKeyhole size={18} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-semibold text-slate-800">Contraseña</h3>
+                            <p className="text-sm text-slate-500">Esta acción se habilitará pronto.</p>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contraseña</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-800">********</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                disabled
+                                title="Proximamente"
+                                className="inline-flex items-center gap-2 w-full cursor-not-allowed justify-center rounded-lg border border-slate-300 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-500 transition-all sm:w-auto"
+                            >
+                                <Pencil size={16} />
+                                Cambiar contraseña
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>

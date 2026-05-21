@@ -1,6 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
+import { z } from "zod";
 import type { User } from "@/types/api";
 import { revalidatePath } from "next/cache";
 
@@ -49,6 +50,63 @@ export type PersonalDataState = {
     values?: PersonalDataFormValues;
     fieldErrors?: Partial<Record<keyof PersonalDataFormValues | "_form", string>>;
 };
+
+export type EmailChangeState = {
+    error?: string;
+    success?: boolean;
+    values?: { new_email?: string };
+    fieldErrors?: Partial<Record<"new_email" | "_form", string>>;
+};
+
+const emailSchema = z.string().email("Email inválido");
+
+export async function requestEmailChange(
+    prevState: EmailChangeState,
+    formData: FormData
+): Promise<EmailChangeState> {
+    const newEmail = String(formData.get("new_email") || "").trim();
+    const values = { new_email: newEmail };
+
+    const validatedFields = emailSchema.safeParse(newEmail);
+    if (!validatedFields.success) {
+        const message = validatedFields.error.issues[0].message;
+        return {
+            error: message,
+            fieldErrors: { new_email: message },
+            values,
+        };
+    }
+
+    try {
+        const res = await serverApi("/auth/email/change", {
+            method: "POST",
+            body: JSON.stringify({ new_email: newEmail }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const message = data?.detail || "No pudimos enviar el email de confirmación.";
+            const fieldErrors: EmailChangeState["fieldErrors"] = {};
+            const normalizedMessage = String(message).toLowerCase();
+
+            if (normalizedMessage.includes("email")) {
+                fieldErrors.new_email = message;
+            }
+
+            return {
+                error: message,
+                fieldErrors: Object.keys(fieldErrors).length ? fieldErrors : { _form: message },
+                values,
+            };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error("Request email change error:", error);
+        const message = "No pudimos procesar el cambio de email. Intentalo nuevamente.";
+        return { error: message, fieldErrors: { _form: message }, values };
+    }
+}
 
 function isValidDateParts(year: number, month: number, day: number): boolean {
     const date = new Date(year, month - 1, day);

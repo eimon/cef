@@ -28,6 +28,7 @@ class Usuario(Base):
 
     refresh_tokens = relationship("RefreshToken", back_populates="usuario", cascade="all, delete-orphan")
     registration_tokens = relationship("RegistrationToken", back_populates="usuario", cascade="all, delete-orphan")
+    email_change_tokens = relationship("EmailChangeToken", back_populates="usuario", cascade="all, delete-orphan")
     suscripciones = relationship("Suscripcion", back_populates="usuario")
     pagos = relationship("Pago", back_populates="usuario")
     asistencias = relationship("Asistencia", back_populates="usuario")
