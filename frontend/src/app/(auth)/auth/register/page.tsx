@@ -3,7 +3,7 @@
 import { useActionState, FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, MailCheck } from "lucide-react";
 
 import { signup, SignupState } from "@/actions/auth";
 
