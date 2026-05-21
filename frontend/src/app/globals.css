@@ -78,6 +78,17 @@ option {
   color: #0f172a;
 }
 
+input[data-password-toggle]::-ms-reveal,
+input[data-password-toggle]::-ms-clear {
+  display: none;
+}
+
+input[data-password-toggle]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
 /* ── Scrollbar ──────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;

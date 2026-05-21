@@ -13,8 +13,18 @@ from schemas.usuario import (
     PublicSignupResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
+    EmailChangeRequest,
+    EmailChangeRequestResponse,
+    EmailChangeConfirmRequest,
+    EmailChangeConfirmResponse,
+    PasswordResetRequest,
+    PasswordResetRequestResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
     PublicFichaMedicaRequest,
+    UsuarioUpdate,
 )
+from schemas.ficha_medica import FichaMedicaPerfilResponse, FichaMedicaUpdateRequest
 from services.auth_service import AuthService
 from services.refresh_token_service import RefreshTokenService
 from core.database import get_db
@@ -62,6 +72,45 @@ async def verify_email(
         "detail": "Email confirmado. Completa tu ficha medica para activar la cuenta",
         "onboarding_token": onboarding_token,
     }
+
+
+@router.post("/email/change", response_model=EmailChangeRequestResponse)
+async def request_email_change(
+    body: EmailChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Request email change and send confirmation link to the new email."""
+    await AuthService(db).request_email_change(current_user.id, body.new_email)
+    return {"detail": "Te enviamos un email para confirmar el cambio de email"}
+
+@router.post("/password/forgot", response_model=PasswordResetRequestResponse)
+async def password_forgot(
+    body: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request a password reset link. Does not reveal whether the email exists."""
+    await AuthService(db).request_password_reset(body.email)
+    return {"detail": "Te enviamos un email con instrucciones para cambiar la contraseña"}
+
+@router.post("/password/reset", response_model=PasswordResetConfirmResponse)
+async def password_reset(
+    body: PasswordResetConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset password using token and new password."""
+    usuario = await AuthService(db).reset_password(body.token, body.new_password)
+    return {"detail": "Contraseña actualizada correctamente", "email": usuario.email}  # type: ignore
+
+
+@router.post("/email/change/confirm", response_model=EmailChangeConfirmResponse)
+async def confirm_email_change(
+    body: EmailChangeConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm the email change using the provided token."""
+    usuario = await AuthService(db).confirm_email_change(body.token)
+    return {"detail": "Tu email fue confirmado y actualizado correctamente", "email": usuario.email}
 
 
 @router.post("/signup/ficha-medica", response_model=Token)
@@ -127,7 +176,36 @@ async def update_perfil(
     )
 
 
+@router.patch("/perfil", response_model=UsuarioResponse)
+async def update_datos_perfil(
+    body: UsuarioUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Update current user's personal data."""
+    return await AuthService(db).update_profile(current_user.id, body)
+
+
 @router.get("/perfil", response_model=UsuarioResponse)
 async def perfil(current_user: Usuario = Depends(get_current_user)):
     """Get current user profile."""
     return current_user
+
+
+@router.get("/perfil/ficha-medica", response_model=FichaMedicaPerfilResponse)
+async def perfil_ficha_medica(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Get current user's medical record."""
+    return await AuthService(db).get_own_ficha_medica(current_user.id)
+
+
+@router.put("/perfil/ficha-medica", response_model=FichaMedicaPerfilResponse)
+async def update_perfil_ficha_medica(
+    body: FichaMedicaUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Update current user's medical record."""
+    return await AuthService(db).update_own_ficha_medica(current_user.id, body.cuerpo_ficha)

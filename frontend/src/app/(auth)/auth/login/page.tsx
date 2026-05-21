@@ -46,7 +46,6 @@ export default function LoginPage() {
                                 id="email"
                                 name="email"
                                 type="email"
-                                required
                                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
                                 placeholder="correo@ejemplo.com"
                             />
@@ -57,16 +56,20 @@ export default function LoginPage() {
                                 htmlFor="password"
                                 className="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider"
                             >
-                                Contrasena
+                                Contraseña
                             </label>
                             <input
                                 id="password"
                                 name="password"
                                 type="password"
-                                required
                                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
                                 placeholder="********"
                             />
+                            <div className="mt-2 text-right">
+                                <Link href="/auth/forgot-password" className="text-xs text-cef-primary hover:text-cef-primary/80 font-medium">
+                                    Olvidé mi contraseña
+                                </Link>
+                            </div>
                         </div>
 
                         <button

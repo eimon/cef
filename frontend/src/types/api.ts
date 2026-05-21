@@ -30,6 +30,52 @@ export interface Profesor {
     updated_at: string | null;
 }
 
+export type MedicalRecordBody = {
+    contacto_emergencia?: {
+        nombre?: string;
+        relacion?: string;
+        telefono?: string;
+    };
+    antecedentes_medicos?: {
+        afecciones?: string[];
+        especifique_otros?: string;
+    };
+    informacion_adicional_salud?: {
+        fuma_o_ha_fumado?: string;
+        consume_alcohol?: string;
+        mareos_falta_aire_o_dolor_pecho?: string;
+        horas_sueno_promedio?: string;
+        dificultad_para_dormir?: string;
+        dieta_especial_o_suplementacion?: string;
+    };
+    historial_cirugias?: Array<{
+        descripcion?: string;
+        fecha?: string;
+        complicaciones_secuelas?: string;
+    }>;
+    alergias_y_medicacion?: {
+        alergias?: string;
+        medicacion_actual?: string;
+    };
+    actividad_fisica_y_objetivos?: {
+        realiza_actividad_fisica_actualmente?: string;
+        frecuencia?: string;
+        objetivo_principal?: string[];
+    };
+    consentimiento_y_declaracion_jurada?: {
+        aceptado?: boolean;
+        texto?: string;
+    };
+};
+
+export interface MedicalRecordProfile {
+    id: string;
+    fecha: string;
+    cuerpo_ficha: MedicalRecordBody;
+    created_at: string;
+    updated_at: string | null;
+}
+
 export interface AuthResponse {
     access_token: string;
     refresh_token: string;
