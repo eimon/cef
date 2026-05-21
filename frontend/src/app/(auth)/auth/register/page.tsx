@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, MailCheck } from "lucide-react";
 
 import { signup, SignupState } from "@/actions/auth";
 
@@ -54,8 +54,9 @@ export default function RegisterPage() {
                     ) : (
                         <form action={formAction} className="grid gap-4 p-6">
                             {state.error && (
-                                <div className="rounded-lg border border-cef-danger/20 bg-cef-danger/10 p-3 text-sm text-cef-danger">
-                                    {state.error}
+                                <div className="flex items-start gap-2 rounded-lg border border-cef-danger/20 bg-cef-danger/10 p-3 text-sm text-cef-danger">
+                                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                                    <p className="leading-tight">{state.error}</p>
                                 </div>
                             )}
 

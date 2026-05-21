@@ -15,6 +15,24 @@ const loginSchema = z.object({
     password: z.string().min(1, "La contrasena es requerida"),
 });
 
+function parseDateString(value: string) {
+    const [year, month, day] = value.split("-").map(Number);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+    return date;
+}
+
+function getEdad(fechaNacimiento: string): number {
+    const fecha = parseDateString(fechaNacimiento);
+    if (!fecha) return NaN;
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - fecha.getFullYear();
+    const cumpleEsteAno = new Date(hoy.getFullYear(), fecha.getMonth(), fecha.getDate());
+    if (hoy < cumpleEsteAno) edad--;
+    return edad;
+}
+
 const signupSchema = z
     .object({
         email: z.string().email("Email invalido"),
@@ -30,6 +48,18 @@ const signupSchema = z
     .refine((data) => data.password === data.confirmPassword, {
         message: "Las contrasenas no coinciden",
         path: ["confirmPassword"],
+    })
+    .superRefine((data, ctx) => {
+        if (data.fecha_nacimiento) {
+            const edad = getEdad(data.fecha_nacimiento);
+            if (!Number.isFinite(edad) || edad < 14) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Debe tener 14 años para registarse",
+                    path: ["fecha_nacimiento"],
+                });
+            }
+        }
     });
 
 const medicalRecordSchema = z
