@@ -46,7 +46,7 @@ export default async function Navbar() {
                             <div className="relative flex items-center space-x-3">
                                 <div className="hidden md:flex flex-col items-end">
                                     <span className="text-sm font-medium text-slate-700">{[user.nombre, user.apellido].filter(Boolean).join(" ") || user.email}</span>
-                                    <span className="text-xs text-slate-400 capitalize">{user.role.toLowerCase()}</span>
+                                    <span className="text-xs text-slate-400">{user.email}</span>
                                 </div>
 
                                 <div className="relative group">

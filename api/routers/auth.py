@@ -14,7 +14,9 @@ from schemas.usuario import (
     VerifyEmailRequest,
     VerifyEmailResponse,
     PublicFichaMedicaRequest,
+    UsuarioUpdate,
 )
+from schemas.ficha_medica import FichaMedicaPerfilResponse, FichaMedicaUpdateRequest
 from services.auth_service import AuthService
 from services.refresh_token_service import RefreshTokenService
 from core.database import get_db
@@ -127,7 +129,36 @@ async def update_perfil(
     )
 
 
+@router.patch("/perfil", response_model=UsuarioResponse)
+async def update_datos_perfil(
+    body: UsuarioUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Update current user's personal data."""
+    return await AuthService(db).update_profile(current_user.id, body)
+
+
 @router.get("/perfil", response_model=UsuarioResponse)
 async def perfil(current_user: Usuario = Depends(get_current_user)):
     """Get current user profile."""
     return current_user
+
+
+@router.get("/perfil/ficha-medica", response_model=FichaMedicaPerfilResponse)
+async def perfil_ficha_medica(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Get current user's medical record."""
+    return await AuthService(db).get_own_ficha_medica(current_user.id)
+
+
+@router.put("/perfil/ficha-medica", response_model=FichaMedicaPerfilResponse)
+async def update_perfil_ficha_medica(
+    body: FichaMedicaUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Update current user's medical record."""
+    return await AuthService(db).update_own_ficha_medica(current_user.id, body.cuerpo_ficha)

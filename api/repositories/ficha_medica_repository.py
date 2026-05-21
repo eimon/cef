@@ -22,3 +22,12 @@ class FichaMedicaRepository:
         await self.db.flush()
         await self.db.refresh(obj)
         return obj
+
+    async def update_by_usuario_id(self, usuario_id: uuid.UUID, cuerpo_ficha: str) -> FichaMedica | None:
+        obj = await self.get_by_usuario_id(usuario_id)
+        if not obj:
+            return None
+        obj.cuerpo_ficha = cuerpo_ficha
+        await self.db.flush()
+        await self.db.refresh(obj)
+        return obj

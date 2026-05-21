@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, AlertCircle, Loader2, MailCheck } from "lucide-react";
@@ -14,6 +14,16 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase trac
 export default function RegisterPage() {
     const [state, formAction, isPending] = useActionState(signup, initialState);
     const values = state.values || {};
+    const fieldErrors = state.fieldErrors || {};
+
+    function handleBirthInput(e: FormEvent<HTMLInputElement>) {
+        const el = e.currentTarget;
+        let value = el.value.replace(/\D/g, "");
+        if (value.length > 8) value = value.slice(0, 8);
+        if (value.length > 4) value = value.slice(0, 2) + "/" + value.slice(2, 4) + "/" + value.slice(4);
+        else if (value.length > 2) value = value.slice(0, 2) + "/" + value.slice(2);
+        el.value = value;
+    }
 
     return (
         <main className="min-h-screen bg-slate-50 px-4 py-8">
@@ -52,53 +62,61 @@ export default function RegisterPage() {
                             </p>
                         </div>
                     ) : (
-                        <form action={formAction} className="grid gap-4 p-6">
-                            {state.error && (
-                                <div className="flex items-start gap-2 rounded-lg border border-cef-danger/20 bg-cef-danger/10 p-3 text-sm text-cef-danger">
-                                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                                    <p className="leading-tight">{state.error}</p>
-                                </div>
-                            )}
+                        <form action={formAction} noValidate className="grid gap-4 p-6">
+                            {fieldErrors._form && <p className="text-xs text-cef-danger">{fieldErrors._form}</p>}
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className={labelCls}>Nombre</label>
-                                    <input name="nombre" required className={inputCls} defaultValue={values.nombre || ""} />
+                                    <input name="nombre" required className={inputCls} defaultValue={values.nombre || ""} aria-invalid={Boolean(fieldErrors.nombre)} />
+                                    {fieldErrors.nombre && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.nombre}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Apellido</label>
-                                    <input name="apellido" required className={inputCls} defaultValue={values.apellido || ""} />
+                                    <input name="apellido" required className={inputCls} defaultValue={values.apellido || ""} aria-invalid={Boolean(fieldErrors.apellido)} />
+                                    {fieldErrors.apellido && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.apellido}</p>}
                                 </div>
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className={labelCls}>Email</label>
-                                    <input name="email" type="email" required className={inputCls} defaultValue={values.email || ""} />
+                                    <input name="email" type="email" required className={inputCls} defaultValue={values.email || ""} aria-invalid={Boolean(fieldErrors.email)} />
+                                    {fieldErrors.email && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.email}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Telefono</label>
-                                    <input name="telefono" type="tel" className={inputCls} defaultValue={values.telefono || ""} />
+                                    <input name="telefono" type="tel" className={inputCls} defaultValue={values.telefono || ""} aria-invalid={Boolean(fieldErrors.telefono)} />
+                                    {fieldErrors.telefono && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.telefono}</p>}
                                 </div>
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div>
                                     <label className={labelCls}>DNI</label>
-                                    <input name="dni" className={inputCls} defaultValue={values.dni || ""} />
+                                    <input name="dni" className={inputCls} defaultValue={values.dni || ""} aria-invalid={Boolean(fieldErrors.dni)} />
+                                    {fieldErrors.dni && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.dni}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Fecha de nacimiento</label>
                                     <input
                                         name="fecha_nacimiento"
-                                        type="date"
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={10}
+                                        placeholder="DD/MM/AAAA"
                                         className={inputCls}
                                         defaultValue={values.fecha_nacimiento || ""}
+                                        onInput={handleBirthInput}
+                                        aria-invalid={Boolean(fieldErrors.fecha_nacimiento)}
                                     />
+                                    {fieldErrors.fecha_nacimiento && (
+                                        <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.fecha_nacimiento}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Genero</label>
-                                    <select name="genero" required className={inputCls} defaultValue={values.genero || ""}>
+                                    <select name="genero" required className={inputCls} defaultValue={values.genero || ""} aria-invalid={Boolean(fieldErrors.genero)}>
                                         <option value="" disabled>Seleccionar</option>
                                         <option value="femenino">Femenino</option>
                                         <option value="masculino">Masculino</option>
@@ -106,20 +124,25 @@ export default function RegisterPage() {
                                         <option value="prefiero_no_decir">Prefiero no decir</option>
                                         <option value="otro">Otro</option>
                                     </select>
+                                    {fieldErrors.genero && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.genero}</p>}
                                 </div>
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className={labelCls}>Contrasena</label>
-                                    <input name="password" type="password" required className={inputCls} />
+                                    <input name="password" type="password" required className={inputCls} aria-invalid={Boolean(fieldErrors.password)} />
+                                    {fieldErrors.password && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.password}</p>}
                                     <p className="mt-1.5 text-xs text-slate-500">
                                         Debe tener como minimo 8 caracteres.
                                     </p>
                                 </div>
                                 <div>
                                     <label className={labelCls}>Confirmar contrasena</label>
-                                    <input name="confirmPassword" type="password" required className={inputCls} />
+                                    <input name="confirmPassword" type="password" required className={inputCls} aria-invalid={Boolean(fieldErrors.confirmPassword)} />
+                                    {fieldErrors.confirmPassword && (
+                                        <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.confirmPassword}</p>
+                                    )}
                                 </div>
                             </div>
 
