@@ -530,6 +530,73 @@ export async function completeMedicalRecord(
     redirect("/");
 }
 
+export type PasswordResetState = {
+    error?: string;
+    success?: boolean;
+    fieldErrors?: Partial<Record<'email' | 'new_password' | '_form', string>>;
+};
+
+const passwordEmailSchema = z.string().email("Email inválido");
+
+export async function requestPasswordReset(prevState: PasswordResetState, formData: FormData): Promise<PasswordResetState> {
+    const email = String(formData.get("email") || "").trim();
+    const validated = passwordEmailSchema.safeParse(email);
+    if (!validated.success) {
+        return { error: validated.error.issues[0].message, fieldErrors: { email: validated.error.issues[0].message } };
+    }
+
+    try {
+        const res = await fetch(`${SERVER_API_URL}/auth/password/forgot`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const message = data?.detail || "No pudimos enviar el email de reseteo.";
+            return { error: message, fieldErrors: { _form: message } };
+        }
+
+        return { success: true };
+    } catch (err) {
+        console.error(err);
+        return { error: "No pudimos procesar la solicitud. Intentalo nuevamente.", fieldErrors: { _form: "No pudimos procesar la solicitud. Intentalo nuevamente." } };
+    }
+}
+
+export async function resetPassword(prevState: PasswordResetState, formData: FormData): Promise<PasswordResetState> {
+    const token = String(formData.get("token") || "").trim();
+    const newPassword = String(formData.get("new_password") || "");
+    const confirmPassword = String(formData.get("confirm_password") || "");
+
+    if (newPassword.length < 8) {
+        return { error: "La contraseña debe tener al menos 8 caracteres", fieldErrors: { new_password: "La contraseña debe tener al menos 8 caracteres" } };
+    }
+    if (newPassword !== confirmPassword) {
+        return { error: "Las contraseñas no coinciden", fieldErrors: { new_password: "Las contraseñas no coinciden" } };
+    }
+
+    try {
+        const res = await fetch(`${SERVER_API_URL}/auth/password/reset`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token, new_password: newPassword }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const message = data?.detail || "No pudimos cambiar la contraseña.";
+            return { error: message, fieldErrors: { _form: message } };
+        }
+
+        return { success: true };
+    } catch (err) {
+        console.error(err);
+        return { error: "No pudimos procesar la solicitud. Intentalo nuevamente.", fieldErrors: { _form: "No pudimos procesar la solicitud. Intentalo nuevamente." } };
+    }
+}
+
 export async function updateMedicalRecord(
     prevState: MedicalRecordState,
     formData: FormData

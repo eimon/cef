@@ -9,6 +9,7 @@ from models.usuario import Usuario
 from repositories.ficha_medica_repository import FichaMedicaRepository
 from repositories.registration_token_repository import RegistrationTokenRepository
 from repositories.email_change_token_repository import EmailChangeTokenRepository
+from repositories.password_reset_token_repository import PasswordResetTokenRepository
 from repositories.user_repository import UserRepository
 from schemas.ficha_medica import FichaMedicaCreate, FichaMedicaPerfilResponse
 from schemas.usuario import (
@@ -29,6 +30,7 @@ class AuthService:
         self.user_repo = UserRepository(db)
         self.registration_token_repo = RegistrationTokenRepository(db)
         self.email_change_token_repo = EmailChangeTokenRepository(db)
+        self.password_reset_token_repo = PasswordResetTokenRepository(db)
         self.ficha_medica_repo = FichaMedicaRepository(db)
 
     async def register_user(self, data: UsuarioCreate) -> Usuario:
@@ -79,6 +81,39 @@ class AuthService:
 
         _, raw_token = await self.email_change_token_repo.create(usuario.id, new_email)
         await EmailService().send_email_change_verification(new_email, raw_token)
+
+    async def request_password_reset(self, email: str) -> None:
+        # Do not reveal whether the email exists
+        usuario = await self.user_repo.get_by_email(email)
+        if not usuario:
+            return
+
+        _, raw_token = await self.password_reset_token_repo.create(usuario.id)
+        await EmailService().send_password_reset(usuario.email, raw_token)
+
+    async def reset_password(self, raw_token: str, new_password: str) -> Usuario:
+        token = await self.password_reset_token_repo.get_by_raw_token(raw_token)
+        if not token:
+            raise UnauthorizedException("Token inválido")
+        if token.expires_at < datetime.now(timezone.utc):
+            raise BadRequestException("El enlace de reseteo expiró")
+        if token.used_at is not None:
+            raise BadRequestException("El enlace ya fue utilizado")
+
+        usuario = await self.user_repo.get_by_id(token.usuario_id)
+        if not usuario:
+            raise UnauthorizedException("Usuario no encontrado")
+
+        if len(new_password) < 8:
+            raise BadRequestException("La contraseña debe tener al menos 8 caracteres")
+        if verify_password(new_password, usuario.hashed_password):
+            raise BadRequestException("La contraseña no puede ser igual a la actual")
+
+        usuario.hashed_password = get_password_hash(new_password)
+        await self.password_reset_token_repo.mark_used(token)
+        await self.db.flush()
+        await self.db.refresh(usuario)
+        return usuario
 
     async def confirm_email_change(self, raw_token: str) -> Usuario:
         token = await self.email_change_token_repo.get_by_raw_token(raw_token)

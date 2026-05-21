@@ -30,7 +30,7 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
                     <Mail size={18} />
                 </div>
                 <div>
-                    <h3 className="text-base font-semibold text-slate-800">Cambiar email</h3>
+                    <h3 className="text-base font-semibold text-slate-800">Email</h3>
                 </div>
             </div>
 
