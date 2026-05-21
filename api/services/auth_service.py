@@ -1,14 +1,15 @@
 import uuid
+import json
 from datetime import date, datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from exceptions.general import ConflictException, UnauthorizedException, BadRequestException
+from exceptions.general import ConflictException, UnauthorizedException, BadRequestException, NotFoundException
 from models.usuario import Usuario
 from repositories.ficha_medica_repository import FichaMedicaRepository
 from repositories.registration_token_repository import RegistrationTokenRepository
 from repositories.user_repository import UserRepository
-from schemas.ficha_medica import FichaMedicaCreate
+from schemas.ficha_medica import FichaMedicaCreate, FichaMedicaPerfilResponse
 from schemas.usuario import (
     PublicFichaMedicaRequest,
     PublicSignupRequest,
@@ -133,6 +134,24 @@ class AuthService:
         await self.db.flush()
         await self.db.refresh(usuario)
         return usuario
+
+    async def get_own_ficha_medica(self, usuario_id: uuid.UUID) -> FichaMedicaPerfilResponse:
+        ficha = await self.ficha_medica_repo.get_by_usuario_id(usuario_id)
+        if not ficha:
+            raise NotFoundException("Ficha medica no encontrada")
+
+        try:
+            cuerpo_ficha = json.loads(ficha.cuerpo_ficha)
+        except json.JSONDecodeError:
+            cuerpo_ficha = {"contenido": ficha.cuerpo_ficha}
+
+        return FichaMedicaPerfilResponse(
+            id=ficha.id,
+            fecha=ficha.fecha,
+            cuerpo_ficha=cuerpo_ficha,
+            created_at=ficha.created_at,
+            updated_at=ficha.updated_at,
+        )
 
     async def _validate_unique_optional_fields(
         self,

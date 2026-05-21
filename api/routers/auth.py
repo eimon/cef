@@ -15,6 +15,7 @@ from schemas.usuario import (
     VerifyEmailResponse,
     PublicFichaMedicaRequest,
 )
+from schemas.ficha_medica import FichaMedicaPerfilResponse
 from services.auth_service import AuthService
 from services.refresh_token_service import RefreshTokenService
 from core.database import get_db
@@ -131,3 +132,12 @@ async def update_perfil(
 async def perfil(current_user: Usuario = Depends(get_current_user)):
     """Get current user profile."""
     return current_user
+
+
+@router.get("/perfil/ficha-medica", response_model=FichaMedicaPerfilResponse)
+async def perfil_ficha_medica(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Get current user's medical record."""
+    return await AuthService(db).get_own_ficha_medica(current_user.id)

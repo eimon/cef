@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Any
 from pydantic import BaseModel, UUID4, Field
 
 
@@ -19,3 +20,11 @@ class FichaMedicaResponse(FichaMedicaBase):
 
     class Config:
         from_attributes = True
+
+
+class FichaMedicaPerfilResponse(BaseModel):
+    id: UUID4
+    fecha: date
+    cuerpo_ficha: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime | None = None
