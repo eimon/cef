@@ -12,6 +12,10 @@ class FichaMedicaCreate(FichaMedicaBase):
     usuario_id: UUID4
 
 
+class FichaMedicaUpdateRequest(BaseModel):
+    cuerpo_ficha: str = Field(..., min_length=10)
+
+
 class FichaMedicaResponse(FichaMedicaBase):
     id: UUID4
     usuario_id: UUID4

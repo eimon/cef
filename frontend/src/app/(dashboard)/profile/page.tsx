@@ -1,5 +1,7 @@
 import { serverApi } from "@/lib/server-api";
 import { MedicalRecordProfile, User } from "@/types/api";
+import PersonalDataEditForm from "@/components/PersonalDataEditForm";
+import MedicalRecordEditForm from "@/components/MedicalRecordEditForm";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
@@ -341,13 +343,15 @@ function normalizeSection(section?: string): ProfileSection {
 }
 
 type ProfilePageProps = {
-    searchParams: Promise<{ seccion?: string }>;
+    searchParams: Promise<{ seccion?: string; editar?: string }>;
 };
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
     const { seccion } = await searchParams;
     const activeSection = normalizeSection(seccion);
     const [profile, medicalRecord] = await Promise.all([getProfile(), getMedicalRecord()]);
+
+    const isEditing = typeof seccion === "string" && (await searchParams).editar;
 
     return (
         <div className="mx-auto max-w-6xl space-y-6">
@@ -359,20 +363,42 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
             <ProfileSectionSelector activeSection={activeSection} />
 
             {activeSection === "cuenta" ? <AccountSection profile={profile} /> : null}
-            {activeSection === "datos-personales" ? <PersonalDataSection profile={profile} /> : null}
+            {activeSection === "datos-personales" ? (
+                isEditing ? (
+                    <PersonalDataEditForm profile={profile} />
+                ) : (
+                    <>
+                        <div className="flex justify-end">
+                            <Link href="/profile?seccion=datos-personales&editar=1" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                                Editar
+                            </Link>
+                        </div>
+                        <PersonalDataSection profile={profile} />
+                    </>
+                )
+            ) : null}
             {activeSection === "ficha-medica" ? (
-                <section className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cef-primary text-white">
-                            <HeartPulse size={22} />
+                isEditing ? (
+                    <MedicalRecordEditForm record={medicalRecord} />
+                ) : (
+                    <section className="space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cef-primary text-white">
+                                <HeartPulse size={22} />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">Ficha medica</h2>
+                                <p className="text-sm text-slate-400">Datos de salud</p>
+                            </div>
+                            <div className="ml-auto">
+                                <Link href="/profile?seccion=ficha-medica&editar=1" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                                    Editar ficha medica
+                                </Link>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800">Ficha medica</h2>
-                            <p className="text-sm text-slate-400">Solo lectura</p>
-                        </div>
-                    </div>
-                    <MedicalRecordView record={medicalRecord} />
-                </section>
+                        <MedicalRecordView record={medicalRecord} />
+                    </section>
+                )
             ) : null}
         </div>
     );

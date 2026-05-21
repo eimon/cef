@@ -15,6 +15,7 @@ from schemas.usuario import (
     PublicSignupRequest,
     Token,
     UsuarioCreate,
+    UsuarioUpdate,
 )
 from services.email_service import EmailService
 from services.refresh_token_service import RefreshTokenService
@@ -135,6 +136,34 @@ class AuthService:
         await self.db.refresh(usuario)
         return usuario
 
+    async def update_profile(self, usuario_id: uuid.UUID, data: UsuarioUpdate) -> Usuario:
+        if data.dni:
+            existing = await self.user_repo.get_by_dni(data.dni)
+            if existing and existing.id != usuario_id:
+                raise ConflictException("DNI ya registrado")
+        if data.telefono:
+            existing = await self.user_repo.get_by_telefono(data.telefono)
+            if existing and existing.id != usuario_id:
+                raise ConflictException("Telefono ya registrado")
+
+        update_data = UsuarioUpdate(
+            **data.model_dump(
+                include={
+                    "telefono",
+                    "nombre",
+                    "apellido",
+                    "fecha_nacimiento",
+                    "dni",
+                    "genero",
+                },
+                exclude_unset=True,
+            )
+        )
+        usuario = await self.user_repo.update(usuario_id, update_data)
+        if not usuario:
+            raise UnauthorizedException("Usuario no encontrado")
+        return usuario
+
     async def get_own_ficha_medica(self, usuario_id: uuid.UUID) -> FichaMedicaPerfilResponse:
         ficha = await self.ficha_medica_repo.get_by_usuario_id(usuario_id)
         if not ficha:
@@ -149,6 +178,28 @@ class AuthService:
             id=ficha.id,
             fecha=ficha.fecha,
             cuerpo_ficha=cuerpo_ficha,
+            created_at=ficha.created_at,
+            updated_at=ficha.updated_at,
+        )
+
+    async def update_own_ficha_medica(
+        self,
+        usuario_id: uuid.UUID,
+        cuerpo_ficha: str,
+    ) -> FichaMedicaPerfilResponse:
+        ficha = await self.ficha_medica_repo.update_by_usuario_id(usuario_id, cuerpo_ficha)
+        if not ficha:
+            raise NotFoundException("Ficha medica no encontrada")
+
+        try:
+            parsed_body = json.loads(ficha.cuerpo_ficha)
+        except json.JSONDecodeError:
+            parsed_body = {"contenido": ficha.cuerpo_ficha}
+
+        return FichaMedicaPerfilResponse(
+            id=ficha.id,
+            fecha=ficha.fecha,
+            cuerpo_ficha=parsed_body,
             created_at=ficha.created_at,
             updated_at=ficha.updated_at,
         )
