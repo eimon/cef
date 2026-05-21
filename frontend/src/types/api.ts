@@ -17,6 +17,19 @@ export interface User {
     activo: boolean;
     created_at: string;
 }
+export interface Profesor {
+    id: string;
+    dni: string;
+    nombre: string;
+    apellido: string;
+    genero: string | null;
+    email: string | null;
+    telefono: string | null;
+    activo: boolean;
+    created_at: string;
+    updated_at: string | null;
+}
+
 export interface AuthResponse {
     access_token: string;
     refresh_token: string;
