@@ -14,26 +14,8 @@ const SERVER_API_URL = RAW_SERVER_API_URL.replace(/\/$/, "");
 
 const loginSchema = z.object({
     email: z.string().email("Email invalido"),
-    password: z.string().min(1, "La contrasena es requerida"),
+    password: z.string().min(1, "Debe ingresar su contraseña"),
 });
-
-function parseDateString(value: string) {
-    const [year, month, day] = value.split("-").map(Number);
-    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-    return date;
-}
-
-function getEdad(fechaNacimiento: string): number {
-    const fecha = parseDateString(fechaNacimiento);
-    if (!fecha) return NaN;
-    const hoy = new Date();
-    let edad = hoy.getFullYear() - fecha.getFullYear();
-    const cumpleEsteAno = new Date(hoy.getFullYear(), fecha.getMonth(), fecha.getDate());
-    if (hoy < cumpleEsteAno) edad--;
-    return edad;
-}
 
 const signupSchema = z
     .object({
@@ -41,27 +23,15 @@ const signupSchema = z
         telefono: z.string().optional(),
         nombre: z.string().min(1, "El nombre es requerido"),
         apellido: z.string().min(1, "El apellido es requerido"),
-        fecha_nacimiento: z.string().optional(),
+        fecha_nacimiento: z.string().min(1, "Fecha de nacimiento invalida"),
         dni: z.string().optional(),
-        genero: z.string().min(1, "El genero es requerido"),
-        password: z.string().min(8, "La contrasena debe tener al menos 8 caracteres"),
-        confirmPassword: z.string().min(1, "Confirma tu contrasena"),
+        genero: z.string().min(1, "Selecciona un genero"),
+        password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+        confirmPassword: z.string().min(1, "Confirma tu contraseña"),
     })
     .refine((data) => data.password === data.confirmPassword, {
-        message: "Las contrasenas no coinciden",
+        message: "Las contraseñas no coinciden",
         path: ["confirmPassword"],
-    })
-    .superRefine((data, ctx) => {
-        if (data.fecha_nacimiento) {
-            const edad = getEdad(data.fecha_nacimiento);
-            if (!Number.isFinite(edad) || edad < 14) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: "Debe tener 14 años para registarse",
-                    path: ["fecha_nacimiento"],
-                });
-            }
-        }
     });
 
 const medicalRecordFieldsSchema = z.object({
@@ -334,9 +304,9 @@ export async function signup(prevState: SignupState, formData: FormData): Promis
         telefono: formData.get("telefono") || undefined,
         nombre: formData.get("nombre"),
         apellido: formData.get("apellido"),
-        fecha_nacimiento: formData.get("fecha_nacimiento") || undefined,
+        fecha_nacimiento: formData.get("fecha_nacimiento"),
         dni: formData.get("dni") || undefined,
-        genero: formData.get("genero"),
+        genero: getFormString(formData, "genero"),
         password: formData.get("password"),
         confirmPassword: formData.get("confirmPassword"),
     });
@@ -346,14 +316,12 @@ export async function signup(prevState: SignupState, formData: FormData): Promis
         return { error: message, fieldErrors: getSignupFieldErrors(validatedFields.error), values };
     }
 
-    const normalizedBirthDate = validatedFields.data.fecha_nacimiento
-        ? normalizeBirthDate(validatedFields.data.fecha_nacimiento)
-        : undefined;
+    const normalizedBirthDate = normalizeBirthDate(validatedFields.data.fecha_nacimiento);
 
-    if (validatedFields.data.fecha_nacimiento && !normalizedBirthDate) {
+    if (!normalizedBirthDate) {
         return {
-            error: "Ingresa una fecha valida con formato DD/MM/AAAA",
-            fieldErrors: { fecha_nacimiento: "Ingresa una fecha valida con formato DD/MM/AAAA" },
+            error: "Fecha de nacimiento invalida",
+            fieldErrors: { fecha_nacimiento: "Fecha de nacimiento invalida" },
             values,
         };
     }

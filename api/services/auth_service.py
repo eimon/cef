@@ -184,9 +184,9 @@ class AuthService:
     ) -> Token:
         usuario = await self.user_repo.get_by_email(email)
         if not usuario or not usuario.hashed_password:
-            raise UnauthorizedException("Email o contrasena incorrectos")
+            raise UnauthorizedException("Email o contraseña incorrectos")
         if not verify_password(password, usuario.hashed_password):
-            raise UnauthorizedException("Email o contrasena incorrectos")
+            raise UnauthorizedException("Email o contraseña incorrectos")
         if not usuario.activo:
             raise UnauthorizedException(
                 "Tu cuenta todavia no esta activada. Revisa tu email y completa la ficha medica."
@@ -205,7 +205,7 @@ class AuthService:
         if not usuario:
             raise UnauthorizedException("Usuario no encontrado")
         if not verify_password(current_password, usuario.hashed_password):
-            raise BadRequestException("Contrasena actual incorrecta")
+            raise BadRequestException("Contraseña actual incorrecta")
         usuario.hashed_password = get_password_hash(new_password)
         await self.db.flush()
         await self.db.refresh(usuario)
