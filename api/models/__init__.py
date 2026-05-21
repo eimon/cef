@@ -9,11 +9,13 @@ from models.asistencia import Asistencia
 from models.pagos import Pago
 from models.ficha_medica import FichaMedica
 from models.sala import Sala
+from models.email_change_token import EmailChangeToken
 
 __all__ = [
     "Usuario",
     "RefreshToken",
     "RegistrationToken",
+    "EmailChangeToken",
     "Profesor",
     "Suscripcion",
     "ClaseTemplate",

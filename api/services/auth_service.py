@@ -8,6 +8,7 @@ from exceptions.general import ConflictException, UnauthorizedException, BadRequ
 from models.usuario import Usuario
 from repositories.ficha_medica_repository import FichaMedicaRepository
 from repositories.registration_token_repository import RegistrationTokenRepository
+from repositories.email_change_token_repository import EmailChangeTokenRepository
 from repositories.user_repository import UserRepository
 from schemas.ficha_medica import FichaMedicaCreate, FichaMedicaPerfilResponse
 from schemas.usuario import (
@@ -27,6 +28,7 @@ class AuthService:
         self.db = db
         self.user_repo = UserRepository(db)
         self.registration_token_repo = RegistrationTokenRepository(db)
+        self.email_change_token_repo = EmailChangeTokenRepository(db)
         self.ficha_medica_repo = FichaMedicaRepository(db)
 
     async def register_user(self, data: UsuarioCreate) -> Usuario:
@@ -63,6 +65,44 @@ class AuthService:
             await self.db.refresh(usuario)
 
         return raw_token
+
+    async def request_email_change(self, usuario_id: uuid.UUID, new_email: str) -> None:
+        usuario = await self.user_repo.get_by_id(usuario_id)
+        if not usuario:
+            raise UnauthorizedException("Usuario no encontrado")
+
+        if usuario.email.lower() == new_email.lower():
+            raise BadRequestException("El email ingresado es igual al actual")
+
+        if await self.user_repo.get_by_email(new_email):
+            raise ConflictException("Email ya registrado")
+
+        _, raw_token = await self.email_change_token_repo.create(usuario.id, new_email)
+        await EmailService().send_email_change_verification(new_email, raw_token)
+
+    async def confirm_email_change(self, raw_token: str) -> Usuario:
+        token = await self.email_change_token_repo.get_by_raw_token(raw_token)
+        if not token:
+            raise UnauthorizedException("Token inválido")
+        if token.expires_at < datetime.now(timezone.utc):
+            raise BadRequestException("El enlace de confirmación expiró")
+        if token.confirmed_at is not None:
+            raise BadRequestException("El enlace ya fue utilizado")
+
+        existing = await self.user_repo.get_by_email(token.new_email)
+        if existing and existing.id != token.usuario_id:
+            raise ConflictException("Email ya registrado")
+
+        usuario = await self.user_repo.get_by_id(token.usuario_id)
+        if not usuario:
+            raise UnauthorizedException("Usuario no encontrado")
+
+        usuario.email = token.new_email
+        usuario.email_verified_at = datetime.now(timezone.utc)
+        await self.email_change_token_repo.mark_confirmed(token)
+        await self.db.flush()
+        await self.db.refresh(usuario)
+        return usuario
 
     async def complete_public_signup(
         self,

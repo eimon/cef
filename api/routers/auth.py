@@ -13,6 +13,10 @@ from schemas.usuario import (
     PublicSignupResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
+    EmailChangeRequest,
+    EmailChangeRequestResponse,
+    EmailChangeConfirmRequest,
+    EmailChangeConfirmResponse,
     PublicFichaMedicaRequest,
     UsuarioUpdate,
 )
@@ -64,6 +68,27 @@ async def verify_email(
         "detail": "Email confirmado. Completa tu ficha medica para activar la cuenta",
         "onboarding_token": onboarding_token,
     }
+
+
+@router.post("/email/change", response_model=EmailChangeRequestResponse)
+async def request_email_change(
+    body: EmailChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Request email change and send confirmation link to the new email."""
+    await AuthService(db).request_email_change(current_user.id, body.new_email)
+    return {"detail": "Te enviamos un email para confirmar el cambio de email"}
+
+
+@router.post("/email/change/confirm", response_model=EmailChangeConfirmResponse)
+async def confirm_email_change(
+    body: EmailChangeConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirm the email change using the provided token."""
+    usuario = await AuthService(db).confirm_email_change(body.token)
+    return {"detail": "Tu email fue confirmado y actualizado correctamente", "email": usuario.email}
 
 
 @router.post("/signup/ficha-medica", response_model=Token)
