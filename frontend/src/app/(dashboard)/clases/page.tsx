@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getClasesSemana } from "@/actions/clases";
 import ClasesGrid from "@/components/ClasesGrid";
 import WeekNavigation from "@/components/WeekNavigation";
+import AddClaseDialog from "@/components/AddClaseDialog";
 import { getUserRole } from "@/lib/auth";
 
 function getMonday(dateStr?: string): string {
@@ -29,6 +30,8 @@ export default async function ClasesPage({
         getUserRole(),
     ]);
 
+    const isStaff = userRole === "admin" || userRole === "recepcion";
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -36,7 +39,10 @@ export default async function ClasesPage({
                     <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Clases</h1>
                     <p className="text-sm text-slate-400 mt-1">Consultá horarios y cupos de cada clase.</p>
                 </div>
-                <WeekNavigation monday={monday} />
+                <div className="flex items-center gap-3">
+                    {isStaff && <AddClaseDialog />}
+                    <WeekNavigation monday={monday} />
+                </div>
             </div>
 
             <ClasesGrid clases={clases} userRole={userRole} />

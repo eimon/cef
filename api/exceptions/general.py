@@ -35,6 +35,30 @@ class ConflictException(APIException):
         super().__init__(message, status_code=409)
 
 
+class ProfesorReactivableException(APIException):
+    def __init__(self, profesor_id: str, nombre: str, apellido: str, genero: str):
+        self.profesor_id = profesor_id
+        self.nombre = nombre
+        self.apellido = apellido
+        self.genero = genero
+        super().__init__("Existe un profesor dado de baja con ese DNI", status_code=409)
+
+
+class ClaseConInscriptosException(APIException):
+    def __init__(self):
+        super().__init__("La clase tiene clientes inscriptos y no puede ser eliminada", status_code=409)
+
+
+class SalaOcupadaException(APIException):
+    def __init__(self):
+        super().__init__("La sala se encuentra ocupada en ese horario", status_code=409)
+
+
+class ProfesorOcupadoException(APIException):
+    def __init__(self):
+        super().__init__("El profesor se encuentra ocupado en ese horario", status_code=409)
+
+
 # === Business Logic Exceptions ===
 
 class ValidacionDatosException(APIException):

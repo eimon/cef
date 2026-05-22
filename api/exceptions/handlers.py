@@ -2,10 +2,24 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 from fastapi.responses import JSONResponse
-from .general import APIException
+from .general import APIException, ProfesorReactivableException
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def profesor_reactivable_handler(_request: Request, exc: ProfesorReactivableException):
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": exc.message,
+            "profesor_id": exc.profesor_id,
+            "nombre": exc.nombre,
+            "apellido": exc.apellido,
+            "genero": exc.genero,
+            "reactivable": True,
+        },
+    )
 
 
 def api_exception_handler(request: Request, exc: APIException):
@@ -83,6 +97,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 def register_exception_handlers(app: FastAPI):
+    app.add_exception_handler(ProfesorReactivableException, profesor_reactivable_handler)
     app.add_exception_handler(APIException, api_exception_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
