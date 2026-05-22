@@ -6,11 +6,23 @@ import uuid
 
 from repositories.clase_template_repository import ClaseTemplateRepository
 from repositories.clase_instancia_repository import ClaseInstanciaRepository
-from schemas.clase_template import ClaseTemplateResponse
+from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
-from exceptions.general import NotFoundException
+from exceptions.general import NotFoundException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
+from services.email_service import EmailService
 from core.enums import DiaSemana
+from models.clase_template import ClaseTemplate
 from models.suscripciones import Suscripcion
+
+_WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
+    0: DiaSemana.LUNES,
+    1: DiaSemana.MARTES,
+    2: DiaSemana.MIERCOLES,
+    3: DiaSemana.JUEVES,
+    4: DiaSemana.VIERNES,
+    5: DiaSemana.SABADO,
+    6: DiaSemana.DOMINGO,
+}
 
 _DIA_OFFSET: dict[DiaSemana, int] = {
     DiaSemana.LUNES: 0,
@@ -51,6 +63,75 @@ class ClaseTemplateService:
             created_at=clase.created_at,
             updated_at=clase.updated_at,
         )
+
+    async def create(self, data: ClaseTemplateCreate) -> ClaseTemplateResponse:
+        dia_semana = _WEEKDAY_TO_DIA[data.fecha.weekday()]
+
+        if await self.repo.get_conflicting_sala(data.sala_id, dia_semana, data.hora_inicio, data.hora_fin):
+            raise SalaOcupadaException()
+
+        if await self.repo.get_conflicting_profesor(data.profesor_id, dia_semana, data.hora_inicio, data.hora_fin):
+            raise ProfesorOcupadoException()
+
+        nombre = data.disciplina.value.capitalize()
+        clase = ClaseTemplate(
+            nombre=nombre,
+            disciplina=data.disciplina,
+            dia_semana=dia_semana,
+            hora_inicio=data.hora_inicio,
+            hora_fin=data.hora_fin,
+            sala_id=data.sala_id,
+            profesor_id=data.profesor_id,
+            capacidad_maxima=20,
+            precio_individual=0,
+            precio_suscripcion=0,
+        )
+        clase = await self.repo.create(clase)
+        clase = await self.repo.get_by_id(clase.id)
+        return self._to_response(clase)
+
+    async def delete(self, clase_id: uuid.UUID) -> None:
+        clase = await self.repo.get_by_id(clase_id)
+        if not clase:
+            raise NotFoundException("Clase no encontrada")
+        if await self.repo.has_inscriptos(clase_id):
+            raise ClaseConInscriptosException()
+        await self.repo.soft_delete(clase)
+
+    async def update(self, clase_id: uuid.UUID, data: ClaseTemplateUpdate) -> ClaseTemplateResponse:
+        clase = await self.repo.get_by_id(clase_id)
+        if not clase:
+            raise NotFoundException("Clase no encontrada")
+
+        dia_semana = _WEEKDAY_TO_DIA[data.fecha.weekday()]
+
+        if await self.repo.get_conflicting_sala(data.sala_id, dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
+            raise SalaOcupadaException()
+
+        if await self.repo.get_conflicting_profesor(data.profesor_id, dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
+            raise ProfesorOcupadoException()
+
+        emails = await self.repo.get_enrolled_emails(clase_id)
+
+        await self.repo.update_fields(clase, {
+            "disciplina": data.disciplina,
+            "dia_semana": dia_semana,
+            "hora_inicio": data.hora_inicio,
+            "hora_fin": data.hora_fin,
+            "sala_id": data.sala_id,
+            "profesor_id": data.profesor_id,
+            "nombre": data.disciplina.value.capitalize(),
+        })
+
+        dia_label = dia_semana.value.capitalize()
+        hora_inicio_str = data.hora_inicio.strftime("%H:%M")
+        hora_fin_str = data.hora_fin.strftime("%H:%M")
+        await EmailService().send_clase_update_notification(
+            emails, data.disciplina.value.capitalize(), dia_label, hora_inicio_str, hora_fin_str
+        )
+
+        clase = await self.repo.get_by_id(clase_id)
+        return self._to_response(clase)
 
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[ClaseTemplateResponse]:
         clases = await self.repo.get_all(skip, limit)

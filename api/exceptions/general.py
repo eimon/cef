@@ -44,6 +44,21 @@ class ProfesorReactivableException(APIException):
         super().__init__("Existe un profesor dado de baja con ese DNI", status_code=409)
 
 
+class ClaseConInscriptosException(APIException):
+    def __init__(self):
+        super().__init__("La clase tiene clientes inscriptos y no puede ser eliminada", status_code=409)
+
+
+class SalaOcupadaException(APIException):
+    def __init__(self):
+        super().__init__("La sala se encuentra ocupada en ese horario", status_code=409)
+
+
+class ProfesorOcupadoException(APIException):
+    def __init__(self):
+        super().__init__("El profesor se encuentra ocupado en ese horario", status_code=409)
+
+
 # === Business Logic Exceptions ===
 
 class ValidacionDatosException(APIException):

@@ -88,6 +88,36 @@ class EmailService:
                 raise BadRequestException("El dominio remitente de Resend no esta verificado") from exc
             raise BadRequestException("No pudimos enviar el email de confirmacion") from exc
 
+    async def send_clase_update_notification(self, emails: list[str], clase_nombre: str, dia_semana: str, hora_inicio: str, hora_fin: str) -> None:
+        if not emails:
+            return
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se enviaron notificaciones de cambio de clase.")
+            return
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se enviaron notificaciones.")
+            return
+
+        resend.api_key = settings.RESEND_API_KEY
+        for email in emails:
+            try:
+                params: resend.Emails.SendParams = {
+                    "from": settings.RESEND_FROM_EMAIL,
+                    "to": [email],
+                    "subject": f"Cambio en la clase {clase_nombre} - CEF",
+                    "html": (
+                        f"<p>Hola,</p>"
+                        f"<p>Te informamos que la clase <strong>{clase_nombre}</strong> a la que estás inscripto ha sido modificada.</p>"
+                        f"<p>Nuevo horario: <strong>{dia_semana} {hora_inicio} – {hora_fin}</strong></p>"
+                        f"<p>Si tenés dudas, comunicate con recepción.</p>"
+                    ),
+                }
+                resend.Emails.send(params)
+            except Exception:
+                logger.exception("Error enviando notificación de cambio de clase a %s", email)
+
     async def send_password_reset(self, to_email: str, token: str) -> None:
         verification_url = f"{settings.FRONTEND_PUBLIC_URL.rstrip('/')}/auth/reset-password?token={token}"
 

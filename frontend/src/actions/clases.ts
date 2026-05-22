@@ -1,7 +1,113 @@
 "use server";
 
+import { z } from "zod";
 import { serverApi } from "@/lib/server-api";
 import { ClaseTemplate, ClaseSemana } from "@/types/api";
+import { revalidatePath } from "next/cache";
+
+export type ClaseFormState = {
+    error?: string;
+    success?: boolean;
+};
+
+const createClaseSchema = z.object({
+    disciplina: z.string().min(1, "La disciplina es requerida"),
+    fecha: z.string().min(1, "La fecha es requerida"),
+    hora_inicio: z.string().min(1, "La hora de inicio es requerida"),
+    hora_fin: z.string().min(1, "La hora de fin es requerida"),
+    sala_id: z.string().uuid("Sala inválida"),
+    profesor_id: z.string().uuid("Profesor inválido"),
+});
+
+export async function createClase(
+    prevState: ClaseFormState,
+    formData: FormData
+): Promise<ClaseFormState> {
+    const validated = createClaseSchema.safeParse({
+        disciplina: formData.get("disciplina"),
+        fecha: formData.get("fecha"),
+        hora_inicio: formData.get("hora_inicio"),
+        hora_fin: formData.get("hora_fin"),
+        sala_id: formData.get("sala_id"),
+        profesor_id: formData.get("profesor_id"),
+    });
+
+    if (!validated.success) {
+        return { error: validated.error.issues[0].message };
+    }
+
+    try {
+        const res = await serverApi("/clases/", {
+            method: "POST",
+            body: JSON.stringify(validated.data),
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Error al crear la clase" };
+        }
+    } catch (error) {
+        console.error("Create Clase Error:", error);
+        return { error: "Something went wrong" };
+    }
+
+    revalidatePath("/clases");
+    return { success: true };
+}
+
+export async function updateClase(
+    claseId: string,
+    prevState: ClaseFormState,
+    formData: FormData
+): Promise<ClaseFormState> {
+    const validated = createClaseSchema.safeParse({
+        disciplina: formData.get("disciplina"),
+        fecha: formData.get("fecha"),
+        hora_inicio: formData.get("hora_inicio"),
+        hora_fin: formData.get("hora_fin"),
+        sala_id: formData.get("sala_id"),
+        profesor_id: formData.get("profesor_id"),
+    });
+
+    if (!validated.success) {
+        return { error: validated.error.issues[0].message };
+    }
+
+    try {
+        const res = await serverApi(`/clases/${claseId}`, {
+            method: "PUT",
+            body: JSON.stringify(validated.data),
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Error al editar la clase" };
+        }
+    } catch (error) {
+        console.error("Update Clase Error:", error);
+        return { error: "Something went wrong" };
+    }
+
+    revalidatePath("/clases");
+    return { success: true };
+}
+
+export async function deleteClase(
+    claseId: string
+): Promise<{ success?: boolean; error?: string }> {
+    try {
+        const res = await serverApi(`/clases/${claseId}`, { method: "DELETE" });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Error al eliminar la clase" };
+        }
+    } catch (error) {
+        console.error("Delete Clase Error:", error);
+        return { error: "Something went wrong" };
+    }
+    revalidatePath("/clases");
+    return { success: true };
+}
 
 export async function getClases(): Promise<ClaseTemplate[]> {
     try {

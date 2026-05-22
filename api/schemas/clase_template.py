@@ -1,6 +1,6 @@
 from pydantic import BaseModel, UUID4, Field
 from typing import Optional
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 from core.enums import DiaSemana, Disciplina
 
@@ -15,6 +15,24 @@ class ClaseTemplateBase(BaseModel):
     capacidad_maxima: int = Field(..., ge=1)
     precio_individual: float
     precio_suscripcion: float
+
+
+class ClaseTemplateCreate(BaseModel):
+    disciplina: Disciplina
+    fecha: date
+    hora_inicio: time
+    hora_fin: time
+    sala_id: UUID4
+    profesor_id: UUID4
+
+
+class ClaseTemplateUpdate(BaseModel):
+    disciplina: Disciplina
+    fecha: date
+    hora_inicio: time
+    hora_fin: time
+    sala_id: UUID4
+    profesor_id: UUID4
 
 
 class ClaseTemplateResponse(ClaseTemplateBase):

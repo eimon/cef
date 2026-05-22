@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, CalendarDays } from "lucide-react";
+import { Clock, CalendarDays, Pencil, Trash2 } from "lucide-react";
 import { ClaseSemana, DiaSemana, Disciplina } from "@/types/api";
 import ClaseDetailDialog from "@/components/ClaseDetailDialog";
+import EditClaseDialog from "@/components/EditClaseDialog";
+import DeleteClaseDialog from "@/components/DeleteClaseDialog";
 
 const DIA_LABELS: Record<string, string> = {
     lunes: "Lunes",
@@ -52,7 +54,10 @@ function formatFechaCorta(fechaStr: string): string {
 
 export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]; userRole: string | null }) {
     const [selectedClase, setSelectedClase] = useState<ClaseSemana | null>(null);
+    const [claseToEdit, setClaseToEdit] = useState<ClaseSemana | null>(null);
+    const [claseToDelete, setClaseToDelete] = useState<ClaseSemana | null>(null);
     const [filtro, setFiltro] = useState<Disciplina | null>(null);
+    const isStaff = userRole === "admin" || userRole === "recepcion";
 
     const disciplinas = Array.from(new Set(clases.map((c) => c.disciplina))) as Disciplina[];
     const clasesFiltradas = filtro ? clases.filter((c) => c.disciplina === filtro) : clases;
@@ -127,15 +132,17 @@ export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]
                             {/* Cards Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {clasesDelDia.map((clase) => (
-                                    <button
+                                    <div
                                         key={clase.id}
-                                        type="button"
-                                        onClick={() => setSelectedClase(clase)}
-                                        className="glass rounded-2xl overflow-hidden hover:border-slate-300 hover:shadow-md hover:shadow-slate-100 transition-all duration-300 text-left flex flex-col group cursor-pointer"
+                                        className="glass rounded-2xl overflow-hidden hover:border-slate-300 hover:shadow-md hover:shadow-slate-100 transition-all duration-300 flex flex-col group relative"
                                     >
                                         <div className={`h-1.5 w-full bg-gradient-to-r ${accentBg}`} />
 
-                                        <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedClase(clase)}
+                                            className="p-5 flex-1 flex flex-col justify-between space-y-4 text-left cursor-pointer"
+                                        >
                                             <div>
                                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                                                     Actividad
@@ -163,8 +170,29 @@ export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]
                                                     </span>
                                                 )}
                                             </div>
-                                        </div>
-                                    </button>
+                                        </button>
+
+                                        {isStaff && (
+                                            <div className="absolute top-3 right-3 flex gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setClaseToEdit(clase)}
+                                                    className="p-1.5 rounded-lg bg-white/80 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all shadow-sm"
+                                                    title="Editar clase"
+                                                >
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setClaseToDelete(clase)}
+                                                    className="p-1.5 rounded-lg bg-white/80 hover:bg-cef-danger/10 text-slate-400 hover:text-cef-danger transition-all shadow-sm"
+                                                    title="Eliminar clase"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -178,6 +206,24 @@ export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]
                 onClose={() => setSelectedClase(null)}
                 userRole={userRole}
             />
+
+            {claseToEdit && (
+                <EditClaseDialog
+                    key={claseToEdit.id}
+                    clase={claseToEdit}
+                    isOpen={true}
+                    onClose={() => setClaseToEdit(null)}
+                />
+            )}
+
+            {claseToDelete && (
+                <DeleteClaseDialog
+                    key={claseToDelete.id}
+                    clase={claseToDelete}
+                    isOpen={true}
+                    onClose={() => setClaseToDelete(null)}
+                />
+            )}
         </>
     );
 }
