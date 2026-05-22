@@ -5,8 +5,6 @@ import { getProfesores } from "@/actions/profesores";
 import { Profesor } from "@/types/api";
 import ProfesoresTable from "@/components/ProfesoresTable";
 import AddProfesorDialog from "@/components/AddProfesorDialog";
-import EditProfesorByDniDialog from "@/components/EditProfesorByDniDialog";
-import DeleteProfesorDialog from "@/components/DeleteProfesorDialog";
 
 export default function ProfesoresPage() {
     const [profesores, setProfesores] = useState<Profesor[]>([]);
@@ -33,11 +31,7 @@ export default function ProfesoresPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800">Profesores</h1>
                 </div>
-                <div className="flex items-center gap-2">
-                    <DeleteProfesorDialog onSuccess={refresh} />
-                    <EditProfesorByDniDialog onSuccess={refresh} />
-                    <AddProfesorDialog onSuccess={refresh} />
-                </div>
+                <AddProfesorDialog onSuccess={refresh} />
             </div>
 
             {isLoading ? (
@@ -45,7 +39,7 @@ export default function ProfesoresPage() {
                     <p className="text-slate-400 text-sm">Cargando...</p>
                 </div>
             ) : (
-                <ProfesoresTable profesores={profesores} />
+                <ProfesoresTable profesores={profesores} onSuccess={refresh} />
             )}
         </div>
     );
