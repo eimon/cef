@@ -176,12 +176,8 @@ class ClaseTemplateService:
         )
         subs = subs_result.scalars().all()
 
-        def count_subs(template_id: uuid.UUID, fecha_clase: date) -> int:
-            return sum(
-                1 for s in subs
-                if s.clase_template_id == template_id
-                and s.fecha_inicio <= fecha_clase <= s.fecha_fin
-            )
+        def count_subs(template_id: uuid.UUID) -> int:
+            return sum(1 for s in subs if s.clase_template_id == template_id)
 
         result = []
         for template in templates:
@@ -192,7 +188,7 @@ class ClaseTemplateService:
             if instancia:
                 cupo_disponible = instancia.cupo
             else:
-                cupo_disponible = template.capacidad_maxima - count_subs(template.id, fecha_clase)
+                cupo_disponible = template.capacidad_maxima - count_subs(template.id)
 
             result.append(ClaseSemanaResponse(
                 id=template.id,
