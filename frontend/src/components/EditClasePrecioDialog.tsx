@@ -92,15 +92,18 @@ export default function EditClasePrecioDialog({ clase, isOpen, onClose, onSucces
 
                     <div>
                         <label className={labelCls}>Nuevo precio</label>
-                        <input
-                            key={tipo}
-                            name="precio"
-                            type="number"
-                            step="0.01"
-                            defaultValue={currentPrice}
-                            required
-                            className={inputCls}
-                        />
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">$</span>
+                            <input
+                                key={tipo}
+                                name="precio"
+                                type="number"
+                                step="0.01"
+                                defaultValue={currentPrice}
+                                required
+                                className={inputCls + " pl-7"}
+                            />
+                        </div>
                     </div>
 
                     <div className="pt-2 flex justify-end space-x-3">

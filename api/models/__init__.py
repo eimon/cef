@@ -12,6 +12,7 @@ from models.sala import Sala
 from models.email_change_token import EmailChangeToken
 from models.password_reset_token import PasswordResetToken
 from models.historial_precio import HistorialPrecio
+from models.configuracion import Configuracion
 
 __all__ = [
     "Usuario",
@@ -28,4 +29,5 @@ __all__ = [
     "FichaMedica",
     "Sala",
     "HistorialPrecio",
+    "Configuracion",
 ]
