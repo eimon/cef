@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, BookOpen } from "lucide-react";
-import { ClaseSemana } from "@/types/api";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, BookOpen, Calendar } from "lucide-react";
+import { ClaseSemana, SuscripcionCheckResponse } from "@/types/api";
 import { checkElegibilidadIndividual, inscribirseIndividual } from "@/actions/inscripciones";
+import { checkElegibilidadSuscripcion, suscribirse } from "@/actions/suscripciones";
 import MockPaymentModal from "@/components/MockPaymentModal";
 
 const DIA_LABELS: Record<string, string> = {
@@ -39,6 +40,22 @@ function formatFechaLarga(fechaStr: string): string {
     }).format(new Date(y, m - 1, d));
 }
 
+function formatFechaCorta(fechaStr: string): string {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    return new Intl.DateTimeFormat("es-AR", {
+        day: "numeric",
+        month: "long",
+    }).format(new Date(y, m - 1, d));
+}
+
+function formatFechaChip(fechaStr: string): string {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    return new Intl.DateTimeFormat("es-AR", {
+        day: "numeric",
+        month: "short",
+    }).format(new Date(y, m - 1, d));
+}
+
 function isFutureDate(fechaStr: string): boolean {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -46,7 +63,7 @@ function isFutureDate(fechaStr: string): boolean {
     return new Date(y, m - 1, d) > today;
 }
 
-type Step = "detail" | "amount" | "payment";
+type Step = "detail" | "amount" | "amount-suscripcion";
 
 export default function ClaseDetailDialog({
     clase,
@@ -64,8 +81,13 @@ export default function ClaseDetailDialog({
     const [partialAmount, setPartialAmount] = useState("");
     const [showPayment, setShowPayment] = useState(false);
     const [amountError, setAmountError] = useState("");
+
     const [checkLoading, setCheckLoading] = useState(false);
     const [checkError, setCheckError] = useState("");
+
+    const [suscripcionData, setSuscripcionData] = useState<SuscripcionCheckResponse | null>(null);
+    const [suscripcionCheckLoading, setSuscripcionCheckLoading] = useState(false);
+    const [suscripcionCheckError, setSuscripcionCheckError] = useState("");
 
     if (!isOpen || !clase) return null;
 
@@ -73,12 +95,15 @@ export default function ClaseDetailDialog({
         !clase.instancia?.cancelada &&
         isFutureDate(clase.fecha_en_semana);
 
-    const precio = clase.precio_individual;
-    const montoMinimo = precio / 2;
-
+    const precioActual = step === "amount-suscripcion"
+        ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
+        : clase.precio_individual;
+    const montoMinimoActual = step === "amount-suscripcion"
+        ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion / 2)
+        : clase.precio_individual / 2;
     const selectedMonto =
         paymentType === "full"
-            ? precio
+            ? precioActual
             : parseFloat(partialAmount) || 0;
 
     function handleClose() {
@@ -88,6 +113,9 @@ export default function ClaseDetailDialog({
         setAmountError("");
         setCheckError("");
         setShowPayment(false);
+        setSuscripcionData(null);
+        setSuscripcionCheckLoading(false);
+        setSuscripcionCheckError("");
         onClose();
     }
 
@@ -104,12 +132,28 @@ export default function ClaseDetailDialog({
         setStep("amount");
     }
 
+    async function handleSuscribirse() {
+        if (!clase) return;
+        setSuscripcionCheckLoading(true);
+        setSuscripcionCheckError("");
+        const result = await checkElegibilidadSuscripcion(clase.id);
+        setSuscripcionCheckLoading(false);
+        if (result.error) {
+            setSuscripcionCheckError(result.error);
+            return;
+        }
+        setSuscripcionData(result.data!);
+        setPaymentType("full");
+        setPartialAmount("");
+        setStep("amount-suscripcion");
+    }
+
     function handleContinuarPago() {
         if (paymentType === "partial") {
             const monto = parseFloat(partialAmount);
-            if (isNaN(monto) || monto <= montoMinimo || monto > precio) {
+            if (isNaN(monto) || monto <= montoMinimoActual || monto > precioActual) {
                 setAmountError(
-                    `El monto parcial debe ser mayor al 50% (${formatPrice(montoMinimo)}) y menor o igual al precio completo`
+                    `El monto parcial debe ser mayor al 50% (${formatPrice(montoMinimoActual)}) y menor o igual al precio completo`
                 );
                 return;
             }
@@ -120,6 +164,9 @@ export default function ClaseDetailDialog({
 
     async function handlePay() {
         if (!clase) return { error: "Clase no disponible" };
+        if (step === "amount-suscripcion") {
+            return await suscribirse(clase.id, selectedMonto);
+        }
         return await inscribirseIndividual(clase.id, clase.fecha_en_semana, selectedMonto);
     }
 
@@ -226,6 +273,7 @@ export default function ClaseDetailDialog({
 
                             {userRole === "cliente" ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                    {/* Clase individual */}
                                     <div className="glass rounded-xl p-4 flex flex-col justify-between space-y-4 group">
                                         <div>
                                             <div className="flex items-center gap-1.5 text-slate-400 mb-1">
@@ -278,6 +326,7 @@ export default function ClaseDetailDialog({
                                         )}
                                     </div>
 
+                                    {/* Suscripción mensual */}
                                     <div className="rounded-xl p-4 border border-cef-primary/30 bg-cef-primary/5 flex flex-col justify-between space-y-4 group">
                                         <div>
                                             <div className="flex items-center gap-1.5 text-cef-primary/70 mb-1">
@@ -290,14 +339,32 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Acceso mensual garantizado</p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            disabled
-                                            className="w-full py-2.5 px-3 rounded-lg bg-cef-primary/10 border border-cef-primary/20 text-xs font-semibold text-cef-primary/60 cursor-not-allowed group-hover:border-cef-primary/30 transition-all flex items-center justify-center gap-1.5"
-                                        >
-                                            <span>Suscribirme</span>
-                                            <span className="text-[10px] bg-cef-primary/15 px-1.5 py-0.5 rounded text-cef-primary/80 font-normal">Próximamente</span>
-                                        </button>
+                                        <div className="space-y-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleSuscribirse}
+                                                disabled={suscripcionCheckLoading}
+                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                                            >
+                                                {suscripcionCheckLoading ? (
+                                                    <>
+                                                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        Verificando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span>Suscribirme</span>
+                                                        <ChevronRight size={14} />
+                                                    </>
+                                                )}
+                                            </button>
+                                            {suscripcionCheckError && (
+                                                <div className="flex items-start gap-1.5">
+                                                    <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                    <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -316,7 +383,7 @@ export default function ClaseDetailDialog({
                         </div>
                     )}
 
-                    {/* Body — Step: amount */}
+                    {/* Body — Step: amount (individual) */}
                     {step === "amount" && (
                         <div className="px-6 py-5 space-y-5">
                             <p className="text-sm text-slate-600">
@@ -324,7 +391,6 @@ export default function ClaseDetailDialog({
                             </p>
 
                             <div className="space-y-3">
-                                {/* Full payment option */}
                                 <button
                                     type="button"
                                     onClick={() => setPaymentType("full")}
@@ -339,13 +405,10 @@ export default function ClaseDetailDialog({
                                             <p className="text-sm font-semibold text-slate-800">Pago completo</p>
                                             <p className="text-xs text-slate-400 mt-0.5">Abonás el monto total ahora</p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-bold text-slate-800">{formatPrice(precio)}</p>
-                                        </div>
+                                        <p className="text-lg font-bold text-slate-800">{formatPrice(precioActual)}</p>
                                     </div>
                                 </button>
 
-                                {/* Partial payment option */}
                                 <button
                                     type="button"
                                     onClick={() => setPaymentType("partial")}
@@ -359,12 +422,10 @@ export default function ClaseDetailDialog({
                                         <div>
                                             <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
                                             <p className="text-xs text-slate-400 mt-0.5">
-                                                Mínimo {formatPrice(montoMinimo + 1)} (más del 50%)
+                                                Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
                                             </p>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-xs text-slate-400">A definir</p>
-                                        </div>
+                                        <p className="text-xs text-slate-400">A definir</p>
                                     </div>
                                 </button>
 
@@ -377,15 +438,113 @@ export default function ClaseDetailDialog({
                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">$</span>
                                             <input
                                                 type="number"
-                                                min={montoMinimo + 1}
-                                                max={precio}
+                                                min={montoMinimoActual + 1}
+                                                max={precioActual}
                                                 step="1"
                                                 value={partialAmount}
                                                 onChange={(e) => {
                                                     setPartialAmount(e.target.value);
                                                     setAmountError("");
                                                 }}
-                                                placeholder={`${Math.ceil(montoMinimo) + 1} – ${precio}`}
+                                                placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
+                                                className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {amountError && (
+                                    <p className="text-xs text-cef-danger">{amountError}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Body — Step: amount-suscripcion */}
+                    {step === "amount-suscripcion" && suscripcionData && (
+                        <div className="px-6 py-5 space-y-5">
+                            {/* Subscription period info */}
+                            <div className="glass rounded-xl p-4 space-y-3">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Período de suscripción</p>
+                                <div className="flex items-center gap-2 text-sm text-slate-700">
+                                    <Calendar size={14} className="text-cef-primary flex-shrink-0" />
+                                    <span>
+                                        Del{" "}
+                                        <span className="font-semibold">{formatFechaCorta(suscripcionData.fecha_inicio)}</span>
+                                        {" "}al{" "}
+                                        <span className="font-semibold">{formatFechaCorta(suscripcionData.fecha_fin)}</span>
+                                    </span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {suscripcionData.fechas_clases.map((f) => (
+                                        <span
+                                            key={f}
+                                            className="text-[10px] px-2 py-0.5 rounded-md bg-cef-primary/10 text-cef-primary font-medium border border-cef-primary/20 capitalize"
+                                        >
+                                            {formatFechaChip(f)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Payment options */}
+                            <div className="space-y-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentType("full")}
+                                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                                        paymentType === "full"
+                                            ? "border-cef-primary bg-cef-primary/5"
+                                            : "border-slate-200 hover:border-slate-300"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-800">Pago completo</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">Abonás el monto total ahora</p>
+                                        </div>
+                                        <p className="text-lg font-bold text-slate-800">{formatPrice(precioActual)}</p>
+                                    </div>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentType("partial")}
+                                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                                        paymentType === "partial"
+                                            ? "border-cef-primary bg-cef-primary/5"
+                                            : "border-slate-200 hover:border-slate-300"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">
+                                                Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
+                                            </p>
+                                        </div>
+                                        <p className="text-xs text-slate-400">A definir</p>
+                                    </div>
+                                </button>
+
+                                {paymentType === "partial" && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                                            Ingresá el monto a pagar
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">$</span>
+                                            <input
+                                                type="number"
+                                                min={montoMinimoActual + 1}
+                                                max={precioActual}
+                                                step="1"
+                                                value={partialAmount}
+                                                onChange={(e) => {
+                                                    setPartialAmount(e.target.value);
+                                                    setAmountError("");
+                                                }}
+                                                placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
                                                 className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
                                             />
                                         </div>
