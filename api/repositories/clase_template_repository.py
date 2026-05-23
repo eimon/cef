@@ -9,6 +9,7 @@ from models.clase_instancia import ClaseInstancia
 from models.asistencia import Asistencia
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
+from models.historial_precio import HistorialPrecio
 from core.enums import DiaSemana
 
 
@@ -129,6 +130,27 @@ class ClaseTemplateRepository:
             .where(ClaseTemplate.id == clase_id)
         )
         return result.scalars().first()
+
+    async def update_precio(
+        self,
+        clase: ClaseTemplate,
+        tipo: str,
+        precio_anterior: float,
+        precio_nuevo: float,
+    ) -> None:
+        if tipo == "mensualidad":
+            clase.precio_suscripcion = precio_nuevo
+        else:
+            clase.precio_individual = precio_nuevo
+
+        historial = HistorialPrecio(
+            clase_template_id=clase.id,
+            tipo=tipo,
+            precio_anterior=precio_anterior,
+            precio_nuevo=precio_nuevo,
+        )
+        self.db.add(historial)
+        await self.db.commit()
 
     async def get_all(self, skip: int = 0, limit: int = 100) -> list[ClaseTemplate]:
         result = await self.db.execute(

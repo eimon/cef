@@ -109,6 +109,48 @@ export async function deleteClase(
     return { success: true };
 }
 
+export type ClasePrecioFormState = {
+    error?: string;
+    success?: boolean;
+    tipo?: string;
+    precio?: number;
+};
+
+export async function updateClasePrecio(
+    claseId: string,
+    prevState: ClasePrecioFormState,
+    formData: FormData
+): Promise<ClasePrecioFormState> {
+    const tipo = formData.get("tipo") as string;
+    const precioRaw = formData.get("precio") as string;
+    const precio = parseFloat(precioRaw);
+
+    if (!tipo || (tipo !== "mensualidad" && tipo !== "individual")) {
+        return { error: "Tipo de precio inválido" };
+    }
+    if (isNaN(precio) || precio <= 0) {
+        return { error: "El precio debe ser un valor mayor a cero" };
+    }
+
+    try {
+        const res = await serverApi(`/clases/${claseId}/precio`, {
+            method: "PUT",
+            body: JSON.stringify({ tipo, precio }),
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Error al actualizar el precio" };
+        }
+    } catch (error) {
+        console.error("Update Precio Error:", error);
+        return { error: "Something went wrong" };
+    }
+
+    revalidatePath("/clases");
+    return { success: true, tipo, precio };
+}
+
 export async function getClases(): Promise<ClaseTemplate[]> {
     try {
         const res = await serverApi("/clases/");

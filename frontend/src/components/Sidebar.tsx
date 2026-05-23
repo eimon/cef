@@ -1,7 +1,7 @@
 "use client";
 
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound } from "lucide-react";
+import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
@@ -12,6 +12,7 @@ const navigation = [
     { name: "Perfil", href: "/profile", icon: UserRound, adminOnly: false, clientOnly: false, staffOnly: false },
     { name: "Usuarios", href: "/users", icon: UserCog, adminOnly: true, clientOnly: false, staffOnly: false },
     { name: "Profesores", href: "/profesores", icon: GraduationCap, adminOnly: false, clientOnly: false, staffOnly: true },
+    { name: "Precios", href: "/precios", icon: DollarSign, adminOnly: true, clientOnly: false, staffOnly: false },
 ];
 
 export default function Sidebar({ userRole }: { userRole: string | null }) {
