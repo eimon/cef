@@ -185,6 +185,26 @@ export interface MiSuscripcion {
     instancias: InstanciaEnSuscripcion[];
 }
 
+export interface SuscripcionCheckResponse {
+    elegible: boolean;
+    fecha_inicio: string;
+    fecha_fin: string;
+    fechas_clases: string[];
+    precio_total: number;
+    monto_minimo: number;
+}
+
+export interface SuscripcionResponse {
+    id: string;
+    clase_template_id: string;
+    pago_id: string;
+    monto: number;
+    fecha_inicio: string;
+    fecha_fin: string;
+    fechas_clases: string[];
+    activo: boolean;
+}
+
 export interface ClaseSemana {
     id: string;
     nombre: string;
