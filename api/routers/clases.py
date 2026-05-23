@@ -7,7 +7,9 @@ from uuid import UUID
 
 from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse, ClasePrecioUpdate
 from schemas.clase_semana import ClaseSemanaResponse
+from schemas.asistencia import AsistenciaRecepcionResponse
 from services.clase_template_service import ClaseTemplateService
+from services.asistencia_service import AsistenciaService
 from core.database import get_db
 from dependencies.auth import get_current_user, has_role
 from core.roles import Role
@@ -71,6 +73,15 @@ async def list_clases(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await ClaseTemplateService(db).list_all(skip, limit)
+
+
+@router.get("/instancias/{instancia_id}/asistencias", response_model=List[AsistenciaRecepcionResponse])
+async def get_asistencias_instancia(
+    instancia_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(has_role(Role.ROLE_RECEPCION)),
+):
+    return await AsistenciaService(db).get_for_instancia(instancia_id)
 
 
 @router.get("/{clase_id}", response_model=ClaseTemplateResponse)

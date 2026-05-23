@@ -11,7 +11,7 @@ from repositories.user_repository import UserRepository
 from models.usuario import Usuario
 from exceptions.general import UnauthorizedException, ForbiddenException
 
-oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/login')
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),

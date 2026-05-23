@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from schemas.usuario import (
@@ -122,6 +123,20 @@ async def complete_signup_ficha_medica(
     """Complete medical record and issue the first session."""
     return await AuthService(db).complete_public_signup(
         body,
+        device_hint=_device_hint(request),
+    )
+
+
+@router.post("/token", response_model=Token, include_in_schema=False)
+async def login_oauth2(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    """OAuth2-compatible endpoint for Swagger UI. Uses username field as email."""
+    return await AuthService(db).authenticate_user(
+        form_data.username,
+        form_data.password,
         device_hint=_device_hint(request),
     )
 

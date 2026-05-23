@@ -146,7 +146,9 @@ class SuscripcionService:
             else:
                 count = await self.repo.count_suscripciones_en_fecha(clase_template_id, fecha)
                 cupo = max(0, template.capacidad_maxima - count)
-                await self.repo.create_instancia(clase_template_id, fecha, cupo)
+                instancia = await self.repo.create_instancia(clase_template_id, fecha, cupo)
+
+            await self.repo.create_asistencia(current_user.id, instancia.id)
 
         pago = await self.repo.create_pago(
             usuario_id=current_user.id,
