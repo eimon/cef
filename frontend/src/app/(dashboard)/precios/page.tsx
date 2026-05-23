@@ -2,17 +2,27 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getClases } from "@/actions/clases";
+import { getSenaMinima } from "@/actions/config";
 import { ClaseTemplate } from "@/types/api";
 import PreciosTable from "@/components/PreciosTable";
+import SenaMinimaCard from "@/components/SenaMinimaCard";
+
+type Tab = "precios" | "sena";
 
 export default function PreciosPage() {
+    const [activeTab, setActiveTab] = useState<Tab>("precios");
     const [clases, setClases] = useState<ClaseTemplate[]>([]);
+    const [senaMinima, setSenaMinima] = useState<string>("0");
     const [isLoading, setIsLoading] = useState(true);
 
     const refresh = useCallback(async () => {
         try {
-            const data = await getClases();
-            setClases(data);
+            const [dataClases, dataSena] = await Promise.all([
+                getClases(),
+                getSenaMinima(),
+            ]);
+            setClases(dataClases);
+            setSenaMinima(dataSena);
         } catch {
             setClases([]);
         } finally {
@@ -24,11 +34,33 @@ export default function PreciosPage() {
         refresh();
     }, [refresh]);
 
+    const tabs: { id: Tab; label: string }[] = [
+        { id: "precios", label: "Configuración de precios" },
+        { id: "sena", label: "Actualizar el monto mínimo de seña" },
+    ];
+
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-slate-800">Configuración de precios</h1>
-                <p className="text-sm text-slate-400 mt-1">Modificá el precio de mensualidad o clase individual por disciplina.</p>
+                <h1 className="text-2xl font-bold text-slate-800">Precios</h1>
+                <p className="text-sm text-slate-400 mt-1">Administrá los precios del sistema.</p>
+            </div>
+
+            <div className="flex gap-1 border-b border-slate-200">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px ${
+                            activeTab === tab.id
+                                ? "border-cef-primary text-cef-primary"
+                                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
+                        }`}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
             {isLoading ? (
@@ -36,7 +68,14 @@ export default function PreciosPage() {
                     <p className="text-slate-400 text-sm">Cargando...</p>
                 </div>
             ) : (
-                <PreciosTable clases={clases} onSuccess={refresh} />
+                <>
+                    {activeTab === "precios" && (
+                        <PreciosTable clases={clases} onSuccess={refresh} />
+                    )}
+                    {activeTab === "sena" && (
+                        <SenaMinimaCard valorActual={senaMinima} onSuccess={refresh} />
+                    )}
+                </>
             )}
         </div>
     );
