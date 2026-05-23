@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, BookOpen, Calendar } from "lucide-react";
-import { ClaseSemana, SuscripcionCheckResponse } from "@/types/api";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar } from "lucide-react";
+import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
 import { checkElegibilidadIndividual, inscribirseIndividual } from "@/actions/inscripciones";
 import { checkElegibilidadSuscripcion, suscribirse } from "@/actions/suscripciones";
+import { getAsistenciasClase } from "@/actions/asistencias";
 import MockPaymentModal from "@/components/MockPaymentModal";
 
 const DIA_LABELS: Record<string, string> = {
@@ -63,7 +64,13 @@ function isFutureDate(fechaStr: string): boolean {
     return new Date(y, m - 1, d) > today;
 }
 
-type Step = "detail" | "amount" | "amount-suscripcion";
+function hasClaseTerminado(fechaStr: string, horaFinStr: string): boolean {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    const [h, min] = horaFinStr.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min) < new Date();
+}
+
+type Step = "detail" | "amount" | "amount-suscripcion" | "asistencias";
 
 export default function ClaseDetailDialog({
     clase,
@@ -88,6 +95,9 @@ export default function ClaseDetailDialog({
     const [suscripcionData, setSuscripcionData] = useState<SuscripcionCheckResponse | null>(null);
     const [suscripcionCheckLoading, setSuscripcionCheckLoading] = useState(false);
     const [suscripcionCheckError, setSuscripcionCheckError] = useState("");
+
+    const [asistencias, setAsistencias] = useState<AsistenciaRecepcion[]>([]);
+    const [asistenciasLoading, setAsistenciasLoading] = useState(false);
 
     if (!isOpen || !clase) return null;
 
@@ -116,6 +126,8 @@ export default function ClaseDetailDialog({
         setSuscripcionData(null);
         setSuscripcionCheckLoading(false);
         setSuscripcionCheckError("");
+        setAsistencias([]);
+        setAsistenciasLoading(false);
         onClose();
     }
 
@@ -173,6 +185,15 @@ export default function ClaseDetailDialog({
     function handlePaymentClose() {
         setShowPayment(false);
         handleClose();
+    }
+
+    async function handleVerAsistencias() {
+        if (!clase) return;
+        setAsistenciasLoading(true);
+        const data = await getAsistenciasClase(clase.instancia!.id);
+        setAsistenciasLoading(false);
+        setAsistencias(data);
+        setStep("asistencias");
     }
 
     return createPortal(
@@ -371,12 +392,21 @@ export default function ClaseDetailDialog({
                                 <div className="pt-2">
                                     <button
                                         type="button"
-                                        disabled
-                                        className="w-full py-3 px-4 rounded-xl bg-slate-100 border border-slate-200 text-sm font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-2"
+                                        onClick={handleVerAsistencias}
+                                        disabled={!clase.instancia || asistenciasLoading}
+                                        className="w-full py-3 px-4 rounded-xl bg-slate-100 border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors disabled:text-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
-                                        <BookOpen size={16} />
-                                        <span>Ver currícula</span>
-                                        <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-normal ml-1">Próximamente</span>
+                                        {asistenciasLoading ? (
+                                            <>
+                                                <span className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
+                                                Cargando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ClipboardList size={16} />
+                                                <span>Ver asistencias</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             )}
@@ -558,6 +588,44 @@ export default function ClaseDetailDialog({
                         </div>
                     )}
 
+                    {/* Body — Step: asistencias */}
+                    {step === "asistencias" && (
+                        <div className="px-6 py-5">
+                            {asistencias.length === 0 ? (
+                                <p className="text-sm text-slate-400 text-center py-8">Sin asistencias registradas</p>
+                            ) : (
+                                <ul className="space-y-2 max-h-72 overflow-y-auto">
+                                    {(() => {
+                                        const terminada = hasClaseTerminado(clase.fecha_en_semana, clase.hora_fin);
+                                        return asistencias.map((a) => {
+                                            const estadoLabel = a.cancelo ? "Canceló" : a.asistio ? "Asistió" : terminada ? "Faltó" : "Pendiente";
+                                            const estadoClass = a.cancelo
+                                                ? "bg-cef-danger/10 text-cef-danger border-cef-danger/20"
+                                                : a.asistio
+                                                ? "bg-cef-success/10 text-cef-success border-cef-success/20"
+                                                : terminada
+                                                ? "bg-slate-100 text-slate-500 border-slate-200"
+                                                : "bg-cef-warning/10 text-cef-warning border-cef-warning/20";
+                                            return (
+                                                <li key={a.asistencia_id} className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-800">{a.usuario_nombre}</p>
+                                                        <p className="text-xs text-slate-400">
+                                                            {a.tipo === TipoInscripcion.INDIVIDUAL ? "No abonado" : "Abonado"}
+                                                        </p>
+                                                    </div>
+                                                    <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${estadoClass}`}>
+                                                        {estadoLabel}
+                                                    </span>
+                                                </li>
+                                            );
+                                        });
+                                    })()}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+
                     {/* Footer */}
                     <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center gap-3">
                         {step === "detail" ? (
@@ -567,6 +635,14 @@ export default function ClaseDetailDialog({
                                 className="px-4 py-2 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-700 hover:bg-slate-100 transition-colors"
                             >
                                 Cerrar
+                            </button>
+                        ) : step === "asistencias" ? (
+                            <button
+                                type="button"
+                                onClick={() => setStep("detail")}
+                                className="px-4 py-2 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                            >
+                                Volver
                             </button>
                         ) : (
                             <>

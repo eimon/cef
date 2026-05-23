@@ -134,6 +134,21 @@ class SuscripcionRepository:
         await self.db.refresh(instancia)
         return instancia
 
+    async def create_asistencia(
+        self, usuario_id: uuid.UUID, instancia_id: uuid.UUID
+    ) -> Asistencia:
+        asistencia = Asistencia(
+            usuario_id=usuario_id,
+            clase_instancia_id=instancia_id,
+            tipo=TipoInscripcion.SUSCRIPCION,
+            asistio=False,
+            cancelo=False,
+        )
+        self.db.add(asistencia)
+        await self.db.flush()
+        await self.db.refresh(asistencia)
+        return asistencia
+
     async def create_suscripcion(
         self,
         usuario_id: uuid.UUID,

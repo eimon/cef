@@ -205,6 +205,19 @@ export interface SuscripcionResponse {
     activo: boolean;
 }
 
+export enum TipoInscripcion {
+    INDIVIDUAL = "individual",
+    SUSCRIPCION = "suscripcion",
+}
+
+export interface AsistenciaRecepcion {
+    asistencia_id: string;
+    usuario_nombre: string;
+    tipo: TipoInscripcion;
+    asistio: boolean;
+    cancelo: boolean;
+}
+
 export interface ClaseSemana {
     id: string;
     nombre: string;
