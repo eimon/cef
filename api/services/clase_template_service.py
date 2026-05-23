@@ -83,8 +83,8 @@ class ClaseTemplateService:
             sala_id=data.sala_id,
             profesor_id=data.profesor_id,
             capacidad_maxima=20,
-            precio_individual=0,
-            precio_suscripcion=0,
+            precio_individual=data.precio_individual,
+            precio_suscripcion=data.precio_suscripcion,
         )
         clase = await self.repo.create(clase)
         clase = await self.repo.get_by_id(clase.id)

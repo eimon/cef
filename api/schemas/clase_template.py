@@ -24,6 +24,8 @@ class ClaseTemplateCreate(BaseModel):
     hora_fin: time
     sala_id: UUID4
     profesor_id: UUID4
+    precio_individual: float = Field(..., gt=0)
+    precio_suscripcion: float = Field(..., gt=0)
 
 
 class ClaseTemplateUpdate(BaseModel):

@@ -17,6 +17,8 @@ const createClaseSchema = z.object({
     hora_fin: z.string().min(1, "La hora de fin es requerida"),
     sala_id: z.string().uuid("Sala inválida"),
     profesor_id: z.string().uuid("Profesor inválido"),
+    precio_individual: z.coerce.number().gt(0, "El precio debe ser un valor mayor a cero"),
+    precio_suscripcion: z.coerce.number().gt(0, "El precio debe ser un valor mayor a cero"),
 });
 
 export async function createClase(
@@ -30,6 +32,8 @@ export async function createClase(
         hora_fin: formData.get("hora_fin"),
         sala_id: formData.get("sala_id"),
         profesor_id: formData.get("profesor_id"),
+        precio_individual: formData.get("precio_individual"),
+        precio_suscripcion: formData.get("precio_suscripcion"),
     });
 
     if (!validated.success) {
