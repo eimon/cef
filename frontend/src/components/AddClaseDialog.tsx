@@ -158,6 +158,35 @@ export default function AddClaseDialog() {
                                         </select>
                                     </div>
 
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className={labelCls}>Precio mensualidad</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">$</span>
+                                                <input
+                                                    name="precio_suscripcion"
+                                                    type="number"
+                                                    step="0.01"
+                                                    required
+                                                    className={inputCls + " pl-7"}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className={labelCls}>Precio individual</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">$</span>
+                                                <input
+                                                    name="precio_individual"
+                                                    type="number"
+                                                    step="0.01"
+                                                    required
+                                                    className={inputCls + " pl-7"}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="pt-2 flex justify-end space-x-3">
                                         <button
                                             type="button"
