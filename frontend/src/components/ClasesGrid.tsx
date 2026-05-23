@@ -224,6 +224,7 @@ export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]
                     onClose={() => setClaseToDelete(null)}
                 />
             )}
+
         </>
     );
 }

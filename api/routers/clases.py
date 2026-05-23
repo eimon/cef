@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
+from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse, ClasePrecioUpdate
 from schemas.clase_semana import ClaseSemanaResponse
 from services.clase_template_service import ClaseTemplateService
 from core.database import get_db
@@ -42,6 +42,16 @@ async def delete_clase(
     _=Depends(has_role(Role.ROLE_CLASE_DELETE)),
 ):
     await ClaseTemplateService(db).delete(clase_id)
+
+
+@router.put("/{clase_id}/precio", response_model=ClaseTemplateResponse)
+async def update_precio_clase(
+    clase_id: UUID,
+    data: ClasePrecioUpdate,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(has_role(Role.ROLE_PRECIO_UPDATE)),
+):
+    return await ClaseTemplateService(db).update_precio(clase_id, data)
 
 
 @router.get("/semana", response_model=List[ClaseSemanaResponse])

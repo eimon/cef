@@ -6,7 +6,7 @@ import uuid
 
 from repositories.clase_template_repository import ClaseTemplateRepository
 from repositories.clase_instancia_repository import ClaseInstanciaRepository
-from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
+from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse, ClasePrecioUpdate
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
@@ -130,6 +130,20 @@ class ClaseTemplateService:
             emails, data.disciplina.value.capitalize(), dia_label, hora_inicio_str, hora_fin_str
         )
 
+        clase = await self.repo.get_by_id(clase_id)
+        return self._to_response(clase)
+
+    async def update_precio(self, clase_id: uuid.UUID, data: ClasePrecioUpdate) -> ClaseTemplateResponse:
+        clase = await self.repo.get_by_id(clase_id)
+        if not clase:
+            raise NotFoundException("Clase no encontrada")
+
+        if data.tipo == "mensualidad":
+            precio_anterior = float(clase.precio_suscripcion)
+        else:
+            precio_anterior = float(clase.precio_individual)
+
+        await self.repo.update_precio(clase, data.tipo, precio_anterior, data.precio)
         clase = await self.repo.get_by_id(clase_id)
         return self._to_response(clase)
 
