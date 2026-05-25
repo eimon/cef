@@ -9,16 +9,17 @@ import DeleteProfesorDialog from "@/components/DeleteProfesorDialog";
 interface ProfesoresTableProps {
     profesores: Profesor[];
     onSuccess: () => void;
+    emptyMessage?: string;
 }
 
-export default function ProfesoresTable({ profesores, onSuccess }: ProfesoresTableProps) {
+export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }: ProfesoresTableProps) {
     const [profesorToEdit, setProfesorToEdit] = useState<Profesor | null>(null);
     const [profesorToDelete, setProfesorToDelete] = useState<Profesor | null>(null);
 
     if (profesores.length === 0) {
         return (
             <div className="text-center py-12 glass rounded-xl border-dashed">
-                <p className="text-slate-400 text-sm">No se encontraron profesores.</p>
+                <p className="text-slate-400 text-sm">{emptyMessage ?? "No se encontraron profesores."}</p>
             </div>
         );
     }

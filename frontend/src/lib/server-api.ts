@@ -1,13 +1,16 @@
 import { cookies } from "next/headers";
 
-// INTERNAL_API_URL is set at runtime in Docker (e.g. http://web:8000/api/v1).
+// INTERNAL_API_URL is set at runtime in Docker (e.g. http://cef_api:8000).
 // Falls back to NEXT_PUBLIC_API_URL (baked at build time) or localhost for local dev.
-const RAW_SERVER_API_URL =
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:8000";
+function getRawServerApiUrl(): string {
+    const envUrl = process.env.INTERNAL_API_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (envUrl) {
+        return envUrl.replace(/\/$/, "");
+    }
+    return "http://localhost:8000";
+}
 
-const SERVER_API_URL = RAW_SERVER_API_URL.replace(/\/$/, "");
+export const SERVER_API_URL = getRawServerApiUrl();
 
 type FetchOptions = RequestInit & {
     params?: Record<string, string>;

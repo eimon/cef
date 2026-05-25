@@ -4,13 +4,7 @@ import { z } from "zod";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { serverApi } from "@/lib/server-api";
-
-const RAW_SERVER_API_URL =
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:8000";
-const SERVER_API_URL = RAW_SERVER_API_URL.replace(/\/$/, "");
+import { serverApi, SERVER_API_URL } from "@/lib/server-api";
 
 const loginSchema = z.object({
     email: z.string().email("Email invalido"),
