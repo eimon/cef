@@ -111,6 +111,15 @@ class InscripcionRepository:
         result = await self.db.execute(query)
         return result.scalars().first() is not None
 
+    async def has_active_inscripciones(self, usuario_id: uuid.UUID) -> bool:
+        result = await self.db.execute(
+            select(Asistencia).where(
+                Asistencia.usuario_id == usuario_id,
+                Asistencia.cancelo == False,
+            )
+        )
+        return result.scalars().first() is not None
+
     async def has_active_suscripcion(
         self, usuario_id: uuid.UUID, clase_template_id: uuid.UUID, fecha: date
     ) -> bool:

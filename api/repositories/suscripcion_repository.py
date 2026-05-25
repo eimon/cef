@@ -27,6 +27,15 @@ class SuscripcionRepository:
         )
         return result.scalars().first()
 
+    async def has_active_suscripciones(self, usuario_id: uuid.UUID) -> bool:
+        result = await self.db.execute(
+            select(Suscripcion).where(
+                Suscripcion.usuario_id == usuario_id,
+                Suscripcion.activo == True,
+            )
+        )
+        return result.scalars().first() is not None
+
     async def has_suscripcion_activa(
         self,
         usuario_id: uuid.UUID,
