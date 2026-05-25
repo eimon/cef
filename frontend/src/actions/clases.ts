@@ -10,13 +10,16 @@ export type ClaseFormState = {
     success?: boolean;
 };
 
-const createClaseSchema = z.object({
+const claseBaseSchema = z.object({
     disciplina: z.string().min(1, "La disciplina es requerida"),
     fecha: z.string().min(1, "La fecha es requerida"),
     hora_inicio: z.string().min(1, "La hora de inicio es requerida"),
     hora_fin: z.string().min(1, "La hora de fin es requerida"),
     sala_id: z.string().uuid("Sala inválida"),
     profesor_id: z.string().uuid("Profesor inválido"),
+});
+
+const createClaseSchema = claseBaseSchema.extend({
     precio_individual: z.coerce.number().gt(0, "El precio debe ser un valor mayor a cero"),
     precio_suscripcion: z.coerce.number().gt(0, "El precio debe ser un valor mayor a cero"),
 });
@@ -64,7 +67,7 @@ export async function updateClase(
     prevState: ClaseFormState,
     formData: FormData
 ): Promise<ClaseFormState> {
-    const validated = createClaseSchema.safeParse({
+    const validated = claseBaseSchema.safeParse({
         disciplina: formData.get("disciplina"),
         fecha: formData.get("fecha"),
         hora_inicio: formData.get("hora_inicio"),
