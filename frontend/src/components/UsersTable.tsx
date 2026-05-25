@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { User, UserRole } from "@/types/api";
 import { Pencil, Trash2, MoreVertical, Loader2 } from "lucide-react";
-import { deleteUser } from "@/actions/users";
+import { deleteUser, deleteUserByDni } from "@/actions/users";
 import EditUserDialog from "@/components/EditUserDialog";
 import { useToast } from "@/context/ToastContext";
 import { useConfirm } from "@/context/ConfirmContext";
@@ -76,6 +76,8 @@ function UserCardMenu({
 
 export default function UsersTable({ users }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const [isDeletingByDni, setIsDeletingByDni] = useState(false);
+    const [dniToDelete, setDniToDelete] = useState("");
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError } = useToast();
     const { confirm } = useConfirm();
@@ -90,16 +92,74 @@ export default function UsersTable({ users }: UsersTableProps) {
         setIsDeleting(null);
     };
 
+    const handleDeleteByDni = async () => {
+        const dni = dniToDelete.trim();
+        if (!dni) {
+            showError("Ingresá un DNI válido para eliminar el usuario");
+            return;
+        }
+
+        if (!await confirm(`¿Estás seguro de que deseas eliminar al usuario con DNI ${dni}? Esta acción no se puede deshacer.`)) {
+            return;
+        }
+
+        setIsDeletingByDni(true);
+        const result = await deleteUserByDni(dni);
+        setIsDeletingByDni(false);
+
+        if (result.error) {
+            showError(result.error);
+            return;
+        }
+
+        setDniToDelete("");
+    };
+
+    const deleteByDniBlock = (
+        <div className="glass rounded-xl p-4 mb-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div className="flex-1 min-w-0">
+                    <label className="block text-sm font-medium text-slate-700 mb-2" htmlFor="delete-user-dni">
+                        Eliminar usuario por DNI
+                    </label>
+                    <input
+                        id="delete-user-dni"
+                        type="text"
+                        value={dniToDelete}
+                        onChange={(e) => setDniToDelete(e.target.value)}
+                        placeholder="Ingrese el DNI"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-cef-primary focus:ring-2 focus:ring-cef-primary/20"
+                    />
+                </div>
+                <button
+                    type="button"
+                    onClick={handleDeleteByDni}
+                    disabled={isDeletingByDni || !dniToDelete.trim()}
+                    className="inline-flex items-center justify-center rounded-xl bg-cef-danger px-4 py-3 text-sm font-semibold text-white transition hover:bg-cef-danger/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {isDeletingByDni ? <Loader2 size={16} className="animate-spin" /> : "Eliminar por DNI"}
+                </button>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+                El usuario solo se eliminará si no está inscripto ni suscripto a ninguna clase.
+            </p>
+        </div>
+    );
+
     if (users.length === 0) {
         return (
-            <div className="text-center py-12 glass rounded-xl border-dashed">
-                <p className="text-slate-400 text-sm">No se encontraron usuarios.</p>
-            </div>
+            <>
+                {deleteByDniBlock}
+                <div className="text-center py-12 glass rounded-xl border-dashed">
+                    <p className="text-slate-400 text-sm">No se encontraron usuarios.</p>
+                </div>
+            </>
         );
     }
 
     return (
         <>
+            {deleteByDniBlock}
             {/* ── Mobile: cards ── */}
             <div className="flex flex-col gap-3 md:hidden">
                 {users.map((user) => (

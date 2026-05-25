@@ -42,6 +42,15 @@ async def update_user(
     return await UserService(db).update(usuario_id, data)
 
 
+@router.delete("/dni/{dni}", status_code=204)
+async def delete_user_by_dni(
+    dni: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(has_role(Role.ROLE_USER_DELETE)),
+):
+    await UserService(db).delete_by_dni(dni, current_user.id)
+
+
 @router.delete("/{usuario_id}", status_code=204)
 async def delete_user(
     usuario_id: UUID,
