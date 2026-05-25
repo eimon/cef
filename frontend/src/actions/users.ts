@@ -133,3 +133,22 @@ export async function deleteUser(userId: string): Promise<{ success?: boolean; e
     revalidatePath("/users");
     return { success: true };
 }
+
+export async function deleteUserByDni(dni: string): Promise<{ success?: boolean; error?: string }> {
+    try {
+        const res = await serverApi(`/users/dni/${encodeURIComponent(dni)}`, {
+            method: "DELETE",
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Failed to delete user" };
+        }
+    } catch (error) {
+        console.error("Delete User By DNI Error:", error);
+        return { error: "Something went wrong" };
+    }
+
+    revalidatePath("/users");
+    return { success: true };
+}

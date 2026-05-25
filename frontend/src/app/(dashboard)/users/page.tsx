@@ -1,20 +1,9 @@
 import { getUsers } from "@/actions/users";
-import UsersTable from "@/components/UsersTable";
-import AddUserDialog from "@/components/AddUserDialog";
+import { getUserRole } from "@/lib/auth";
+import UsersDashboard from "@/components/UsersDashboard";
 
 export default async function UsersPage() {
-    const users = await getUsers();
+    const [users, userRole] = await Promise.all([getUsers(), getUserRole()]);
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Usuarios</h1>
-                </div>
-                <AddUserDialog />
-            </div>
-
-            <UsersTable users={users} />
-        </div>
-    );
+    return <UsersDashboard users={users} userRole={userRole} />;
 }

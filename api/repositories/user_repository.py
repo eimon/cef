@@ -1,3 +1,4 @@
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models.usuario import Usuario
@@ -50,7 +51,16 @@ class UserRepository:
         usuario = await self.get_by_id(usuario_id)
         if not usuario:
             return None
-        await self.db.delete(usuario)
+        await self.db.execute(delete(Usuario).where(Usuario.id == usuario_id))
+        await self.db.flush()
+        return usuario
+
+    async def delete_by_dni(self, dni: str) -> Usuario | None:
+        usuario = await self.get_by_dni(dni)
+        if not usuario:
+            return None
+        await self.db.execute(delete(Usuario).where(Usuario.id == usuario.id))
+        await self.db.flush()
         return usuario
 
     async def create(self, data: UsuarioCreate, hashed_password: str) -> Usuario:
