@@ -90,7 +90,7 @@ async def password_forgot(
     body: PasswordResetRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Request a password reset link. Does not reveal whether the email exists."""
+    """Request a password reset link for a registered email."""
     await AuthService(db).request_password_reset(body.email)
     return {"detail": "Te enviamos un email con instrucciones para cambiar la contraseña"}
 

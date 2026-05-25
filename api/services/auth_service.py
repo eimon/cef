@@ -83,10 +83,9 @@ class AuthService:
         await EmailService().send_email_change_verification(new_email, raw_token)
 
     async def request_password_reset(self, email: str) -> None:
-        # Do not reveal whether the email exists
         usuario = await self.user_repo.get_by_email(email)
         if not usuario:
-            return
+            raise BadRequestException("El email ingresado no se encuentra registrado")
 
         _, raw_token = await self.password_reset_token_repo.create(usuario.id)
         await EmailService().send_password_reset(usuario.email, raw_token)

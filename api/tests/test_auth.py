@@ -70,6 +70,16 @@ async def test_login_nonexistent_user(client):
     assert resp.status_code == 401
 
 
+# ---------- Password reset ----------
+
+async def test_password_forgot_nonexistent_email(client):
+    resp = await client.post("/auth/password/forgot", json={
+        "email": "nobody@test.com",
+    })
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "El email ingresado no se encuentra registrado"
+
+
 # ---------- Perfil ----------
 
 async def test_perfil_authenticated(client, admin_headers):
