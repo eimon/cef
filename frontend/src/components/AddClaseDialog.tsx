@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useActionState } from "react";
+import { useState, useEffect, useActionState, ChangeEvent } from "react";
 import { X, Loader2 } from "lucide-react";
 import { createClase, ClaseFormState } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
@@ -13,16 +13,22 @@ const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-30
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
 const disciplinas = ["yoga", "pilates", "funcional"];
-
-const horasDisponibles = Array.from({ length: 15 }, (_, i) => {
-    const h = String(i + 7).padStart(2, "0");
-    return `${h}:00`;
-});
+const horasDisponibles = Array.from({ length: 15 }, (_, i) => `${String(i + 7).padStart(2, "0")}:00`);
 
 function sumarUnaHora(hora: string): string {
     const [h] = hora.split(":").map(Number);
     return `${String(h + 1).padStart(2, "0")}:00`;
 }
+
+const emptyFields = {
+    disciplina: "",
+    fecha: "",
+    hora_inicio: "",
+    sala_id: "",
+    profesor_id: "",
+    precio_suscripcion: "",
+    precio_individual: "",
+};
 
 export default function AddClaseDialog() {
     const router = useRouter();
@@ -31,10 +37,13 @@ export default function AddClaseDialog() {
     const [salas, setSalas] = useState<Sala[]>([]);
     const [profesores, setProfesores] = useState<Profesor[]>([]);
     const [isLoadingOptions, setIsLoadingOptions] = useState(false);
-    const [horaInicio, setHoraInicio] = useState("");
+    const [fields, setFields] = useState(emptyFields);
 
     const initialState: ClaseFormState = {};
     const [state, formAction, isPending] = useActionState(createClase, initialState);
+
+    const set = (k: keyof typeof emptyFields) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        setFields((f: typeof emptyFields) => ({ ...f, [k]: e.target.value }));
 
     useEffect(() => {
         if (!isOpen) return;
@@ -50,14 +59,17 @@ export default function AddClaseDialog() {
         if (state.success) {
             showSuccess("Clase creada correctamente");
             setIsOpen(false);
+            setFields(emptyFields);
             router.refresh();
         }
     }, [state.success, showSuccess, router]);
 
     const handleClose = () => {
         setIsOpen(false);
-        setHoraInicio("");
+        setFields(emptyFields);
     };
+
+    const horaFin = fields.hora_inicio ? sumarUnaHora(fields.hora_inicio) : "--:--";
 
     return (
         <>
@@ -93,31 +105,23 @@ export default function AddClaseDialog() {
 
                                     <div>
                                         <label className={labelCls}>Disciplina</label>
-                                        <select name="disciplina" required className={inputCls}>
+                                        <select name="disciplina" required value={fields.disciplina} onChange={set("disciplina")} className={inputCls}>
                                             <option value="">Seleccionar...</option>
                                             {disciplinas.map((d) => (
-                                                <option key={d} value={d}>
-                                                    {d.charAt(0).toUpperCase() + d.slice(1)}
-                                                </option>
+                                                <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
                                             ))}
                                         </select>
                                     </div>
 
                                     <div>
                                         <label className={labelCls}>Fecha</label>
-                                        <input name="fecha" type="date" required className={inputCls} />
+                                        <input name="fecha" type="date" required value={fields.fecha} onChange={set("fecha")} className={inputCls} />
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className={labelCls}>Hora inicio</label>
-                                            <select
-                                                name="hora_inicio"
-                                                required
-                                                value={horaInicio}
-                                                onChange={(e) => setHoraInicio(e.target.value)}
-                                                className={inputCls}
-                                            >
+                                            <select name="hora_inicio" required value={fields.hora_inicio} onChange={set("hora_inicio")} className={inputCls}>
                                                 <option value="">--:--</option>
                                                 {horasDisponibles.map((h) => (
                                                     <option key={h} value={h}>{h}</option>
@@ -130,7 +134,7 @@ export default function AddClaseDialog() {
                                                 name="hora_fin"
                                                 type="text"
                                                 readOnly
-                                                value={horaInicio ? sumarUnaHora(horaInicio) : "--:--"}
+                                                value={horaFin}
                                                 className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
                                             />
                                         </div>
@@ -138,7 +142,7 @@ export default function AddClaseDialog() {
 
                                     <div>
                                         <label className={labelCls}>Sala</label>
-                                        <select name="sala_id" required className={inputCls}>
+                                        <select name="sala_id" required value={fields.sala_id} onChange={set("sala_id")} className={inputCls}>
                                             <option value="">Seleccionar...</option>
                                             {salas.map((s) => (
                                                 <option key={s.id} value={s.id}>{s.nombre}</option>
@@ -148,12 +152,10 @@ export default function AddClaseDialog() {
 
                                     <div>
                                         <label className={labelCls}>Profesor</label>
-                                        <select name="profesor_id" required className={inputCls}>
+                                        <select name="profesor_id" required value={fields.profesor_id} onChange={set("profesor_id")} className={inputCls}>
                                             <option value="">Seleccionar...</option>
                                             {profesores.map((p) => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.nombre} {p.apellido}
-                                                </option>
+                                                <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -168,6 +170,8 @@ export default function AddClaseDialog() {
                                                     type="number"
                                                     step="0.01"
                                                     required
+                                                    value={fields.precio_suscripcion}
+                                                    onChange={set("precio_suscripcion")}
                                                     className={inputCls + " pl-7"}
                                                 />
                                             </div>
@@ -181,6 +185,8 @@ export default function AddClaseDialog() {
                                                     type="number"
                                                     step="0.01"
                                                     required
+                                                    value={fields.precio_individual}
+                                                    onChange={set("precio_individual")}
                                                     className={inputCls + " pl-7"}
                                                 />
                                             </div>
