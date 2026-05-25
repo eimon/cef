@@ -11,8 +11,18 @@ class UserService:
         self.db = db
         self.repo = UserRepository(db)
 
-    async def list(self, skip: int = 0, limit: int = 100) -> list[Usuario]:
-        return await self.repo.get_all(skip, limit)
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        dni: str | None = None,
+        nombre: str | None = None,
+        apellido: str | None = None,
+    ) -> list[Usuario]:
+        usuarios = await self.repo.get_all(skip, limit, dni, nombre, apellido)
+        if (dni or nombre or apellido) and not usuarios:
+            raise NotFoundException("No se encuentran usuarios")
+        return usuarios
 
     async def get(self, usuario_id: uuid.UUID) -> Usuario:
         usuario = await self.repo.get_by_id(usuario_id)

@@ -27,10 +27,24 @@ class UserRepository:
         result = await self.db.execute(select(Usuario).where(Usuario.telefono == telefono))
         return result.scalars().first()
 
-    async def get_all(self, skip: int = 0, limit: int = 100) -> list[Usuario]:
-        result = await self.db.execute(
-            select(Usuario).where(Usuario.activo == True).offset(skip).limit(limit)
-        )
+    async def get_all(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        dni: str | None = None,
+        nombre: str | None = None,
+        apellido: str | None = None,
+    ) -> list[Usuario]:
+        query = select(Usuario).where(Usuario.activo == True)
+
+        if dni:
+            query = query.where(Usuario.dni.ilike(f"%{dni}%"))
+        if nombre:
+            query = query.where(Usuario.nombre.ilike(f"%{nombre}%"))
+        if apellido:
+            query = query.where(Usuario.apellido.ilike(f"%{apellido}%"))
+
+        result = await self.db.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
 
     async def update(self, usuario_id: uuid.UUID, data: UsuarioUpdate) -> Usuario | None:
