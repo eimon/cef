@@ -65,7 +65,8 @@ async def _seed_cliente(session) -> None:
     print("  [ok]   cliente")
 
 
-async def _seed_profesor(session) -> Profesor:
+async def _seed_profesor(session) -> list[Profesor]:
+    profesores = []
     existe = (await session.execute(
         select(Profesor).where(Profesor.email == "profesor@cef.ar")
     )).scalars().first()
@@ -80,29 +81,89 @@ async def _seed_profesor(session) -> Profesor:
         dni="25987654",
     )
     session.add(profesor)
-    await session.flush()
-    print("  [ok]   profesor")
-    return profesor
-
-
-async def _seed_sala(session) -> Sala:
+    profesores.append(profesor)
+    
+    print("  [ok]   profesor 1")
     existe = (await session.execute(
-        select(Sala).where(Sala.nombre == "Sala Principal")
+        select(Profesor).where(Profesor.email == "profesor2@cef.ar")
+    )).scalars().first()
+    if existe:
+        print("  [skip] profesor")
+        return existe
+    profesor = Profesor(
+        nombre="Ana",
+        apellido="Pérez",
+        email="profesor2@cef.ar",
+        telefono="1100000004",
+        dni="25987655",
+    )
+    session.add(profesor)
+    profesores.append(profesor)
+    print("  [ok]   profesor 2")
+    existe = (await session.execute(
+        select(Profesor).where(Profesor.email == "profesor3@cef.ar")
+    )).scalars().first()
+    if existe:
+        print("  [skip] profesor")
+        return existe
+    profesor = Profesor(
+        nombre="Luis",
+        apellido="Martínez",
+        email="profesor3@cef.ar",
+        telefono="1100000005",
+        dni="25987656",
+    )
+    session.add(profesor)
+    profesores.append(profesor)
+    await session.flush()
+    print("  [ok]   profesor 3")
+    return profesores
+
+
+async def _seed_sala(session) -> list[Sala]:
+    salas = []
+    existe = (await session.execute(
+        select(Sala).where(Sala.nombre == "Sala 1")
     )).scalars().first()
     if existe:
         print("  [skip] sala")
         return existe
     sala = Sala(
-        nombre="Sala Principal",
+        nombre="Sala 1",
         capacidad=20,
     )
     session.add(sala)
+    salas.append(sala)
+    existe = (await session.execute(
+        select(Sala).where(Sala.nombre == "Sala 2")
+    )).scalars().first()
+    if existe:
+        print("  [skip] sala")
+        return existe
+    sala = Sala(
+        nombre="Sala 2",
+        capacidad=20,
+    )
+    session.add(sala)
+    salas.append(sala)
+    existe = (await session.execute(
+        select(Sala).where(Sala.nombre == "Sala 3")
+    )).scalars().first()
+    if existe:
+        print("  [skip] sala")
+        return existe
+    sala = Sala(
+        nombre="Sala 3",
+        capacidad=20,
+    )
+    session.add(sala)
+    salas.append(sala)
     await session.flush()
     print("  [ok]   sala")
-    return sala
+    return salas
 
 
-async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
+async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -> None:
     clases = [
         {
             "nombre": "Yoga",
@@ -138,6 +199,7 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
             "precio_suscripcion": 1200,
         },
     ]
+    i = 0
     for data in clases:
         existe = (await session.execute(
             select(ClaseTemplate).where(
@@ -152,7 +214,8 @@ async def _seed_clases(session, profesor: Profesor, sala: Sala) -> None:
             else:
                 print(f"  [skip] clase '{data['nombre']}'")
             continue
-        session.add(ClaseTemplate(profesor_id=profesor.id, sala_id=sala.id, **data))
+        session.add(ClaseTemplate(profesor_id=profesores[i].id, sala_id=salas[i].id, **data))
+        i += 1
         print(f"  [ok]   clase '{data['nombre']}'")
 
 async def seed_dev() -> None:
@@ -161,8 +224,8 @@ async def seed_dev() -> None:
         await _seed_admin(session)
         await _seed_cliente(session)
         profesor = await _seed_profesor(session)
-        sala = await _seed_sala(session)
-        await _seed_clases(session, profesor, sala)
+        salas = await _seed_sala(session)
+        await _seed_clases(session, profesor, salas)
         # await _seed_instancias(session)
         # await _seed_suscripciones(session)
         await session.commit()
