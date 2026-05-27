@@ -27,9 +27,22 @@ export type UserFormState = {
     success?: boolean;
 };
 
-export async function getUsers(): Promise<User[]> {
+export async function getUsers(filters?: {
+    dni?: string;
+    nombre?: string;
+    apellido?: string;
+}): Promise<User[]> {
     try {
-        const res = await serverApi("/users/");
+        const params = filters
+            ? Object.fromEntries(
+                  Object.entries(filters).filter(([, value]) => typeof value === "string" && value.trim() !== "")
+              )
+            : undefined;
+
+        const res = await serverApi("/users/", {
+            params: params as Record<string, string> | undefined,
+        });
+
         if (!res.ok) return [];
         return res.json();
     } catch (error) {

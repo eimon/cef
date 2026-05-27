@@ -1,20 +1,14 @@
 import { getUsers } from "@/actions/users";
-import UsersTable from "@/components/UsersTable";
-import AddUserDialog from "@/components/AddUserDialog";
+import UsersManager from "@/components/UsersManager";
+
+export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
     const users = await getUsers();
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Usuarios</h1>
-                </div>
-                <AddUserDialog />
-            </div>
-
-            <UsersTable users={users} />
+            <UsersManager initialUsers={users} />
         </div>
     );
 }

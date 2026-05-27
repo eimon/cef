@@ -88,7 +88,7 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
 
                     <div>
                         <label className={labelCls}>Género</label>
-                        <select name="genero" defaultValue={profesor.genero} className={inputCls}>
+                        <select name="genero" defaultValue={profesor.genero ?? ""} className={inputCls}>
                             {generoOptions.map((g) => (
                                 <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>
                             ))}

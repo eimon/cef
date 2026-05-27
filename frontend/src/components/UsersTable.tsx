@@ -10,6 +10,7 @@ import { useConfirm } from "@/context/ConfirmContext";
 
 interface UsersTableProps {
     users: User[];
+    emptyMessage?: string;
 }
 
 const roleBadgeClass: Record<string, string> = {
@@ -74,7 +75,7 @@ function UserCardMenu({
     );
 }
 
-export default function UsersTable({ users }: UsersTableProps) {
+export default function UsersTable({ users, emptyMessage }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError } = useToast();
@@ -93,7 +94,7 @@ export default function UsersTable({ users }: UsersTableProps) {
     if (users.length === 0) {
         return (
             <div className="text-center py-12 glass rounded-xl border-dashed">
-                <p className="text-slate-400 text-sm">No se encontraron usuarios.</p>
+                <p className="text-slate-400 text-sm">{emptyMessage ?? "No se encontraron usuarios."}</p>
             </div>
         );
     }

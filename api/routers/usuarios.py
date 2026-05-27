@@ -17,10 +17,13 @@ router = APIRouter(prefix="/users", tags=["users"])
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
+    dni: str | None = Query(None, min_length=1),
+    nombre: str | None = Query(None, min_length=1),
+    apellido: str | None = Query(None, min_length=1),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_USER_LIST)),
 ):
-    return await UserService(db).list(skip, limit)
+    return await UserService(db).list(skip, limit, dni, nombre, apellido)
 
 
 @router.get("/{usuario_id}", response_model=UsuarioResponse)
