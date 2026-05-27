@@ -28,6 +28,12 @@ export type ProfesorFormState = {
     success?: boolean;
 };
 
+export type GetProfesoresParams = {
+    dni?: string;
+    nombre?: string;
+    apellido?: string;
+};
+
 export async function getProfesorByDni(dni: string): Promise<Profesor | null> {
     try {
         const res = await serverApi(`/profesores/?dni=${encodeURIComponent(dni)}`);
@@ -40,9 +46,15 @@ export async function getProfesorByDni(dni: string): Promise<Profesor | null> {
     }
 }
 
-export async function getProfesores(): Promise<Profesor[]> {
+export async function getProfesores(params: GetProfesoresParams = {}): Promise<Profesor[]> {
     try {
-        const res = await serverApi("/profesores/");
+        const searchParams = new URLSearchParams();
+        if (params.dni?.trim()) searchParams.append("dni", params.dni.trim());
+        if (params.nombre?.trim()) searchParams.append("nombre", params.nombre.trim());
+        if (params.apellido?.trim()) searchParams.append("apellido", params.apellido.trim());
+
+        const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+        const res = await serverApi(`/profesores/${query}`);
         if (!res.ok) return [];
         return res.json();
     } catch (error) {

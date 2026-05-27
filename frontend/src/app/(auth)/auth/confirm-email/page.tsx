@@ -1,10 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-
-const SERVER_API_URL =
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:8000";
+import { SERVER_API_URL } from "@/lib/server-api";
 
 type ConfirmEmailPageProps = {
     searchParams: Promise<{ token?: string }>;

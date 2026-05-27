@@ -1,10 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-const SERVER_API_URL =
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:8000";
+import { SERVER_API_URL } from "@/lib/server-api";
 
 const cookieBase = {
     secure: process.env.NODE_ENV === "production",
