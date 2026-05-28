@@ -81,3 +81,7 @@ async def get_clase(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await ClaseTemplateService(db).get(clase_id)
+
+@router.get("/date")
+async def get_date():
+    return datetime.now(timezone.utc)

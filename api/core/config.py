@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str
     
+    # Timezone
+    TIMEZONE: str = "America/Argentina/Buenos_Aires"
+
     # iCalendar
     DOMAIN: str = "cef.com.ar"
 

@@ -13,6 +13,14 @@ const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-30
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
 const disciplinas = ["yoga", "pilates", "funcional"];
+const diasSemana = [
+    { value: "lunes",    label: "Lun" },
+    { value: "martes",   label: "Mar" },
+    { value: "miercoles",label: "Mié" },
+    { value: "jueves",   label: "Jue" },
+    { value: "viernes",  label: "Vie" },
+    { value: "sabado",   label: "Sáb" },
+];
 const horasDisponibles = Array.from({ length: 15 }, (_, i) => `${String(i + 7).padStart(2, "0")}:00`);
 
 function sumarUnaHora(hora: string): string {
@@ -22,10 +30,10 @@ function sumarUnaHora(hora: string): string {
 
 const emptyFields = {
     disciplina: "",
-    fecha: "",
     hora_inicio: "",
     sala_id: "",
     profesor_id: "",
+    capacidad_maxima: "",
 };
 
 export default function AddClaseDialog() {
@@ -36,12 +44,13 @@ export default function AddClaseDialog() {
     const [profesores, setProfesores] = useState<Profesor[]>([]);
     const [isLoadingOptions, setIsLoadingOptions] = useState(false);
     const [fields, setFields] = useState(emptyFields);
+    const [diaSemana, setDiaSemana] = useState("");
 
     const initialState: ClaseFormState = {};
     const [state, formAction, isPending] = useActionState(createClase, initialState);
 
     const set = (k: keyof typeof emptyFields) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setFields((f: typeof emptyFields) => ({ ...f, [k]: e.target.value }));
+        setFields((f) => ({ ...f, [k]: e.target.value }));
 
     useEffect(() => {
         if (!isOpen) return;
@@ -58,6 +67,7 @@ export default function AddClaseDialog() {
             showSuccess("Clase creada correctamente");
             setIsOpen(false);
             setFields(emptyFields);
+            setDiaSemana("");
             router.refresh();
         }
     }, [state.success, showSuccess, router]);
@@ -65,6 +75,7 @@ export default function AddClaseDialog() {
     const handleClose = () => {
         setIsOpen(false);
         setFields(emptyFields);
+        setDiaSemana("");
     };
 
     const horaFin = fields.hora_inicio ? sumarUnaHora(fields.hora_inicio) : "--:--";
@@ -112,8 +123,24 @@ export default function AddClaseDialog() {
                                     </div>
 
                                     <div>
-                                        <label className={labelCls}>Fecha</label>
-                                        <input name="fecha" type="date" required value={fields.fecha} onChange={set("fecha")} className={inputCls} />
+                                        <label className={labelCls}>Día de la semana</label>
+                                        <input type="hidden" name="dia_semana" value={diaSemana} />
+                                        <div className="grid grid-cols-6 gap-1.5">
+                                            {diasSemana.map((d) => (
+                                                <button
+                                                    key={d.value}
+                                                    type="button"
+                                                    onClick={() => setDiaSemana(d.value)}
+                                                    className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                                                        diaSemana === d.value
+                                                            ? "bg-cef-primary text-white"
+                                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                                    }`}
+                                                >
+                                                    {d.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
@@ -136,6 +163,20 @@ export default function AddClaseDialog() {
                                                 className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
                                             />
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className={labelCls}>Cupo máximo</label>
+                                        <input
+                                            name="capacidad_maxima"
+                                            type="number"
+                                            min={1}
+                                            required
+                                            value={fields.capacidad_maxima}
+                                            onChange={set("capacidad_maxima")}
+                                            className={inputCls}
+                                            placeholder="Ej: 15"
+                                        />
                                     </div>
 
                                     <div>
@@ -168,7 +209,7 @@ export default function AddClaseDialog() {
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={isPending}
+                                            disabled={isPending || !diaSemana}
                                             className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                                         >
                                             {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

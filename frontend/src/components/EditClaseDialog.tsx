@@ -13,7 +13,14 @@ const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-30
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
 const disciplinas = ["yoga", "pilates", "funcional"];
-
+const diasSemana = [
+    { value: "lunes",     label: "Lun" },
+    { value: "martes",    label: "Mar" },
+    { value: "miercoles", label: "Mié" },
+    { value: "jueves",    label: "Jue" },
+    { value: "viernes",   label: "Vie" },
+    { value: "sabado",    label: "Sáb" },
+];
 const horasDisponibles = Array.from({ length: 15 }, (_, i) => {
     const h = String(i + 7).padStart(2, "0");
     return `${h}:00`;
@@ -37,6 +44,7 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
     const [profesores, setProfesores] = useState<Profesor[]>([]);
     const [isLoadingOptions, setIsLoadingOptions] = useState(false);
     const [horaInicio, setHoraInicio] = useState(clase.hora_inicio.slice(0, 5));
+    const [diaSemana, setDiaSemana] = useState(clase.dia_semana);
 
     const initialState: ClaseFormState = {};
     const updateClaseWithId = updateClase.bind(null, clase.id);
@@ -45,13 +53,14 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
     useEffect(() => {
         if (!isOpen) return;
         setHoraInicio(clase.hora_inicio.slice(0, 5));
+        setDiaSemana(clase.dia_semana);
         setIsLoadingOptions(true);
         Promise.all([getSalas(), getProfesores()]).then(([s, p]) => {
             setSalas(s);
             setProfesores(p);
             setIsLoadingOptions(false);
         });
-    }, [isOpen, clase.hora_inicio]);
+    }, [isOpen, clase.hora_inicio, clase.dia_semana]);
 
     useEffect(() => {
         if (state.success) {
@@ -96,14 +105,24 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                             </div>
 
                             <div>
-                                <label className={labelCls}>Fecha</label>
-                                <input
-                                    name="fecha"
-                                    type="date"
-                                    required
-                                    defaultValue={clase.fecha_en_semana}
-                                    className={inputCls}
-                                />
+                                <label className={labelCls}>Día de la semana</label>
+                                <input type="hidden" name="dia_semana" value={diaSemana} />
+                                <div className="grid grid-cols-6 gap-1.5">
+                                    {diasSemana.map((d) => (
+                                        <button
+                                            key={d.value}
+                                            type="button"
+                                            onClick={() => setDiaSemana(d.value)}
+                                            className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                                                diaSemana === d.value
+                                                    ? "bg-cef-primary text-white"
+                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                            }`}
+                                        >
+                                            {d.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -131,6 +150,18 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                         className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className={labelCls}>Cupo máximo</label>
+                                <input
+                                    name="capacidad_maxima"
+                                    type="number"
+                                    min={1}
+                                    required
+                                    defaultValue={clase.capacidad_maxima}
+                                    className={inputCls}
+                                />
                             </div>
 
                             <div>

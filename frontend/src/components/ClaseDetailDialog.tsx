@@ -57,11 +57,10 @@ function formatFechaChip(fechaStr: string): string {
     }).format(new Date(y, m - 1, d));
 }
 
-function isFutureDate(fechaStr: string): boolean {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+function hasClaseEmpezado(fechaStr: string, horaInicioStr: string): boolean {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Date(y, m - 1, d) > today;
+    const [h, min] = horaInicioStr.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min) <= new Date();
 }
 
 function hasClaseTerminado(fechaStr: string, horaFinStr: string): boolean {
@@ -103,7 +102,7 @@ export default function ClaseDetailDialog({
 
     const canEnroll =
         !clase.instancia?.cancelada &&
-        isFutureDate(clase.fecha_en_semana);
+        !hasClaseEmpezado(clase.fecha_en_semana, clase.hora_inicio);
 
     const precioActual = step === "amount-suscripcion"
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
