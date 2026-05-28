@@ -15,22 +15,24 @@ const DIA_LABELS: Record<string, string> = {
     jueves: "Jueves", viernes: "Viernes", sabado: "Sábado", domingo: "Domingo",
 };
 
+const fmtFecha      = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short" });
+const fmtFechaLarga = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" });
+const fmtPrice      = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 });
+
 function formatTime(t: string) { return t.slice(0, 5); }
 
 function formatFecha(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short" })
-        .format(new Date(y, m - 1, d));
+    return fmtFecha.format(new Date(y, m - 1, d));
 }
 
 function formatFechaLarga(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" })
-        .format(new Date(y, m - 1, d));
+    return fmtFechaLarga.format(new Date(y, m - 1, d));
 }
 
 function formatPrice(n: number) {
-    return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 }).format(n);
+    return fmtPrice.format(n);
 }
 
 function isClaseUpcoming(fechaStr: string, horaInicioStr: string): boolean {
@@ -218,7 +220,7 @@ function SuscripcionCard({ suscripcion: s }: { suscripcion: MiSuscripcion }) {
                 <div className="px-5 pb-4">
                     <div className="border-t border-slate-100 pt-1">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 py-2">
-                            Clases del período — {s.instancias.length} {s.instancias.length === 1 ? "clase" : "clases"}
+                            Clases del período: {s.instancias.length} {s.instancias.length === 1 ? "clase" : "clases"}
                         </p>
                         {s.instancias.length === 0 ? (
                             <p className="text-xs text-slate-400 py-2">No hay clases agendadas en este período.</p>

@@ -19,42 +19,32 @@ const DIA_LABELS: Record<string, string> = {
     domingo: "Domingo",
 };
 
+const fmtPrice = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 });
+const fmtFechaLarga = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const fmtFechaCorta = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long" });
+const fmtFechaChip  = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" });
+
 function formatTime(time: string) {
     return time.slice(0, 5);
 }
 
 function formatPrice(price: number) {
-    return new Intl.NumberFormat("es-AR", {
-        style: "currency",
-        currency: "ARS",
-        minimumFractionDigits: 0,
-    }).format(price);
+    return fmtPrice.format(price);
 }
 
 function formatFechaLarga(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-    }).format(new Date(y, m - 1, d));
+    return fmtFechaLarga.format(new Date(y, m - 1, d));
 }
 
 function formatFechaCorta(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", {
-        day: "numeric",
-        month: "long",
-    }).format(new Date(y, m - 1, d));
+    return fmtFechaCorta.format(new Date(y, m - 1, d));
 }
 
 function formatFechaChip(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", {
-        day: "numeric",
-        month: "short",
-    }).format(new Date(y, m - 1, d));
+    return fmtFechaChip.format(new Date(y, m - 1, d));
 }
 
 function hasClaseEmpezado(fechaStr: string, horaInicioStr: string): boolean {
@@ -68,6 +58,133 @@ function hasClaseTerminado(fechaStr: string, horaFinStr: string): boolean {
     const [h, min] = horaFinStr.split(":").map(Number);
     return new Date(y, m - 1, d, h, min) < new Date();
 }
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+interface PaymentAmountStepProps {
+    inputId: string;
+    precioActual: number;
+    montoMinimoActual: number;
+    paymentType: "full" | "partial";
+    partialAmount: string;
+    amountError: string;
+    onTypeChange: (type: "full" | "partial") => void;
+    onAmountChange: (value: string) => void;
+}
+
+function PaymentAmountStep({
+    inputId, precioActual, montoMinimoActual, paymentType,
+    partialAmount, amountError, onTypeChange, onAmountChange,
+}: PaymentAmountStepProps) {
+    return (
+        <div className="space-y-3">
+            <button
+                type="button"
+                onClick={() => onTypeChange("full")}
+                className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                    paymentType === "full"
+                        ? "border-cef-primary bg-cef-primary/5"
+                        : "border-slate-200 hover:border-slate-300"
+                }`}
+            >
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-slate-800">Pago completo</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Abonás el monto total ahora</p>
+                    </div>
+                    <p className="text-lg font-bold text-slate-800">{formatPrice(precioActual)}</p>
+                </div>
+            </button>
+
+            <button
+                type="button"
+                onClick={() => onTypeChange("partial")}
+                className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                    paymentType === "partial"
+                        ? "border-cef-primary bg-cef-primary/5"
+                        : "border-slate-200 hover:border-slate-300"
+                }`}
+            >
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
+                        </p>
+                    </div>
+                    <p className="text-xs text-slate-400">A definir</p>
+                </div>
+            </button>
+
+            {paymentType === "partial" && (
+                <div>
+                    <label htmlFor={inputId} className="block text-xs font-medium text-slate-600 mb-1.5">
+                        Ingresá el monto a pagar
+                    </label>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">$</span>
+                        <input
+                            id={inputId}
+                            type="number"
+                            min={montoMinimoActual + 1}
+                            max={precioActual}
+                            step="1"
+                            value={partialAmount}
+                            onChange={(e) => onAmountChange(e.target.value)}
+                            placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
+                            className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {amountError && (
+                <p className="text-xs text-cef-danger">{amountError}</p>
+            )}
+        </div>
+    );
+}
+
+interface AsistenciasStepProps {
+    asistencias: AsistenciaRecepcion[];
+    clase: ClaseSemana;
+}
+
+function AsistenciasStep({ asistencias, clase }: AsistenciasStepProps) {
+    if (asistencias.length === 0) {
+        return <p className="text-sm text-slate-400 text-center py-8">Sin asistencias registradas</p>;
+    }
+    const terminada = hasClaseTerminado(clase.fecha_en_semana, clase.hora_fin);
+    return (
+        <ul className="space-y-2 max-h-72 overflow-y-auto">
+            {asistencias.map((a) => {
+                const estadoLabel = a.cancelo ? "Canceló" : a.asistio ? "Asistió" : terminada ? "Faltó" : "Pendiente";
+                const estadoClass = a.cancelo
+                    ? "bg-cef-danger/10 text-cef-danger border-cef-danger/20"
+                    : a.asistio
+                    ? "bg-cef-success/10 text-cef-success border-cef-success/20"
+                    : terminada
+                    ? "bg-slate-100 text-slate-500 border-slate-200"
+                    : "bg-cef-warning/10 text-cef-warning border-cef-warning/20";
+                return (
+                    <li key={a.asistencia_id} className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-800">{a.usuario_nombre}</p>
+                            <p className="text-xs text-slate-400">
+                                {a.tipo === TipoInscripcion.INDIVIDUAL ? "No abonado" : "Abonado"}
+                            </p>
+                        </div>
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${estadoClass}`}>
+                            {estadoLabel}
+                        </span>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 type Step = "detail" | "amount" | "amount-suscripcion" | "asistencias";
 
@@ -294,7 +411,7 @@ export default function ClaseDetailDialog({
                             {userRole === "cliente" ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                                     {/* Clase individual */}
-                                    <div className="glass rounded-xl p-4 flex flex-col justify-between space-y-4 group">
+                                    <div className="glass rounded-xl p-4 flex flex-col justify-between gap-4 group">
                                         <div>
                                             <div className="flex items-center gap-1.5 text-slate-400 mb-1">
                                                 <DollarSign size={14} />
@@ -315,8 +432,8 @@ export default function ClaseDetailDialog({
                                                 >
                                                     {checkLoading ? (
                                                         <>
-                                                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                            Verificando...
+                                                            <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            Verificando…
                                                         </>
                                                     ) : (
                                                         <>
@@ -347,7 +464,7 @@ export default function ClaseDetailDialog({
                                     </div>
 
                                     {/* Suscripción mensual */}
-                                    <div className="rounded-xl p-4 border border-cef-primary/30 bg-cef-primary/5 flex flex-col justify-between space-y-4 group">
+                                    <div className="rounded-xl p-4 border border-cef-primary/30 bg-cef-primary/5 flex flex-col justify-between gap-4 group">
                                         <div>
                                             <div className="flex items-center gap-1.5 text-cef-primary/70 mb-1">
                                                 <DollarSign size={14} />
@@ -368,8 +485,8 @@ export default function ClaseDetailDialog({
                                             >
                                                 {suscripcionCheckLoading ? (
                                                     <>
-                                                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Verificando...
+                                                        <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                        Verificando…
                                                     </>
                                                 ) : (
                                                     <>
@@ -397,8 +514,8 @@ export default function ClaseDetailDialog({
                                     >
                                         {asistenciasLoading ? (
                                             <>
-                                                <span className="w-4 h-4 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
-                                                Cargando...
+                                                <span className="size-4 border-2 border-slate-400/30 border-t-slate-400 rounded-full animate-spin" />
+                                                Cargando…
                                             </>
                                         ) : (
                                             <>
@@ -418,81 +535,22 @@ export default function ClaseDetailDialog({
                             <p className="text-sm text-slate-600">
                                 Elegí cómo querés abonar la clase de <span className="font-semibold text-slate-800">{clase.nombre}</span>.
                             </p>
-
-                            <div className="space-y-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentType("full")}
-                                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                                        paymentType === "full"
-                                            ? "border-cef-primary bg-cef-primary/5"
-                                            : "border-slate-200 hover:border-slate-300"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-800">Pago completo</p>
-                                            <p className="text-xs text-slate-400 mt-0.5">Abonás el monto total ahora</p>
-                                        </div>
-                                        <p className="text-lg font-bold text-slate-800">{formatPrice(precioActual)}</p>
-                                    </div>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentType("partial")}
-                                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                                        paymentType === "partial"
-                                            ? "border-cef-primary bg-cef-primary/5"
-                                            : "border-slate-200 hover:border-slate-300"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
-                                            <p className="text-xs text-slate-400 mt-0.5">
-                                                Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
-                                            </p>
-                                        </div>
-                                        <p className="text-xs text-slate-400">A definir</p>
-                                    </div>
-                                </button>
-
-                                {paymentType === "partial" && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                                            Ingresá el monto a pagar
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">$</span>
-                                            <input
-                                                type="number"
-                                                min={montoMinimoActual + 1}
-                                                max={precioActual}
-                                                step="1"
-                                                value={partialAmount}
-                                                onChange={(e) => {
-                                                    setPartialAmount(e.target.value);
-                                                    setAmountError("");
-                                                }}
-                                                placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
-                                                className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {amountError && (
-                                    <p className="text-xs text-cef-danger">{amountError}</p>
-                                )}
-                            </div>
+                            <PaymentAmountStep
+                                inputId="individual-amount"
+                                precioActual={precioActual}
+                                montoMinimoActual={montoMinimoActual}
+                                paymentType={paymentType}
+                                partialAmount={partialAmount}
+                                amountError={amountError}
+                                onTypeChange={setPaymentType}
+                                onAmountChange={(v) => { setPartialAmount(v); setAmountError(""); }}
+                            />
                         </div>
                     )}
 
                     {/* Body — Step: amount-suscripcion */}
                     {step === "amount-suscripcion" && suscripcionData && (
                         <div className="px-6 py-5 space-y-5">
-                            {/* Subscription period info */}
                             <div className="glass rounded-xl p-4 space-y-3">
                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Período de suscripción</p>
                                 <div className="flex items-center gap-2 text-sm text-slate-700">
@@ -515,113 +573,23 @@ export default function ClaseDetailDialog({
                                     ))}
                                 </div>
                             </div>
-
-                            {/* Payment options */}
-                            <div className="space-y-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentType("full")}
-                                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                                        paymentType === "full"
-                                            ? "border-cef-primary bg-cef-primary/5"
-                                            : "border-slate-200 hover:border-slate-300"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-800">Pago completo</p>
-                                            <p className="text-xs text-slate-400 mt-0.5">Abonás el monto total ahora</p>
-                                        </div>
-                                        <p className="text-lg font-bold text-slate-800">{formatPrice(precioActual)}</p>
-                                    </div>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setPaymentType("partial")}
-                                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                                        paymentType === "partial"
-                                            ? "border-cef-primary bg-cef-primary/5"
-                                            : "border-slate-200 hover:border-slate-300"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
-                                            <p className="text-xs text-slate-400 mt-0.5">
-                                                Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
-                                            </p>
-                                        </div>
-                                        <p className="text-xs text-slate-400">A definir</p>
-                                    </div>
-                                </button>
-
-                                {paymentType === "partial" && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-600 mb-1.5">
-                                            Ingresá el monto a pagar
-                                        </label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">$</span>
-                                            <input
-                                                type="number"
-                                                min={montoMinimoActual + 1}
-                                                max={precioActual}
-                                                step="1"
-                                                value={partialAmount}
-                                                onChange={(e) => {
-                                                    setPartialAmount(e.target.value);
-                                                    setAmountError("");
-                                                }}
-                                                placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
-                                                className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {amountError && (
-                                    <p className="text-xs text-cef-danger">{amountError}</p>
-                                )}
-                            </div>
+                            <PaymentAmountStep
+                                inputId="suscripcion-amount"
+                                precioActual={precioActual}
+                                montoMinimoActual={montoMinimoActual}
+                                paymentType={paymentType}
+                                partialAmount={partialAmount}
+                                amountError={amountError}
+                                onTypeChange={setPaymentType}
+                                onAmountChange={(v) => { setPartialAmount(v); setAmountError(""); }}
+                            />
                         </div>
                     )}
 
                     {/* Body — Step: asistencias */}
                     {step === "asistencias" && (
                         <div className="px-6 py-5">
-                            {asistencias.length === 0 ? (
-                                <p className="text-sm text-slate-400 text-center py-8">Sin asistencias registradas</p>
-                            ) : (
-                                <ul className="space-y-2 max-h-72 overflow-y-auto">
-                                    {(() => {
-                                        const terminada = hasClaseTerminado(clase.fecha_en_semana, clase.hora_fin);
-                                        return asistencias.map((a) => {
-                                            const estadoLabel = a.cancelo ? "Canceló" : a.asistio ? "Asistió" : terminada ? "Faltó" : "Pendiente";
-                                            const estadoClass = a.cancelo
-                                                ? "bg-cef-danger/10 text-cef-danger border-cef-danger/20"
-                                                : a.asistio
-                                                ? "bg-cef-success/10 text-cef-success border-cef-success/20"
-                                                : terminada
-                                                ? "bg-slate-100 text-slate-500 border-slate-200"
-                                                : "bg-cef-warning/10 text-cef-warning border-cef-warning/20";
-                                            return (
-                                                <li key={a.asistencia_id} className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-slate-800">{a.usuario_nombre}</p>
-                                                        <p className="text-xs text-slate-400">
-                                                            {a.tipo === TipoInscripcion.INDIVIDUAL ? "No abonado" : "Abonado"}
-                                                        </p>
-                                                    </div>
-                                                    <span className={`text-xs font-medium px-2.5 py-1 rounded-md border ${estadoClass}`}>
-                                                        {estadoLabel}
-                                                    </span>
-                                                </li>
-                                            );
-                                        });
-                                    })()}
-                                </ul>
-                            )}
+                            <AsistenciasStep asistencias={asistencias} clase={clase} />
                         </div>
                     )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useActionState, ChangeEvent } from "react";
+import { useReducer, useEffect, useActionState, ChangeEvent } from "react";
 import { X, Loader2 } from "lucide-react";
 import { createClase, ClaseFormState } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
@@ -28,79 +28,92 @@ function sumarUnaHora(hora: string): string {
     return `${String(h + 1).padStart(2, "0")}:00`;
 }
 
-const emptyFields = {
-    disciplina: "",
-    hora_inicio: "",
-    sala_id: "",
-    profesor_id: "",
-    capacidad_maxima: "",
+// ── State ────────────────────────────────────────────────────────────────────
+
+type State = {
+    isOpen: boolean;
+    salas: Sala[];
+    profesores: Profesor[];
+    isLoadingOptions: boolean;
+    fields: { disciplina: string; hora_inicio: string; sala_id: string; profesor_id: string; capacidad_maxima: string };
+    diaSemana: string;
 };
 
+type Action =
+    | { type: "OPEN" }
+    | { type: "CLOSE" }
+    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[] }
+    | { type: "SET_FIELD"; key: keyof State["fields"]; value: string }
+    | { type: "SET_DIA"; value: string };
+
+const emptyFields: State["fields"] = { disciplina: "", hora_inicio: "", sala_id: "", profesor_id: "", capacidad_maxima: "" };
+
+const initialState: State = {
+    isOpen: false, salas: [], profesores: [], isLoadingOptions: false, fields: emptyFields, diaSemana: "",
+};
+
+function reducer(state: State, action: Action): State {
+    switch (action.type) {
+        case "OPEN":  return { ...state, isOpen: true, isLoadingOptions: true };
+        case "CLOSE": return { ...initialState };
+        case "SET_OPTIONS": return { ...state, salas: action.salas, profesores: action.profesores, isLoadingOptions: false };
+        case "SET_FIELD": return { ...state, fields: { ...state.fields, [action.key]: action.value } };
+        case "SET_DIA": return { ...state, diaSemana: action.value };
+    }
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function AddClaseDialog() {
-    const router = useRouter();
+    const { refresh } = useRouter();
     const { showSuccess } = useToast();
-    const [isOpen, setIsOpen] = useState(false);
-    const [salas, setSalas] = useState<Sala[]>([]);
-    const [profesores, setProfesores] = useState<Profesor[]>([]);
-    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
-    const [fields, setFields] = useState(emptyFields);
-    const [diaSemana, setDiaSemana] = useState("");
-
-    const initialState: ClaseFormState = {};
-    const [state, formAction, isPending] = useActionState(createClase, initialState);
-
-    const set = (k: keyof typeof emptyFields) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setFields((f) => ({ ...f, [k]: e.target.value }));
+    const [ui, dispatch] = useReducer(reducer, initialState);
+    const [state, formAction, isPending] = useActionState(createClase, {} as ClaseFormState);
 
     useEffect(() => {
-        if (!isOpen) return;
-        setIsLoadingOptions(true);
-        Promise.all([getSalas(), getProfesores()]).then(([s, p]) => {
-            setSalas(s);
-            setProfesores(p);
-            setIsLoadingOptions(false);
-        });
-    }, [isOpen]);
+        if (!ui.isOpen) return;
+        getSalas().then(salas =>
+            getProfesores().then(profesores =>
+                dispatch({ type: "SET_OPTIONS", salas, profesores })
+            )
+        );
+    }, [ui.isOpen]);
 
     useEffect(() => {
-        if (state.success) {
-            showSuccess("Clase creada correctamente");
-            setIsOpen(false);
-            setFields(emptyFields);
-            setDiaSemana("");
-            router.refresh();
-        }
-    }, [state.success, showSuccess, router]);
+        if (!state.success) return;
+        showSuccess("Clase creada correctamente");
+        dispatch({ type: "CLOSE" });
+        refresh();
+    }, [state.success, showSuccess, refresh]);
 
-    const handleClose = () => {
-        setIsOpen(false);
-        setFields(emptyFields);
-        setDiaSemana("");
-    };
+    const set = (key: keyof State["fields"]) =>
+        (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+            dispatch({ type: "SET_FIELD", key, value: e.target.value });
 
-    const horaFin = fields.hora_inicio ? sumarUnaHora(fields.hora_inicio) : "--:--";
+    const horaFin = ui.fields.hora_inicio ? sumarUnaHora(ui.fields.hora_inicio) : "--:--";
 
     return (
         <>
             <button
-                onClick={() => setIsOpen(true)}
+                type="button"
+                onClick={() => dispatch({ type: "OPEN" })}
                 className="inline-flex items-center px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg transition-colors text-sm font-medium"
             >
                 + Nueva Clase
             </button>
 
-            {isOpen && (
+            {ui.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
                     <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                             <h3 className="text-base font-semibold text-slate-800">Agregar Clase</h3>
-                            <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+                            <button type="button" onClick={() => dispatch({ type: "CLOSE" })} className="text-slate-400 hover:text-slate-600 transition-colors">
                                 <X size={18} />
                             </button>
                         </div>
 
                         <div className="p-6">
-                            {isLoadingOptions ? (
+                            {ui.isLoadingOptions ? (
                                 <div className="flex justify-center py-8">
                                     <Loader2 className="animate-spin text-slate-400" size={24} />
                                 </div>
@@ -113,26 +126,26 @@ export default function AddClaseDialog() {
                                     )}
 
                                     <div>
-                                        <label className={labelCls}>Disciplina</label>
-                                        <select name="disciplina" required value={fields.disciplina} onChange={set("disciplina")} className={inputCls}>
-                                            <option value="">Seleccionar...</option>
+                                        <label htmlFor="add-disciplina" className={labelCls}>Disciplina</label>
+                                        <select id="add-disciplina" name="disciplina" required value={ui.fields.disciplina} onChange={set("disciplina")} className={inputCls}>
+                                            <option value="">Seleccionar…</option>
                                             {disciplinas.map((d) => (
                                                 <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
                                             ))}
                                         </select>
                                     </div>
 
-                                    <div>
-                                        <label className={labelCls}>Día de la semana</label>
-                                        <input type="hidden" name="dia_semana" value={diaSemana} />
+                                    <fieldset className="border-0 p-0 m-0 min-w-0">
+                                        <legend className={labelCls}>Día de la semana</legend>
+                                        <input type="hidden" name="dia_semana" value={ui.diaSemana} />
                                         <div className="grid grid-cols-6 gap-1.5">
                                             {diasSemana.map((d) => (
                                                 <button
                                                     key={d.value}
                                                     type="button"
-                                                    onClick={() => setDiaSemana(d.value)}
+                                                    onClick={() => dispatch({ type: "SET_DIA", value: d.value })}
                                                     className={`py-2 rounded-lg text-xs font-medium transition-colors ${
-                                                        diaSemana === d.value
+                                                        ui.diaSemana === d.value
                                                             ? "bg-cef-primary text-white"
                                                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                                     }`}
@@ -141,12 +154,12 @@ export default function AddClaseDialog() {
                                                 </button>
                                             ))}
                                         </div>
-                                    </div>
+                                    </fieldset>
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className={labelCls}>Hora inicio</label>
-                                            <select name="hora_inicio" required value={fields.hora_inicio} onChange={set("hora_inicio")} className={inputCls}>
+                                            <label htmlFor="add-hora-inicio" className={labelCls}>Hora inicio</label>
+                                            <select id="add-hora-inicio" name="hora_inicio" required value={ui.fields.hora_inicio} onChange={set("hora_inicio")} className={inputCls}>
                                                 <option value="">--:--</option>
                                                 {horasDisponibles.map((h) => (
                                                     <option key={h} value={h}>{h}</option>
@@ -154,8 +167,9 @@ export default function AddClaseDialog() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className={labelCls}>Hora fin</label>
+                                            <label htmlFor="add-hora-fin" className={labelCls}>Hora fin</label>
                                             <input
+                                                id="add-hora-fin"
                                                 name="hora_fin"
                                                 type="text"
                                                 readOnly
@@ -166,13 +180,14 @@ export default function AddClaseDialog() {
                                     </div>
 
                                     <div>
-                                        <label className={labelCls}>Cupo máximo</label>
+                                        <label htmlFor="add-capacidad" className={labelCls}>Cupo máximo</label>
                                         <input
+                                            id="add-capacidad"
                                             name="capacidad_maxima"
                                             type="number"
                                             min={1}
                                             required
-                                            value={fields.capacidad_maxima}
+                                            value={ui.fields.capacidad_maxima}
                                             onChange={set("capacidad_maxima")}
                                             className={inputCls}
                                             placeholder="Ej: 15"
@@ -180,36 +195,36 @@ export default function AddClaseDialog() {
                                     </div>
 
                                     <div>
-                                        <label className={labelCls}>Sala</label>
-                                        <select name="sala_id" required value={fields.sala_id} onChange={set("sala_id")} className={inputCls}>
-                                            <option value="">Seleccionar...</option>
-                                            {salas.map((s) => (
+                                        <label htmlFor="add-sala" className={labelCls}>Sala</label>
+                                        <select id="add-sala" name="sala_id" required value={ui.fields.sala_id} onChange={set("sala_id")} className={inputCls}>
+                                            <option value="">Seleccionar…</option>
+                                            {ui.salas.map((s) => (
                                                 <option key={s.id} value={s.id}>{s.nombre}</option>
                                             ))}
                                         </select>
                                     </div>
 
                                     <div>
-                                        <label className={labelCls}>Profesor</label>
-                                        <select name="profesor_id" required value={fields.profesor_id} onChange={set("profesor_id")} className={inputCls}>
-                                            <option value="">Seleccionar...</option>
-                                            {profesores.map((p) => (
+                                        <label htmlFor="add-profesor" className={labelCls}>Profesor</label>
+                                        <select id="add-profesor" name="profesor_id" required value={ui.fields.profesor_id} onChange={set("profesor_id")} className={inputCls}>
+                                            <option value="">Seleccionar…</option>
+                                            {ui.profesores.map((p) => (
                                                 <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
                                             ))}
                                         </select>
                                     </div>
 
-                                    <div className="pt-2 flex justify-end space-x-3">
+                                    <div className="pt-2 flex justify-end gap-3">
                                         <button
                                             type="button"
-                                            onClick={handleClose}
+                                            onClick={() => dispatch({ type: "CLOSE" })}
                                             className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg transition-colors"
                                         >
                                             Cancelar
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={isPending || !diaSemana}
+                                            disabled={isPending || !ui.diaSemana}
                                             className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                                         >
                                             {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

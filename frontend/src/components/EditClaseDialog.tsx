@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useActionState } from "react";
+import { useReducer, useEffect, useActionState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { updateClase, ClaseFormState } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
@@ -31,6 +31,33 @@ function sumarUnaHora(hora: string): string {
     return `${String(h + 1).padStart(2, "0")}:00`;
 }
 
+// ── State ─────────────────────────────────────────────────────────────────────
+
+type State = {
+    salas: Sala[];
+    profesores: Profesor[];
+    isLoadingOptions: boolean;
+    horaInicio: string;
+    diaSemana: string;
+};
+
+type Action =
+    | { type: "OPEN"; horaInicio: string; diaSemana: string }
+    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[] }
+    | { type: "SET_HORA"; value: string }
+    | { type: "SET_DIA"; value: string };
+
+function reducer(state: State, action: Action): State {
+    switch (action.type) {
+        case "OPEN":        return { ...state, isLoadingOptions: true, horaInicio: action.horaInicio, diaSemana: action.diaSemana };
+        case "SET_OPTIONS": return { ...state, salas: action.salas, profesores: action.profesores, isLoadingOptions: false };
+        case "SET_HORA":    return { ...state, horaInicio: action.value };
+        case "SET_DIA":     return { ...state, diaSemana: action.value };
+    }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 interface EditClaseDialogProps {
     clase: ClaseSemana;
     isOpen: boolean;
@@ -38,50 +65,46 @@ interface EditClaseDialogProps {
 }
 
 export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDialogProps) {
-    const router = useRouter();
+    const { refresh } = useRouter();
     const { showSuccess } = useToast();
-    const [salas, setSalas] = useState<Sala[]>([]);
-    const [profesores, setProfesores] = useState<Profesor[]>([]);
-    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
-    const [horaInicio, setHoraInicio] = useState(clase.hora_inicio.slice(0, 5));
-    const [diaSemana, setDiaSemana] = useState(clase.dia_semana);
+    const [ui, dispatch] = useReducer(reducer, {
+        salas: [],
+        profesores: [],
+        isLoadingOptions: false,
+        horaInicio: clase.hora_inicio.slice(0, 5),
+        diaSemana: clase.dia_semana,
+    });
 
-    const initialState: ClaseFormState = {};
     const updateClaseWithId = updateClase.bind(null, clase.id);
-    const [state, formAction, isPending] = useActionState(updateClaseWithId, initialState);
+    const [state, formAction, isPending] = useActionState(updateClaseWithId, {} as ClaseFormState);
 
     useEffect(() => {
         if (!isOpen) return;
-        setHoraInicio(clase.hora_inicio.slice(0, 5));
-        setDiaSemana(clase.dia_semana);
-        setIsLoadingOptions(true);
-        Promise.all([getSalas(), getProfesores()]).then(([s, p]) => {
-            setSalas(s);
-            setProfesores(p);
-            setIsLoadingOptions(false);
+        dispatch({ type: "OPEN", horaInicio: clase.hora_inicio.slice(0, 5), diaSemana: clase.dia_semana });
+        Promise.all([getSalas(), getProfesores()]).then(([salas, profesores]) => {
+            dispatch({ type: "SET_OPTIONS", salas, profesores });
         });
     }, [isOpen, clase.hora_inicio, clase.dia_semana]);
 
     useEffect(() => {
-        if (state.success) {
-            showSuccess("Clase editada correctamente");
-            onClose();
-            router.refresh();
-        }
-    }, [state.success, showSuccess, onClose, router]);
+        if (!state.success) return;
+        showSuccess("Clase editada correctamente");
+        onClose();
+        refresh();
+    }, [state.success, showSuccess, onClose, refresh]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                     <h3 className="text-base font-semibold text-slate-800">Editar Clase</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
                         <X size={18} />
                     </button>
                 </div>
 
                 <div className="p-6">
-                    {isLoadingOptions ? (
+                    {ui.isLoadingOptions ? (
                         <div className="flex justify-center py-8">
                             <Loader2 className="animate-spin text-slate-400" size={24} />
                         </div>
@@ -94,8 +117,8 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                             )}
 
                             <div>
-                                <label className={labelCls}>Disciplina</label>
-                                <select name="disciplina" required defaultValue={clase.disciplina} className={inputCls}>
+                                <label htmlFor="edit-disciplina" className={labelCls}>Disciplina</label>
+                                <select id="edit-disciplina" name="disciplina" required defaultValue={clase.disciplina} className={inputCls}>
                                     {disciplinas.map((d) => (
                                         <option key={d} value={d}>
                                             {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -104,17 +127,17 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                 </select>
                             </div>
 
-                            <div>
-                                <label className={labelCls}>Día de la semana</label>
-                                <input type="hidden" name="dia_semana" value={diaSemana} />
+                            <fieldset className="border-0 p-0 m-0 min-w-0">
+                                <legend className={labelCls}>Día de la semana</legend>
+                                <input type="hidden" name="dia_semana" value={ui.diaSemana} />
                                 <div className="grid grid-cols-6 gap-1.5">
                                     {diasSemana.map((d) => (
                                         <button
                                             key={d.value}
                                             type="button"
-                                            onClick={() => setDiaSemana(d.value)}
+                                            onClick={() => dispatch({ type: "SET_DIA", value: d.value })}
                                             className={`py-2 rounded-lg text-xs font-medium transition-colors ${
-                                                diaSemana === d.value
+                                                ui.diaSemana === d.value
                                                     ? "bg-cef-primary text-white"
                                                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                             }`}
@@ -123,16 +146,17 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                         </button>
                                     ))}
                                 </div>
-                            </div>
+                            </fieldset>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>Hora inicio</label>
+                                    <label htmlFor="edit-hora-inicio" className={labelCls}>Hora inicio</label>
                                     <select
+                                        id="edit-hora-inicio"
                                         name="hora_inicio"
                                         required
-                                        value={horaInicio}
-                                        onChange={(e) => setHoraInicio(e.target.value)}
+                                        value={ui.horaInicio}
+                                        onChange={(e) => dispatch({ type: "SET_HORA", value: e.target.value })}
                                         className={inputCls}
                                     >
                                         {horasDisponibles.map((h) => (
@@ -141,20 +165,22 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                     </select>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Hora fin</label>
+                                    <label htmlFor="edit-hora-fin" className={labelCls}>Hora fin</label>
                                     <input
+                                        id="edit-hora-fin"
                                         name="hora_fin"
                                         type="text"
                                         readOnly
-                                        value={sumarUnaHora(horaInicio)}
+                                        value={sumarUnaHora(ui.horaInicio)}
                                         className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className={labelCls}>Cupo máximo</label>
+                                <label htmlFor="edit-capacidad" className={labelCls}>Cupo máximo</label>
                                 <input
+                                    id="edit-capacidad"
                                     name="capacidad_maxima"
                                     type="number"
                                     min={1}
@@ -165,20 +191,20 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                             </div>
 
                             <div>
-                                <label className={labelCls}>Sala</label>
-                                <select name="sala_id" required defaultValue={clase.sala_id ?? ""} className={inputCls}>
-                                    <option value="">Seleccionar...</option>
-                                    {salas.map((s) => (
+                                <label htmlFor="edit-sala" className={labelCls}>Sala</label>
+                                <select id="edit-sala" name="sala_id" required defaultValue={clase.sala_id ?? ""} className={inputCls}>
+                                    <option value="">Seleccionar…</option>
+                                    {ui.salas.map((s) => (
                                         <option key={s.id} value={s.id}>{s.nombre}</option>
                                     ))}
                                 </select>
                             </div>
 
                             <div>
-                                <label className={labelCls}>Profesor</label>
-                                <select name="profesor_id" required defaultValue={clase.profesor_id ?? ""} className={inputCls}>
-                                    <option value="">Seleccionar...</option>
-                                    {profesores.map((p) => (
+                                <label htmlFor="edit-profesor" className={labelCls}>Profesor</label>
+                                <select id="edit-profesor" name="profesor_id" required defaultValue={clase.profesor_id ?? ""} className={inputCls}>
+                                    <option value="">Seleccionar…</option>
+                                    {ui.profesores.map((p) => (
                                         <option key={p.id} value={p.id}>
                                             {p.nombre} {p.apellido}
                                         </option>
@@ -186,7 +212,7 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                 </select>
                             </div>
 
-                            <div className="pt-2 flex justify-end space-x-3">
+                            <div className="pt-2 flex justify-end gap-3">
                                 <button
                                     type="button"
                                     onClick={onClose}
