@@ -33,16 +33,22 @@ function formatPrice(n: number) {
     return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 }).format(n);
 }
 
-function isFuture(fechaStr: string): boolean {
+function isClaseUpcoming(fechaStr: string, horaInicioStr: string): boolean {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    const [h, min] = horaInicioStr.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min) > new Date();
+}
+
+function isFechaUpcoming(fechaStr: string): boolean {
     const [y, m, d] = fechaStr.split("-").map(Number);
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    return new Date(y, m - 1, d) > today;
+    return new Date(y, m - 1, d) >= today;
 }
 
 // ─── Individual: card ────────────────────────────────────────────────────────
 
 function ClaseIndividualCard({ clase }: { clase: MiClaseIndividual }) {
-    const upcoming = isFuture(clase.fecha);
+    const upcoming = isClaseUpcoming(clase.fecha, clase.hora_inicio);
     return (
         <div className="glass rounded-2xl p-5 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -103,7 +109,7 @@ function ClaseIndividualCard({ clase }: { clase: MiClaseIndividual }) {
 // ─── Suscripcion: instancia row ───────────────────────────────────────────────
 
 function InstanciaRow({ inst }: { inst: InstanciaEnSuscripcion }) {
-    const upcoming = isFuture(inst.fecha);
+    const upcoming = isFechaUpcoming(inst.fecha);
 
     return (
         <div className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
@@ -241,8 +247,8 @@ export default function MisClasesView({
 }) {
     const [tab, setTab] = useState<Tab>("proximas");
 
-    const proximas = individuales.filter(c => isFuture(c.fecha));
-    const pasadas = individuales.filter(c => !isFuture(c.fecha));
+    const proximas = individuales.filter(c => isClaseUpcoming(c.fecha, c.hora_inicio));
+    const pasadas = individuales.filter(c => !isClaseUpcoming(c.fecha, c.hora_inicio));
     const listaActual = tab === "proximas" ? proximas : pasadas;
 
     return (

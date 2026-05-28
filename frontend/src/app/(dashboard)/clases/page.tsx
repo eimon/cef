@@ -6,7 +6,9 @@ import AddClaseDialog from "@/components/AddClaseDialog";
 import { getUserRole } from "@/lib/auth";
 
 function getMonday(dateStr?: string): string {
-    const date = dateStr ? new Date(dateStr + "T12:00:00") : new Date();
+    const date = dateStr
+        ? new Date(dateStr + "T12:00:00")
+        : new Date(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date()) + "T12:00:00");
     const day = date.getDay();
     const diff = day === 0 ? -6 : 1 - day;
     date.setDate(date.getDate() + diff);

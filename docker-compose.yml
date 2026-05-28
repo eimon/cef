@@ -14,6 +14,7 @@ services:
       RESEND_FROM_EMAIL: "${RESEND_FROM_EMAIL:-CEF <onboarding@resend.dev>}"
       FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
       EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS: ${EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS:-24}
+      TZ: America/Argentina/Buenos_Aires
     depends_on:
       db:
         condition: service_healthy
@@ -42,6 +43,7 @@ services:
       - INTERNAL_API_URL=http://cef_api:8000
       - JWT_SECRET_KEY=${SECRET_KEY:-supersecretkey}
       - ALGORITHM=${ALGORITHM:-HS256}
+      - TZ=America/Argentina/Buenos_Aires
     depends_on:
       - web
     restart: unless-stopped
@@ -49,13 +51,15 @@ services:
   db:
     image: postgres:16
     container_name: cef_db
+    command: ["postgres", "-c", "timezone=America/Argentina/Buenos_Aires"]
     ports:
       - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: cef_db
-      TZ: UTC
+      TZ: America/Argentina/Buenos_Aires
+      PGTZ: America/Argentina/Buenos_Aires
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped

@@ -1,11 +1,12 @@
 import uuid
 import calendar
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.enums import DiaSemana
+from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
 from repositories.suscripcion_repository import SuscripcionRepository
@@ -25,7 +26,7 @@ _DIA_TO_WEEKDAY = {
 
 
 def _proxima_fecha(dia_semana: DiaSemana) -> date:
-    hoy = date.today()
+    hoy = datetime.now(LOCAL_TZ).date()
     dias = ((_DIA_TO_WEEKDAY[dia_semana] - hoy.weekday()) % 7) or 7
     return hoy + timedelta(days=dias)
 

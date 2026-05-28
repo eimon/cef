@@ -12,11 +12,12 @@ export type ClaseFormState = {
 
 const claseBaseSchema = z.object({
     disciplina: z.string().min(1, "La disciplina es requerida"),
-    fecha: z.string().min(1, "La fecha es requerida"),
+    dia_semana: z.string().min(1, "El día es requerido"),
     hora_inicio: z.string().min(1, "La hora de inicio es requerida"),
     hora_fin: z.string().min(1, "La hora de fin es requerida"),
     sala_id: z.string().uuid("Sala inválida"),
     profesor_id: z.string().uuid("Profesor inválido"),
+    capacidad_maxima: z.coerce.number().int().min(1, "El cupo debe ser al menos 1"),
 });
 
 export async function createClase(
@@ -25,11 +26,12 @@ export async function createClase(
 ): Promise<ClaseFormState> {
     const validated = claseBaseSchema.safeParse({
         disciplina: formData.get("disciplina"),
-        fecha: formData.get("fecha"),
+        dia_semana: formData.get("dia_semana"),
         hora_inicio: formData.get("hora_inicio"),
         hora_fin: formData.get("hora_fin"),
         sala_id: formData.get("sala_id"),
         profesor_id: formData.get("profesor_id"),
+        capacidad_maxima: formData.get("capacidad_maxima"),
     });
 
     if (!validated.success) {
@@ -62,11 +64,12 @@ export async function updateClase(
 ): Promise<ClaseFormState> {
     const validated = claseBaseSchema.safeParse({
         disciplina: formData.get("disciplina"),
-        fecha: formData.get("fecha"),
+        dia_semana: formData.get("dia_semana"),
         hora_inicio: formData.get("hora_inicio"),
         hora_fin: formData.get("hora_fin"),
         sala_id: formData.get("sala_id"),
         profesor_id: formData.get("profesor_id"),
+        capacidad_maxima: formData.get("capacidad_maxima"),
     });
 
     if (!validated.success) {
@@ -108,7 +111,6 @@ export async function deleteClase(
     revalidatePath("/clases");
     return { success: true };
 }
-
 
 export async function getClases(): Promise<ClaseTemplate[]> {
     try {

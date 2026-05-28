@@ -72,24 +72,22 @@ class ClaseTemplateService:
         )
 
     async def create(self, data: ClaseTemplateCreate) -> ClaseTemplateResponse:
-        dia_semana = _WEEKDAY_TO_DIA[data.fecha.weekday()]
-
-        if await self.repo.get_conflicting_sala(data.sala_id, dia_semana, data.hora_inicio, data.hora_fin):
+        if await self.repo.get_conflicting_sala(data.sala_id, data.dia_semana, data.hora_inicio, data.hora_fin):
             raise SalaOcupadaException()
 
-        if await self.repo.get_conflicting_profesor(data.profesor_id, dia_semana, data.hora_inicio, data.hora_fin):
+        if await self.repo.get_conflicting_profesor(data.profesor_id, data.dia_semana, data.hora_inicio, data.hora_fin):
             raise ProfesorOcupadoException()
 
         nombre = data.disciplina.value.capitalize()
         clase = ClaseTemplate(
             nombre=nombre,
             disciplina=data.disciplina,
-            dia_semana=dia_semana,
+            dia_semana=data.dia_semana,
             hora_inicio=data.hora_inicio,
             hora_fin=data.hora_fin,
             sala_id=data.sala_id,
             profesor_id=data.profesor_id,
-            capacidad_maxima=20,
+            capacidad_maxima=data.capacidad_maxima,
         )
         clase = await self.repo.create(clase)
         clase = await self.repo.get_by_id(clase.id)
@@ -109,27 +107,26 @@ class ClaseTemplateService:
         if not clase:
             raise NotFoundException("Clase no encontrada")
 
-        dia_semana = _WEEKDAY_TO_DIA[data.fecha.weekday()]
-
-        if await self.repo.get_conflicting_sala(data.sala_id, dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
+        if await self.repo.get_conflicting_sala(data.sala_id, data.dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
             raise SalaOcupadaException()
 
-        if await self.repo.get_conflicting_profesor(data.profesor_id, dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
+        if await self.repo.get_conflicting_profesor(data.profesor_id, data.dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
             raise ProfesorOcupadoException()
 
         emails = await self.repo.get_enrolled_emails(clase_id)
 
         await self.repo.update_fields(clase, {
             "disciplina": data.disciplina,
-            "dia_semana": dia_semana,
+            "dia_semana": data.dia_semana,
             "hora_inicio": data.hora_inicio,
             "hora_fin": data.hora_fin,
             "sala_id": data.sala_id,
             "profesor_id": data.profesor_id,
             "nombre": data.disciplina.value.capitalize(),
+            "capacidad_maxima": data.capacidad_maxima,
         })
 
-        dia_label = dia_semana.value.capitalize()
+        dia_label = data.dia_semana.value.capitalize()
         hora_inicio_str = data.hora_inicio.strftime("%H:%M")
         hora_fin_str = data.hora_fin.strftime("%H:%M")
         await EmailService().send_clase_update_notification(

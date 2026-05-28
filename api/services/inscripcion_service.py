@@ -1,9 +1,10 @@
 import uuid
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.timezone import LOCAL_TZ
 from repositories.inscripcion_repository import InscripcionRepository
 from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
 from schemas.inscripcion import InscripcionIndividualCreate, InscripcionResponse
@@ -27,7 +28,8 @@ class InscripcionService:
         if not template:
             raise NotFoundException("Clase no encontrada")
 
-        if fecha <= date.today():
+        clase_inicio = datetime.combine(fecha, template.hora_inicio, tzinfo=LOCAL_TZ)
+        if clase_inicio <= datetime.now(LOCAL_TZ):
             raise BadRequestException("Solo podés inscribirte a clases futuras")
 
         instancia = await self.repo.get_instancia(clase_template_id, fecha)
