@@ -6,12 +6,14 @@ import uuid
 
 from repositories.clase_template_repository import ClaseTemplateRepository
 from repositories.clase_instancia_repository import ClaseInstanciaRepository
-from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse, ClasePrecioUpdate
+from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
-from core.enums import DiaSemana
+from core.enums import DiaSemana, Disciplina
 from models.clase_template import ClaseTemplate
+from models.precio_disciplina import PrecioDisciplina
 from models.suscripciones import Suscripcion
 
 _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
@@ -40,7 +42,12 @@ class ClaseTemplateService:
         self.db = db
         self.repo = ClaseTemplateRepository(db)
 
-    def _to_response(self, clase) -> ClaseTemplateResponse:
+    async def _load_precios(self) -> dict[Disciplina, tuple[float, float]]:
+        items = await PrecioDisciplinaRepository(self.db).get_all()
+        return {p.disciplina: (float(p.precio_individual), float(p.precio_suscripcion)) for p in items}
+
+    def _to_response(self, clase, precios: dict[Disciplina, tuple[float, float]]) -> ClaseTemplateResponse:
+        pi, ps = precios.get(clase.disciplina, (0.0, 0.0))
         return ClaseTemplateResponse(
             id=clase.id,
             nombre=clase.nombre,
@@ -50,8 +57,8 @@ class ClaseTemplateService:
             hora_inicio=clase.hora_inicio,
             hora_fin=clase.hora_fin,
             capacidad_maxima=clase.capacidad_maxima,
-            precio_individual=float(clase.precio_individual),
-            precio_suscripcion=float(clase.precio_suscripcion),
+            precio_individual=pi,
+            precio_suscripcion=ps,
             profesor_id=clase.profesor_id,
             sala_id=clase.sala_id,
             profesor_nombre=(
@@ -83,12 +90,11 @@ class ClaseTemplateService:
             sala_id=data.sala_id,
             profesor_id=data.profesor_id,
             capacidad_maxima=20,
-            precio_individual=data.precio_individual,
-            precio_suscripcion=data.precio_suscripcion,
         )
         clase = await self.repo.create(clase)
         clase = await self.repo.get_by_id(clase.id)
-        return self._to_response(clase)
+        precios = await self._load_precios()
+        return self._to_response(clase, precios)
 
     async def delete(self, clase_id: uuid.UUID) -> None:
         clase = await self.repo.get_by_id(clase_id)
@@ -131,31 +137,20 @@ class ClaseTemplateService:
         )
 
         clase = await self.repo.get_by_id(clase_id)
-        return self._to_response(clase)
-
-    async def update_precio(self, clase_id: uuid.UUID, data: ClasePrecioUpdate) -> ClaseTemplateResponse:
-        clase = await self.repo.get_by_id(clase_id)
-        if not clase:
-            raise NotFoundException("Clase no encontrada")
-
-        if data.tipo == "mensualidad":
-            precio_anterior = float(clase.precio_suscripcion)
-        else:
-            precio_anterior = float(clase.precio_individual)
-
-        await self.repo.update_precio(clase, data.tipo, precio_anterior, data.precio)
-        clase = await self.repo.get_by_id(clase_id)
-        return self._to_response(clase)
+        precios = await self._load_precios()
+        return self._to_response(clase, precios)
 
     async def list_all(self, skip: int = 0, limit: int = 100) -> list[ClaseTemplateResponse]:
         clases = await self.repo.get_all(skip, limit)
-        return [self._to_response(c) for c in clases]
+        precios = await self._load_precios()
+        return [self._to_response(c, precios) for c in clases]
 
     async def get(self, clase_id: uuid.UUID) -> ClaseTemplateResponse:
         clase = await self.repo.get_by_id(clase_id)
         if not clase:
             raise NotFoundException("Clase no encontrada")
-        return self._to_response(clase)
+        precios = await self._load_precios()
+        return self._to_response(clase, precios)
 
     async def get_semana(self, fecha: date) -> list[ClaseSemanaResponse]:
         week_start = fecha - timedelta(days=fecha.weekday())
@@ -163,10 +158,10 @@ class ClaseTemplateService:
 
         templates = await self.repo.get_all()
         instancias = await ClaseInstanciaRepository(self.db).get_by_fechas(fechas)
+        precios = await self._load_precios()
 
         instancia_map = {(i.clase_template_id, i.fecha): i for i in instancias}
 
-        # Batch-fetch all active suscripciones for templates that have no instancia
         template_ids = [t.id for t in templates]
         subs_result = await self.db.execute(
             select(Suscripcion).where(
@@ -190,6 +185,8 @@ class ClaseTemplateService:
             else:
                 cupo_disponible = template.capacidad_maxima - count_subs(template.id)
 
+            pi, ps = precios.get(template.disciplina, (0.0, 0.0))
+
             result.append(ClaseSemanaResponse(
                 id=template.id,
                 nombre=template.nombre,
@@ -199,8 +196,8 @@ class ClaseTemplateService:
                 hora_inicio=template.hora_inicio,
                 hora_fin=template.hora_fin,
                 capacidad_maxima=template.capacidad_maxima,
-                precio_individual=float(template.precio_individual),
-                precio_suscripcion=float(template.precio_suscripcion),
+                precio_individual=pi,
+                precio_suscripcion=ps,
                 profesor_id=template.profesor_id,
                 sala_id=template.sala_id,
                 profesor_nombre=(

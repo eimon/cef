@@ -4,8 +4,9 @@ Seeder de desarrollo — datos base para trabajar en paralelo.
 Crea (idempotente):
   - 1 usuario admin       admin@cef.ar     / admin
   - 1 usuario cliente     cliente@cef.ar   / cliente123
-  - 1 profesor
-  - 1 sala
+  - 3 profesores
+  - 3 salas
+  - 3 precios por disciplina
   - 3 templates de clase
 """
 
@@ -24,8 +25,7 @@ from models.usuario import Usuario
 from models.profesor import Profesor
 from models.sala import Sala
 from models.clase_template import ClaseTemplate
-from models.clase_instancia import ClaseInstancia
-from models.suscripciones import Suscripcion
+from models.precio_disciplina import PrecioDisciplina
 
 
 async def _seed_admin(session) -> None:
@@ -65,102 +65,64 @@ async def _seed_cliente(session) -> None:
     print("  [ok]   cliente")
 
 
-async def _seed_profesor(session) -> list[Profesor]:
+async def _seed_profesores(session) -> list[Profesor]:
+    datos = [
+        {"nombre": "Carlos", "apellido": "Rodríguez", "email": "profesor@cef.ar", "telefono": "1100000003", "dni": "25987654"},
+        {"nombre": "Ana", "apellido": "Pérez", "email": "profesor2@cef.ar", "telefono": "1100000004", "dni": "25987655"},
+        {"nombre": "Luis", "apellido": "Martínez", "email": "profesor3@cef.ar", "telefono": "1100000005", "dni": "25987656"},
+    ]
     profesores = []
-    existe = (await session.execute(
-        select(Profesor).where(Profesor.email == "profesor@cef.ar")
-    )).scalars().first()
-    if existe:
-        print("  [skip] profesor")
-        return existe
-    profesor = Profesor(
-        nombre="Carlos",
-        apellido="Rodríguez",
-        email="profesor@cef.ar",
-        telefono="1100000003",
-        dni="25987654",
-    )
-    session.add(profesor)
-    profesores.append(profesor)
-    
-    print("  [ok]   profesor 1")
-    existe = (await session.execute(
-        select(Profesor).where(Profesor.email == "profesor2@cef.ar")
-    )).scalars().first()
-    if existe:
-        print("  [skip] profesor")
-        return existe
-    profesor = Profesor(
-        nombre="Ana",
-        apellido="Pérez",
-        email="profesor2@cef.ar",
-        telefono="1100000004",
-        dni="25987655",
-    )
-    session.add(profesor)
-    profesores.append(profesor)
-    print("  [ok]   profesor 2")
-    existe = (await session.execute(
-        select(Profesor).where(Profesor.email == "profesor3@cef.ar")
-    )).scalars().first()
-    if existe:
-        print("  [skip] profesor")
-        return existe
-    profesor = Profesor(
-        nombre="Luis",
-        apellido="Martínez",
-        email="profesor3@cef.ar",
-        telefono="1100000005",
-        dni="25987656",
-    )
-    session.add(profesor)
-    profesores.append(profesor)
+    for i, d in enumerate(datos, 1):
+        existe = (await session.execute(
+            select(Profesor).where(Profesor.email == d["email"])
+        )).scalars().first()
+        if existe:
+            print(f"  [skip] profesor {i}")
+            profesores.append(existe)
+        else:
+            p = Profesor(**d)
+            session.add(p)
+            profesores.append(p)
+            print(f"  [ok]   profesor {i}")
     await session.flush()
-    print("  [ok]   profesor 3")
     return profesores
 
 
-async def _seed_sala(session) -> list[Sala]:
+async def _seed_salas(session) -> list[Sala]:
     salas = []
-    existe = (await session.execute(
-        select(Sala).where(Sala.nombre == "Sala 1")
-    )).scalars().first()
-    if existe:
-        print("  [skip] sala")
-        return existe
-    sala = Sala(
-        nombre="Sala 1",
-        capacidad=20,
-    )
-    session.add(sala)
-    salas.append(sala)
-    existe = (await session.execute(
-        select(Sala).where(Sala.nombre == "Sala 2")
-    )).scalars().first()
-    if existe:
-        print("  [skip] sala")
-        return existe
-    sala = Sala(
-        nombre="Sala 2",
-        capacidad=20,
-    )
-    session.add(sala)
-    salas.append(sala)
-    existe = (await session.execute(
-        select(Sala).where(Sala.nombre == "Sala 3")
-    )).scalars().first()
-    if existe:
-        print("  [skip] sala")
-        return existe
-    sala = Sala(
-        nombre="Sala 3",
-        capacidad=20,
-    )
-    session.add(sala)
-    salas.append(sala)
+    for i in range(1, 4):
+        nombre = f"Sala {i}"
+        existe = (await session.execute(
+            select(Sala).where(Sala.nombre == nombre)
+        )).scalars().first()
+        if existe:
+            print(f"  [skip] {nombre}")
+            salas.append(existe)
+        else:
+            s = Sala(nombre=nombre, capacidad=20)
+            session.add(s)
+            salas.append(s)
+            print(f"  [ok]   {nombre}")
     await session.flush()
-    print("  [ok]   sala")
     return salas
+
+
+async def _seed_precios(session) -> None:
+    precios = [
+        {"disciplina": Disciplina.YOGA, "precio_individual": 1500, "precio_suscripcion": 1200},
+        {"disciplina": Disciplina.PILATES, "precio_individual": 1500, "precio_suscripcion": 1200},
+        {"disciplina": Disciplina.FUNCIONAL, "precio_individual": 1800, "precio_suscripcion": 1400},
+    ]
+    for d in precios:
+        existe = (await session.execute(
+            select(PrecioDisciplina).where(PrecioDisciplina.disciplina == d["disciplina"])
+        )).scalars().first()
+        if existe:
+            print(f"  [skip] precio {d['disciplina'].value}")
+        else:
+            session.add(PrecioDisciplina(**d))
+            print(f"  [ok]   precio {d['disciplina'].value}")
+    await session.flush()
 
 
 async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -> None:
@@ -173,8 +135,6 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
             "hora_inicio": time(9, 0),
             "hora_fin": time(10, 0),
             "capacidad_maxima": 15,
-            "precio_individual": 1500,
-            "precio_suscripcion": 1200,
         },
         {
             "nombre": "Funcional",
@@ -184,8 +144,6 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
             "hora_inicio": time(18, 0),
             "hora_fin": time(19, 0),
             "capacidad_maxima": 20,
-            "precio_individual": 1800,
-            "precio_suscripcion": 1400,
         },
         {
             "nombre": "Pilates",
@@ -195,12 +153,9 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
             "hora_inicio": time(10, 0),
             "hora_fin": time(11, 0),
             "capacidad_maxima": 12,
-            "precio_individual": 1500,
-            "precio_suscripcion": 1200,
         },
     ]
-    i = 0
-    for data in clases:
+    for i, data in enumerate(clases):
         existe = (await session.execute(
             select(ClaseTemplate).where(
                 ClaseTemplate.nombre == data["nombre"],
@@ -208,26 +163,25 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
             )
         )).scalars().first()
         if existe:
-            if existe.disciplina != data["disciplina"]:
-                existe.disciplina = data["disciplina"]
-                print(f"  [upd]  clase '{data['nombre']}' — disciplina actualizada")
-            else:
-                print(f"  [skip] clase '{data['nombre']}'")
+            print(f"  [skip] clase '{data['nombre']}'")
             continue
-        session.add(ClaseTemplate(profesor_id=profesores[i].id, sala_id=salas[i].id, **data))
-        i += 1
+        session.add(ClaseTemplate(
+            profesor_id=profesores[i].id,
+            sala_id=salas[i].id,
+            **data,
+        ))
         print(f"  [ok]   clase '{data['nombre']}'")
+
 
 async def seed_dev() -> None:
     print("Iniciando seed de desarrollo...")
     async with AsyncSessionLocal() as session:
         await _seed_admin(session)
         await _seed_cliente(session)
-        profesor = await _seed_profesor(session)
-        salas = await _seed_sala(session)
-        await _seed_clases(session, profesor, salas)
-        # await _seed_instancias(session)
-        # await _seed_suscripciones(session)
+        profesores = await _seed_profesores(session)
+        salas = await _seed_salas(session)
+        await _seed_precios(session)
+        await _seed_clases(session, profesores, salas)
         await session.commit()
     print("Listo.")
 
