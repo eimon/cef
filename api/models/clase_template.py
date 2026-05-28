@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime, Time, Integer, ForeignKey, Enum, Numeric
+from sqlalchemy import Column, String, Boolean, DateTime, Time, Integer, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -20,8 +20,6 @@ class ClaseTemplate(Base):
     hora_inicio = Column(Time, nullable=False)
     hora_fin = Column(Time, nullable=False)
     capacidad_maxima = Column(Integer, nullable=False)
-    precio_individual = Column(Numeric(10, 2), nullable=False)
-    precio_suscripcion = Column(Numeric(10, 2), nullable=False)
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

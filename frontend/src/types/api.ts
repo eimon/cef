@@ -97,6 +97,13 @@ export enum Disciplina {
     FUNCIONAL = "funcional",
 }
 
+export interface PrecioDisciplina {
+    disciplina: Disciplina;
+    precio_individual: number;
+    precio_suscripcion: number;
+    updated_at: string;
+}
+
 export enum DiaSemana {
     LUNES = "lunes",
     MARTES = "martes",

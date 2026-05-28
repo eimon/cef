@@ -9,6 +9,7 @@ from core.enums import DiaSemana
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
 from repositories.suscripcion_repository import SuscripcionRepository
+from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
 from schemas.suscripcion import SuscripcionCreate, SuscripcionCheckResponse, SuscripcionResponse
 
 
@@ -101,7 +102,10 @@ class SuscripcionService:
         template, fecha_inicio, fecha_fin, fechas_clases = await self._validar_elegibilidad(
             current_user, clase_template_id
         )
-        precio = float(template.precio_suscripcion)
+        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        if not precio_disciplina:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+        precio = float(precio_disciplina.precio_suscripcion)
         return SuscripcionCheckResponse(
             elegible=True,
             fecha_inicio=fecha_inicio,
@@ -119,7 +123,10 @@ class SuscripcionService:
             current_user, clase_template_id
         )
 
-        precio = Decimal(str(template.precio_suscripcion))
+        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        if not precio_disciplina:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+        precio = Decimal(str(precio_disciplina.precio_suscripcion))
         monto_minimo = precio / 2
 
         if data.monto < monto_minimo:
