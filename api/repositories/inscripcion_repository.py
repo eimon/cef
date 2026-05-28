@@ -99,7 +99,6 @@ class InscripcionRepository:
             .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
             .where(
                 Asistencia.usuario_id == usuario_id,
-                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
                 Asistencia.cancelo == False,
                 ClaseInstancia.fecha == fecha,
                 ClaseTemplate.hora_inicio < hora_fin,
