@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, FormEvent, useEffect } from "react";
+import { useActionState, ChangeEvent, useEffect, useState } from "react";
 import { useToast } from "@/context/ToastContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,15 @@ export default function PersonalDataEditForm({ profile }: { profile: User | null
     const fieldErrors = state.fieldErrors || {};
     const { showSuccess } = useToast();
     const router = useRouter();
+    const [dni, setDni] = useState(values.dni || "");
+    const [nombre, setNombre] = useState(values.nombre || "");
+    const [apellido, setApellido] = useState(values.apellido || "");
+    const [genero, setGenero] = useState(values.genero || "");
+    const [telefono, setTelefono] = useState(values.telefono || "");
+    const [fechaNacimiento, setFechaNacimiento] = useState(values.fecha_nacimiento || "");
+    const canSubmit = [dni, nombre, apellido, genero, telefono, fechaNacimiento].every(
+        (value) => value.trim().length > 0
+    );
 
     useEffect(() => {
         if (state?.success) {
@@ -51,13 +60,12 @@ export default function PersonalDataEditForm({ profile }: { profile: User | null
         }
     }, [state?.success, showSuccess, router]);
 
-    function handleBirthInput(e: FormEvent<HTMLInputElement>) {
-        const el = e.currentTarget as HTMLInputElement;
-        let v = el.value.replace(/\D/g, "");
+    function handleBirthChange(e: ChangeEvent<HTMLInputElement>) {
+        let v = e.currentTarget.value.replace(/\D/g, "");
         if (v.length > 8) v = v.slice(0, 8);
         if (v.length > 4) v = v.slice(0, 2) + "/" + v.slice(2, 4) + "/" + v.slice(4);
         else if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
-        el.value = v;
+        setFechaNacimiento(v);
     }
 
     return (
@@ -73,20 +81,20 @@ export default function PersonalDataEditForm({ profile }: { profile: User | null
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <div>
                         <label className={labelCls}>DNI</label>
-                        <input name="dni" required className={inputCls} defaultValue={values.dni || ""} aria-invalid={Boolean(fieldErrors.dni)} />
+                        <input name="dni" required className={inputCls} value={dni} onChange={(event) => setDni(event.target.value)} aria-invalid={Boolean(fieldErrors.dni)} />
                         {fieldErrors.dni && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.dni}</p>}
                     </div>
                     <div>
                         <label className={labelCls}>Nombre</label>
-                        <input name="nombre" required className={inputCls} defaultValue={values.nombre || ""} />
+                        <input name="nombre" required className={inputCls} value={nombre} onChange={(event) => setNombre(event.target.value)} />
                     </div>
                     <div>
                         <label className={labelCls}>Apellido</label>
-                        <input name="apellido" required className={inputCls} defaultValue={values.apellido || ""} />
+                        <input name="apellido" required className={inputCls} value={apellido} onChange={(event) => setApellido(event.target.value)} />
                     </div>
                     <div>
                         <label className={labelCls}>Género</label>
-                        <select name="genero" required className={inputCls} defaultValue={values.genero || ""}>
+                        <select name="genero" required className={inputCls} value={genero} onChange={(event) => setGenero(event.target.value)}>
                             <option value="" disabled>
                                 Seleccionar
                             </option>
@@ -98,7 +106,7 @@ export default function PersonalDataEditForm({ profile }: { profile: User | null
                     </div>
                     <div>
                         <label className={labelCls}>Teléfono</label>
-                        <input name="telefono" required className={inputCls} defaultValue={values.telefono || ""} aria-invalid={Boolean(fieldErrors.telefono)} />
+                        <input name="telefono" required className={inputCls} value={telefono} onChange={(event) => setTelefono(event.target.value)} aria-invalid={Boolean(fieldErrors.telefono)} />
                         {fieldErrors.telefono && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.telefono}</p>}
                     </div>
                     <div>
@@ -111,8 +119,8 @@ export default function PersonalDataEditForm({ profile }: { profile: User | null
                             required
                             placeholder="DD/MM/AAAA"
                             className={inputCls}
-                            defaultValue={values.fecha_nacimiento || ""}
-                            onInput={handleBirthInput}
+                            value={fechaNacimiento}
+                            onChange={handleBirthChange}
                             aria-invalid={Boolean(fieldErrors.fecha_nacimiento)}
                         />
                         {fieldErrors.fecha_nacimiento && (
@@ -131,7 +139,7 @@ export default function PersonalDataEditForm({ profile }: { profile: User | null
                     </Link>
                     <button
                         type="submit"
-                        disabled={isPending}
+                        disabled={isPending || !canSubmit}
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-cef-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cef-primary/80 disabled:opacity-60"
                     >
                         {isPending ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}

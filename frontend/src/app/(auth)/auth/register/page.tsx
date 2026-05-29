@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, FormEvent, useState } from "react";
+import { useActionState, ChangeEvent, FormEvent, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
@@ -14,10 +14,14 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase trac
 function PasswordField({
     name,
     label,
+    value,
+    onChange,
     error,
 }: {
     name: string;
     label: string;
+    value: string;
+    onChange: (event: ChangeEvent<HTMLInputElement>) => void;
     error?: string;
 }) {
     const [isVisible, setIsVisible] = useState(false);
@@ -31,6 +35,8 @@ function PasswordField({
                     data-password-toggle
                     name={name}
                     type={isVisible ? "text" : "password"}
+                    value={value}
+                    onChange={onChange}
                     required
                     className={`${inputCls} pr-10`}
                     aria-invalid={Boolean(error)}
@@ -51,50 +57,32 @@ function PasswordField({
     );
 }
 
-function GenderSelect({
-    value,
-    error,
-}: {
-    value?: string;
-    error?: string;
-}) {
-    const selectedValue = value || "";
-
-    return (
-        <div>
-            <label className={labelCls}>Genero</label>
-            <select
-                key={selectedValue}
-                name="genero"
-                required
-                className={inputCls}
-                defaultValue={selectedValue}
-                aria-invalid={Boolean(error)}
-            >
-                <option value="" disabled>Seleccionar</option>
-                <option value="femenino">Femenino</option>
-                <option value="masculino">Masculino</option>
-                <option value="no_binario">No binario</option>
-                <option value="prefiero_no_decir">Prefiero no decir</option>
-                <option value="otro">Otro</option>
-            </select>
-            {error && <p className="mt-1.5 text-xs text-cef-danger">{error}</p>}
-        </div>
-    );
-}
-
 export default function RegisterPage() {
     const [state, formAction, isPending] = useActionState(signup, initialState);
     const values = state.values || {};
     const fieldErrors = state.fieldErrors || {};
+    const [nombre, setNombre] = useState(values.nombre || "");
+    const [apellido, setApellido] = useState(values.apellido || "");
+    const [email, setEmail] = useState(values.email || "");
+    const [fechaNacimiento, setFechaNacimiento] = useState(values.fecha_nacimiento || "");
+    const [genero, setGenero] = useState(values.genero || "");
+    const [password, setPassword] = useState("");
+    const canSubmit = [nombre, apellido, email, fechaNacimiento, genero, password].every(
+        (value) => value.trim().length > 0
+    );
 
-    function handleBirthInput(e: FormEvent<HTMLInputElement>) {
-        const el = e.currentTarget;
-        let value = el.value.replace(/\D/g, "");
+    function handleBirthChange(e: ChangeEvent<HTMLInputElement>) {
+        let value = e.currentTarget.value.replace(/\D/g, "");
         if (value.length > 8) value = value.slice(0, 8);
         if (value.length > 4) value = value.slice(0, 2) + "/" + value.slice(2, 4) + "/" + value.slice(4);
         else if (value.length > 2) value = value.slice(0, 2) + "/" + value.slice(2);
-        el.value = value;
+        setFechaNacimiento(value);
+    }
+
+    function handleSubmit(event: FormEvent<HTMLFormElement>) {
+        if (!canSubmit) {
+            event.preventDefault();
+        }
     }
 
     return (
@@ -134,18 +122,18 @@ export default function RegisterPage() {
                             </p>
                         </div>
                     ) : (
-                        <form action={formAction} noValidate className="grid gap-4 p-6">
+                        <form action={formAction} noValidate onSubmit={handleSubmit} className="grid gap-4 p-6">
                             {fieldErrors._form && <p className="text-xs text-cef-danger">{fieldErrors._form}</p>}
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className={labelCls}>Nombre</label>
-                                    <input name="nombre" required className={inputCls} defaultValue={values.nombre || ""} aria-invalid={Boolean(fieldErrors.nombre)} />
+                                    <input name="nombre" required className={inputCls} value={nombre} onChange={(event) => setNombre(event.target.value)} aria-invalid={Boolean(fieldErrors.nombre)} />
                                     {fieldErrors.nombre && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.nombre}</p>}
                                 </div>
                                 <div>
                                     <label className={labelCls}>Apellido</label>
-                                    <input name="apellido" required className={inputCls} defaultValue={values.apellido || ""} aria-invalid={Boolean(fieldErrors.apellido)} />
+                                    <input name="apellido" required className={inputCls} value={apellido} onChange={(event) => setApellido(event.target.value)} aria-invalid={Boolean(fieldErrors.apellido)} />
                                     {fieldErrors.apellido && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.apellido}</p>}
                                 </div>
                             </div>
@@ -153,7 +141,7 @@ export default function RegisterPage() {
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className={labelCls}>Email</label>
-                                    <input name="email" type="email" required className={inputCls} defaultValue={values.email || ""} aria-invalid={Boolean(fieldErrors.email)} />
+                                    <input name="email" type="email" required className={inputCls} value={email} onChange={(event) => setEmail(event.target.value)} aria-invalid={Boolean(fieldErrors.email)} />
                                     {fieldErrors.email && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.email}</p>}
                                 </div>
                                 <div>
@@ -179,34 +167,53 @@ export default function RegisterPage() {
                                         required
                                         placeholder="DD/MM/AAAA"
                                         className={inputCls}
-                                        defaultValue={values.fecha_nacimiento || ""}
-                                        onInput={handleBirthInput}
+                                        value={fechaNacimiento}
+                                        onChange={handleBirthChange}
                                         aria-invalid={Boolean(fieldErrors.fecha_nacimiento)}
                                     />
                                     {fieldErrors.fecha_nacimiento && (
                                         <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.fecha_nacimiento}</p>
                                     )}
                                 </div>
-                                <GenderSelect value={values.genero} error={fieldErrors.genero} />
+                                <div>
+                                    <label className={labelCls}>Genero</label>
+                                    <select
+                                        name="genero"
+                                        required
+                                        className={inputCls}
+                                        value={genero}
+                                        onChange={(event) => setGenero(event.target.value)}
+                                        aria-invalid={Boolean(fieldErrors.genero)}
+                                    >
+                                        <option value="" disabled>Seleccionar</option>
+                                        <option value="femenino">Femenino</option>
+                                        <option value="masculino">Masculino</option>
+                                        <option value="no_binario">No binario</option>
+                                        <option value="prefiero_no_decir">Prefiero no decir</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                    {fieldErrors.genero && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.genero}</p>}
+                                </div>
                             </div>
 
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
                                 <div>
-                                    <PasswordField name="password" label="Contraseña" error={fieldErrors.password} />
+                                    <PasswordField
+                                        name="password"
+                                        label="Contraseña"
+                                        value={password}
+                                        onChange={(event) => setPassword(event.target.value)}
+                                        error={fieldErrors.password}
+                                    />
                                     <p className="mt-1.5 text-xs text-slate-500">
                                         Debe tener como minimo 8 caracteres.
                                     </p>
                                 </div>
-                                <PasswordField
-                                    name="confirmPassword"
-                                    label="Confirmar contraseña"
-                                    error={fieldErrors.confirmPassword}
-                                />
                             </div>
 
                             <button
                                 type="submit"
-                                disabled={isPending}
+                                disabled={isPending || !canSubmit}
                                 className="mt-2 inline-flex items-center justify-center rounded-lg bg-cef-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cef-primary/80 disabled:opacity-60"
                             >
                                 {isPending ? <Loader2 className="mr-2 animate-spin" size={16} /> : null}

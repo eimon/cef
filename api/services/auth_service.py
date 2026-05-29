@@ -74,7 +74,7 @@ class AuthService:
             raise UnauthorizedException("Usuario no encontrado")
 
         if usuario.email.lower() == new_email.lower():
-            raise BadRequestException("El email ingresado es igual al actual")
+            raise ConflictException("Email ya registrado")
 
         if await self.user_repo.get_by_email(new_email):
             raise ConflictException("Email ya registrado")

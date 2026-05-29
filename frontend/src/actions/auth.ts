@@ -11,22 +11,18 @@ const loginSchema = z.object({
     password: z.string().min(1, "Debe ingresar su contraseña"),
 });
 
-const signupSchema = z
-    .object({
-        email: z.string().email("Email invalido"),
-        telefono: z.string().optional(),
-        nombre: z.string().min(1, "El nombre es requerido"),
-        apellido: z.string().min(1, "El apellido es requerido"),
-        fecha_nacimiento: z.string().min(1, "Fecha de nacimiento invalida"),
-        dni: z.string().optional(),
-        genero: z.string().min(1, "Selecciona un genero"),
-        password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-        confirmPassword: z.string().min(1, "Confirma tu contraseña"),
-    })
-    .refine((data) => data.password === data.confirmPassword, {
-        message: "Las contraseñas no coinciden",
-        path: ["confirmPassword"],
-    });
+const signupSchema = z.object({
+    email: z.string().email("Email invalido"),
+    telefono: z.string().optional(),
+    nombre: z.string().min(1, "El nombre es requerido"),
+    apellido: z.string().min(1, "El apellido es requerido"),
+    fecha_nacimiento: z.string().min(1, "Fecha de nacimiento invalida"),
+    dni: z.string().optional(),
+    genero: z.enum(["femenino", "masculino", "no_binario", "prefiero_no_decir", "otro"], {
+        error: "Selecciona un genero",
+    }),
+    password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+});
 
 const medicalRecordFieldsSchema = z.object({
         emergency_name: z.string().min(2, "Indica el nombre del contacto de emergencia"),
@@ -84,7 +80,7 @@ export type SignupState = {
     success?: boolean;
     message?: string;
     values?: SignupFormValues;
-    fieldErrors?: Partial<Record<keyof SignupFormValues | "password" | "confirmPassword" | "_form", string>>;
+    fieldErrors?: Partial<Record<keyof SignupFormValues | "password" | "_form", string>>;
 };
 
 export type MedicalRecordState = {
@@ -302,7 +298,6 @@ export async function signup(prevState: SignupState, formData: FormData): Promis
         dni: formData.get("dni") || undefined,
         genero: getFormString(formData, "genero"),
         password: formData.get("password"),
-        confirmPassword: formData.get("confirmPassword"),
     });
 
     if (!validatedFields.success) {

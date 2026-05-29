@@ -19,6 +19,19 @@ import {
 import { completeMedicalRecord, MedicalRecordState } from "@/actions/auth";
 
 const initialState: MedicalRecordState = {};
+const requiredTextInitialValues = {
+    emergency_name: "",
+    emergency_relationship: "",
+    emergency_phone: "",
+    medical_other: "",
+    smoked: "",
+    alcohol: "",
+    recent_symptoms: "",
+    sleep_hours: "",
+    sleep_difficulty: "",
+    diet_supplements: "",
+    physical_activity: "",
+};
 const inputCls = "w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-cef-primary/60 focus:bg-white focus:ring-2 focus:ring-cef-primary/15";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 const sectionCls = "glass overflow-hidden rounded-2xl border-l-4 border-l-cef-primary/70";
@@ -42,12 +55,27 @@ const medicalConditions = [
 
 const goals = ["Pérdida de peso", "Tonificación", "Salud", "Competencia"];
 
-function YesNoGroup({ name, value }: { name: string; value?: string }) {
+function YesNoGroup({
+    name,
+    value,
+    onChange,
+}: {
+    name: string;
+    value?: string;
+    onChange: (value: string) => void;
+}) {
     return (
         <div className="flex gap-2">
             {["No", "Sí"].map((option) => (
                 <label key={option} className={optionCls}>
-                    <input name={name} type="radio" value={option} required defaultChecked={option === value} />
+                    <input
+                        name={name}
+                        type="radio"
+                        value={option}
+                        required
+                        checked={option === value}
+                        onChange={(event) => onChange(event.target.value)}
+                    />
                     <span>{option}</span>
                 </label>
             ))}
@@ -74,7 +102,43 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
     const values = state.values;
     const fieldErrors = state.fieldErrors || {};
     const [selectedConditions, setSelectedConditions] = useState<string[]>(values?.medical_conditions || []);
+    const [selectedGoals, setSelectedGoals] = useState<string[]>(values?.goals || []);
+    const [requiredTextValues, setRequiredTextValues] = useState({
+        ...requiredTextInitialValues,
+        emergency_name: values?.emergency_name || "",
+        emergency_relationship: values?.emergency_relationship || "",
+        emergency_phone: values?.emergency_phone || "",
+        medical_other: values?.medical_other || "",
+        smoked: values?.smoked || "",
+        alcohol: values?.alcohol || "",
+        recent_symptoms: values?.recent_symptoms || "",
+        sleep_hours: values?.sleep_hours || "",
+        sleep_difficulty: values?.sleep_difficulty || "",
+        diet_supplements: values?.diet_supplements || "",
+        physical_activity: values?.physical_activity || "",
+    });
+    const [consent, setConsent] = useState(Boolean(values?.consent));
     const [surgeryCount, setSurgeryCount] = useState(Math.max(1, values?.surgeries?.length || 1));
+    const hasOtherCondition = selectedConditions.includes("Otros");
+    const canSubmit =
+        requiredTextValues.emergency_name.trim().length >= 2 &&
+        requiredTextValues.emergency_relationship.trim().length >= 2 &&
+        requiredTextValues.emergency_phone.trim().length >= 3 &&
+        selectedConditions.length > 0 &&
+        (!hasOtherCondition || requiredTextValues.medical_other.trim().length > 0) &&
+        requiredTextValues.smoked.trim().length > 0 &&
+        requiredTextValues.alcohol.trim().length > 0 &&
+        requiredTextValues.recent_symptoms.trim().length > 0 &&
+        requiredTextValues.sleep_hours.trim().length > 0 &&
+        requiredTextValues.sleep_difficulty.trim().length > 0 &&
+        requiredTextValues.diet_supplements.trim().length > 0 &&
+        requiredTextValues.physical_activity.trim().length > 0 &&
+        selectedGoals.length > 0 &&
+        consent;
+
+    const updateRequiredText = (name: keyof typeof requiredTextInitialValues, value: string) => {
+        setRequiredTextValues((current) => ({ ...current, [name]: value }));
+    };
 
     const toggleCondition = (condition: string, checked: boolean) => {
         setSelectedConditions((current) => {
@@ -87,6 +151,13 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                 return [...withoutNone, condition];
             }
             return withoutNone.filter((item) => item !== condition);
+        });
+    };
+
+    const toggleGoal = (goal: string, checked: boolean) => {
+        setSelectedGoals((current) => {
+            if (checked) return current.includes(goal) ? current : [...current, goal];
+            return current.filter((item) => item !== goal);
         });
     };
 
@@ -136,18 +207,39 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={labelCls}>Nombre</label>
-                                <input name="emergency_name" required className={inputCls} defaultValue={values?.emergency_name || ""} aria-invalid={Boolean(fieldErrors.emergency_name)} />
+                                <input
+                                    name="emergency_name"
+                                    required
+                                    className={inputCls}
+                                    value={requiredTextValues.emergency_name}
+                                    onChange={(event) => updateRequiredText("emergency_name", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.emergency_name)}
+                                />
                                 <ErrorText message={fieldErrors.emergency_name} />
                             </div>
                             <div>
                                 <label className={labelCls}>Relación</label>
-                                <input name="emergency_relationship" required className={inputCls} defaultValue={values?.emergency_relationship || ""} aria-invalid={Boolean(fieldErrors.emergency_relationship)} />
+                                <input
+                                    name="emergency_relationship"
+                                    required
+                                    className={inputCls}
+                                    value={requiredTextValues.emergency_relationship}
+                                    onChange={(event) => updateRequiredText("emergency_relationship", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.emergency_relationship)}
+                                />
                                 <ErrorText message={fieldErrors.emergency_relationship} />
                             </div>
                         </div>
                         <div>
                             <label className={labelCls}>Teléfono</label>
-                            <input name="emergency_phone" required className={inputCls} defaultValue={values?.emergency_phone || ""} aria-invalid={Boolean(fieldErrors.emergency_phone)} />
+                            <input
+                                name="emergency_phone"
+                                required
+                                className={inputCls}
+                                value={requiredTextValues.emergency_phone}
+                                onChange={(event) => updateRequiredText("emergency_phone", event.target.value)}
+                                aria-invalid={Boolean(fieldErrors.emergency_phone)}
+                            />
                             <ErrorText message={fieldErrors.emergency_phone} />
                         </div>
                     </div>
@@ -172,10 +264,18 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                             ))}
                         </div>
                         <ErrorText message={fieldErrors.medical_conditions} />
-                        {selectedConditions.includes("Otros") && (
+                        {hasOtherCondition && (
                             <div>
                                 <label className={labelCls}>Especifique/Otros</label>
-                                <textarea name="medical_other" required rows={3} className={inputCls} defaultValue={values?.medical_other || ""} aria-invalid={Boolean(fieldErrors.medical_other)} />
+                                <textarea
+                                    name="medical_other"
+                                    required
+                                    rows={3}
+                                    className={inputCls}
+                                    value={requiredTextValues.medical_other}
+                                    onChange={(event) => updateRequiredText("medical_other", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.medical_other)}
+                                />
                                 <ErrorText message={fieldErrors.medical_other} />
                             </div>
                         )}
@@ -188,32 +288,48 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={labelCls}>Hábitos: ¿Fuma o ha fumado?</label>
-                                <YesNoGroup name="smoked" value={values?.smoked} />
+                                <YesNoGroup name="smoked" value={requiredTextValues.smoked} onChange={(value) => updateRequiredText("smoked", value)} />
                                 <ErrorText message={fieldErrors.smoked} />
                             </div>
                             <div>
                                 <label className={labelCls}>¿Consume alcohol?</label>
-                                <YesNoGroup name="alcohol" value={values?.alcohol} />
+                                <YesNoGroup name="alcohol" value={requiredTextValues.alcohol} onChange={(value) => updateRequiredText("alcohol", value)} />
                                 <ErrorText message={fieldErrors.alcohol} />
                             </div>
                             <div>
                                 <label className={labelCls}>Síntomas recientes: ¿Sufre de mareos, falta de aire o dolor de pecho?</label>
-                                <YesNoGroup name="recent_symptoms" value={values?.recent_symptoms} />
+                                <YesNoGroup name="recent_symptoms" value={requiredTextValues.recent_symptoms} onChange={(value) => updateRequiredText("recent_symptoms", value)} />
                                 <ErrorText message={fieldErrors.recent_symptoms} />
                             </div>
                             <div>
                                 <label className={labelCls}>Descanso: Horas de sueño promedio</label>
-                                <input name="sleep_hours" required className={inputCls} inputMode="numeric" defaultValue={values?.sleep_hours || ""} aria-invalid={Boolean(fieldErrors.sleep_hours)} />
+                                <input
+                                    name="sleep_hours"
+                                    required
+                                    className={inputCls}
+                                    inputMode="numeric"
+                                    value={requiredTextValues.sleep_hours}
+                                    onChange={(event) => updateRequiredText("sleep_hours", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.sleep_hours)}
+                                />
                                 <ErrorText message={fieldErrors.sleep_hours} />
                             </div>
                             <div>
                                 <label className={labelCls}>¿Dificultad para dormir?</label>
-                                <YesNoGroup name="sleep_difficulty" value={values?.sleep_difficulty} />
+                                <YesNoGroup name="sleep_difficulty" value={requiredTextValues.sleep_difficulty} onChange={(value) => updateRequiredText("sleep_difficulty", value)} />
                                 <ErrorText message={fieldErrors.sleep_difficulty} />
                             </div>
                             <div>
                                 <label className={labelCls}>Nutrición: ¿Sigue alguna dieta especial o suplementación?</label>
-                                <input name="diet_supplements" required className={inputCls} placeholder="No / detalle" defaultValue={values?.diet_supplements || ""} aria-invalid={Boolean(fieldErrors.diet_supplements)} />
+                                <input
+                                    name="diet_supplements"
+                                    required
+                                    className={inputCls}
+                                    placeholder="No / detalle"
+                                    value={requiredTextValues.diet_supplements}
+                                    onChange={(event) => updateRequiredText("diet_supplements", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.diet_supplements)}
+                                />
                                 <ErrorText message={fieldErrors.diet_supplements} />
                             </div>
                         </div>
@@ -292,7 +408,7 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={labelCls}>¿Realiza actividad física actualmente?</label>
-                                <YesNoGroup name="physical_activity" value={values?.physical_activity} />
+                                <YesNoGroup name="physical_activity" value={requiredTextValues.physical_activity} onChange={(value) => updateRequiredText("physical_activity", value)} />
                                 <ErrorText message={fieldErrors.physical_activity} />
                             </div>
                             <div>
@@ -305,7 +421,13 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {goals.map((goal) => (
                                     <label key={goal} className={optionCls}>
-                                        <input name="goals" type="checkbox" value={goal} defaultChecked={values?.goals?.includes(goal)} />
+                                        <input
+                                            name="goals"
+                                            type="checkbox"
+                                            value={goal}
+                                            checked={selectedGoals.includes(goal)}
+                                            onChange={(event) => toggleGoal(goal, event.target.checked)}
+                                        />
                                         <span>{goal}</span>
                                     </label>
                                 ))}
@@ -319,7 +441,14 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
                     <SectionHeader icon={<ShieldCheck size={18} />} title="Consentimiento y declaración jurada" />
                     <div className={sectionBodyCls}>
                         <label className="flex items-start gap-3 rounded-lg border border-cef-primary/20 bg-cef-primary/5 p-4 text-sm text-slate-600 transition-colors hover:border-cef-primary/30">
-                            <input name="consent" type="checkbox" required className="mt-1 accent-cef-primary" defaultChecked={values?.consent} />
+                            <input
+                                name="consent"
+                                type="checkbox"
+                                required
+                                className="mt-1 accent-cef-primary"
+                                checked={consent}
+                                onChange={(event) => setConsent(event.target.checked)}
+                            />
                             <span>
                                 Declaro que la información proporcionada es verdadera y completa. Me comprometo a informar
                                 cualquier cambio en mi estado de salud y asumo la responsabilidad de realizar actividad física bajo
@@ -332,7 +461,7 @@ export default function PublicMedicalRecordForm({ token }: { token: string }) {
 
                 <button
                     type="submit"
-                    disabled={isPending}
+                    disabled={isPending || !canSubmit}
                     className="inline-flex w-full items-center justify-center rounded-lg bg-cef-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cef-primary/80 disabled:opacity-60"
                 >
                     {isPending ? <Loader2 className="mr-2 animate-spin" size={16} /> : null}

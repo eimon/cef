@@ -3,6 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 type FichaMedicaPageProps = {
     searchParams: Promise<{ token?: string }>;
 };

@@ -26,6 +26,19 @@ import type { MedicalRecordProfile } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
 
 const initialState: MedicalRecordState = {};
+const requiredTextInitialValues = {
+    emergency_name: "",
+    emergency_relationship: "",
+    emergency_phone: "",
+    medical_other: "",
+    smoked: "",
+    alcohol: "",
+    recent_symptoms: "",
+    sleep_hours: "",
+    sleep_difficulty: "",
+    diet_supplements: "",
+    physical_activity: "",
+};
 const inputCls = "w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-cef-primary/60 focus:bg-white focus:ring-2 focus:ring-cef-primary/15";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 const sectionCls = "glass overflow-hidden rounded-2xl border-l-4 border-l-cef-primary/70";
@@ -54,12 +67,27 @@ function ErrorText({ message, field }: { message?: string; field?: string }) {
     return <p data-error-field={field} className="mt-1.5 text-xs text-cef-danger">{message}</p>;
 }
 
-function YesNoGroup({ name, value }: { name: string; value?: string }) {
+function YesNoGroup({
+    name,
+    value,
+    onChange,
+}: {
+    name: string;
+    value?: string;
+    onChange: (value: string) => void;
+}) {
     return (
         <div className="flex gap-2">
             {Array.from(["No", "Sí"]).map((option) => (
                 <label key={option} className={optionCls}>
-                    <input name={name} type="radio" value={option} defaultChecked={option === value} />
+                    <input
+                        name={name}
+                        type="radio"
+                        value={option}
+                        required
+                        checked={option === value}
+                        onChange={(event) => onChange(event.target.value)}
+                    />
                     <span>{option}</span>
                 </label>
             ))}
@@ -73,7 +101,7 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
     const submittedValues = state.values;
     const values: MedicalRecordFormValues = submittedValues || {};
     const fieldErrors = state.fieldErrors || {};
-    const selectedGoals = submittedValues
+    const initialSelectedGoals = submittedValues
         ? (submittedValues.goals || [])
         : (record?.cuerpo_ficha?.actividad_fisica_y_objetivos?.objetivo_principal || []);
     const [selectedConditions, setSelectedConditions] = useState<string[]>(
@@ -81,23 +109,76 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
             ? (submittedValues.medical_conditions || [])
             : (record?.cuerpo_ficha?.antecedentes_medicos?.afecciones || [])
     );
+    const [selectedGoals, setSelectedGoals] = useState<string[]>(initialSelectedGoals);
+    const [requiredTextValues, setRequiredTextValues] = useState({
+        ...requiredTextInitialValues,
+        emergency_name: submittedValues
+            ? (submittedValues.emergency_name || "")
+            : (record?.cuerpo_ficha?.contacto_emergencia?.nombre || ""),
+        emergency_relationship: submittedValues
+            ? (submittedValues.emergency_relationship || "")
+            : (record?.cuerpo_ficha?.contacto_emergencia?.relacion || ""),
+        emergency_phone: submittedValues
+            ? (submittedValues.emergency_phone || "")
+            : (record?.cuerpo_ficha?.contacto_emergencia?.telefono || ""),
+        medical_other: submittedValues
+            ? (submittedValues.medical_other || "")
+            : (record?.cuerpo_ficha?.antecedentes_medicos?.especifique_otros || ""),
+        smoked: submittedValues
+            ? (submittedValues.smoked || "")
+            : (record?.cuerpo_ficha?.informacion_adicional_salud?.fuma_o_ha_fumado || ""),
+        alcohol: submittedValues
+            ? (submittedValues.alcohol || "")
+            : (record?.cuerpo_ficha?.informacion_adicional_salud?.consume_alcohol || ""),
+        recent_symptoms: submittedValues
+            ? (submittedValues.recent_symptoms || "")
+            : (record?.cuerpo_ficha?.informacion_adicional_salud?.mareos_falta_aire_o_dolor_pecho || ""),
+        sleep_hours: submittedValues
+            ? (submittedValues.sleep_hours || "")
+            : (record?.cuerpo_ficha?.informacion_adicional_salud?.horas_sueno_promedio || ""),
+        sleep_difficulty: submittedValues
+            ? (submittedValues.sleep_difficulty || "")
+            : (record?.cuerpo_ficha?.informacion_adicional_salud?.dificultad_para_dormir || ""),
+        diet_supplements: submittedValues
+            ? (submittedValues.diet_supplements || "")
+            : (record?.cuerpo_ficha?.informacion_adicional_salud?.dieta_especial_o_suplementacion || ""),
+        physical_activity: submittedValues
+            ? (submittedValues.physical_activity || "")
+            : (record?.cuerpo_ficha?.actividad_fisica_y_objetivos?.realiza_actividad_fisica_actualmente || ""),
+    });
     const [surgeryCount, setSurgeryCount] = useState(
         Math.max(1, submittedValues?.surgeries?.length ?? record?.cuerpo_ficha?.historial_cirugias?.length ?? 1)
     );
     const { showSuccess } = useToast();
     const router = useRouter();
+    const hasOtherCondition = selectedConditions.includes("Otros");
+    const canSubmit =
+        requiredTextValues.emergency_name.trim().length >= 2 &&
+        requiredTextValues.emergency_relationship.trim().length >= 2 &&
+        requiredTextValues.emergency_phone.trim().length >= 3 &&
+        selectedConditions.length > 0 &&
+        (!hasOtherCondition || requiredTextValues.medical_other.trim().length > 0) &&
+        requiredTextValues.smoked.trim().length > 0 &&
+        requiredTextValues.alcohol.trim().length > 0 &&
+        requiredTextValues.recent_symptoms.trim().length > 0 &&
+        requiredTextValues.sleep_hours.trim().length > 0 &&
+        requiredTextValues.sleep_difficulty.trim().length > 0 &&
+        requiredTextValues.diet_supplements.trim().length > 0 &&
+        requiredTextValues.physical_activity.trim().length > 0 &&
+        selectedGoals.length > 0;
 
     const fieldValue = (submitted: string | undefined, fallback?: string | null) =>
         submittedValues ? (submitted ?? "") : (fallback || "");
-
-    const radioValue = (field: keyof Pick<MedicalRecordFormValues, "smoked" | "alcohol" | "recent_symptoms" | "sleep_difficulty" | "physical_activity">, fallback?: string | null) =>
-        submittedValues ? (submittedValues[field] || "") : (fallback || "");
 
     const surgeryValue = (
         index: number,
         field: keyof MedicalRecordSurgeryValues,
         fallback?: string | null
     ) => submittedValues ? (submittedValues.surgeries?.[index]?.[field] ?? "") : (fallback || "");
+
+    const updateRequiredText = (name: keyof typeof requiredTextInitialValues, value: string) => {
+        setRequiredTextValues((current) => ({ ...current, [name]: value }));
+    };
 
     useEffect(() => {
         if (state?.success) showSuccess("Ficha médica actualizada");
@@ -152,6 +233,13 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
         });
     };
 
+    const toggleGoal = (goal: string, checked: boolean) => {
+        setSelectedGoals((current) => {
+            if (checked) return current.includes(goal) ? current : [...current, goal];
+            return current.filter((item) => item !== goal);
+        });
+    };
+
     return (
         <div className="glass-modal overflow-hidden rounded-2xl">
             <div className="border-b border-slate-200 bg-white px-6 py-5">
@@ -184,18 +272,39 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={labelCls}>Nombre</label>
-                                <input name="emergency_name" required className={inputCls} defaultValue={fieldValue(values.emergency_name, record?.cuerpo_ficha?.contacto_emergencia?.nombre)} aria-invalid={Boolean(fieldErrors.emergency_name)} />
+                                <input
+                                    name="emergency_name"
+                                    required
+                                    className={inputCls}
+                                    value={requiredTextValues.emergency_name}
+                                    onChange={(event) => updateRequiredText("emergency_name", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.emergency_name)}
+                                />
                                 <ErrorText message={fieldErrors.emergency_name} />
                             </div>
                             <div>
                                 <label className={labelCls}>Relación</label>
-                                <input name="emergency_relationship" required className={inputCls} defaultValue={fieldValue(values.emergency_relationship, record?.cuerpo_ficha?.contacto_emergencia?.relacion)} aria-invalid={Boolean(fieldErrors.emergency_relationship)} />
+                                <input
+                                    name="emergency_relationship"
+                                    required
+                                    className={inputCls}
+                                    value={requiredTextValues.emergency_relationship}
+                                    onChange={(event) => updateRequiredText("emergency_relationship", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.emergency_relationship)}
+                                />
                                 <ErrorText message={fieldErrors.emergency_relationship} />
                             </div>
                         </div>
                         <div>
                             <label className={labelCls}>Teléfono</label>
-                            <input name="emergency_phone" required className={inputCls} defaultValue={fieldValue(values.emergency_phone, record?.cuerpo_ficha?.contacto_emergencia?.telefono)} aria-invalid={Boolean(fieldErrors.emergency_phone)} />
+                            <input
+                                name="emergency_phone"
+                                required
+                                className={inputCls}
+                                value={requiredTextValues.emergency_phone}
+                                onChange={(event) => updateRequiredText("emergency_phone", event.target.value)}
+                                aria-invalid={Boolean(fieldErrors.emergency_phone)}
+                            />
                             <ErrorText message={fieldErrors.emergency_phone} />
                         </div>
                     </div>
@@ -223,10 +332,18 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                             ))}
                         </div>
                         <ErrorText message={fieldErrors.medical_conditions} field="medical_conditions" />
-                        {selectedConditions.includes("Otros") && (
+                        {hasOtherCondition && (
                             <div>
                                 <label className={labelCls}>Especifique/Otros</label>
-                                <textarea name="medical_other" required rows={3} className={inputCls} defaultValue={fieldValue(values.medical_other, record?.cuerpo_ficha?.antecedentes_medicos?.especifique_otros)} aria-invalid={Boolean(fieldErrors.medical_other)} />
+                                <textarea
+                                    name="medical_other"
+                                    required
+                                    rows={3}
+                                    className={inputCls}
+                                    value={requiredTextValues.medical_other}
+                                    onChange={(event) => updateRequiredText("medical_other", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.medical_other)}
+                                />
                                 <ErrorText message={fieldErrors.medical_other} />
                             </div>
                         )}
@@ -242,32 +359,48 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={labelCls}>Hábitos: ¿Fuma o ha fumado?</label>
-                                <YesNoGroup name="smoked" value={radioValue("smoked", record?.cuerpo_ficha?.informacion_adicional_salud?.fuma_o_ha_fumado)} />
+                                <YesNoGroup name="smoked" value={requiredTextValues.smoked} onChange={(value) => updateRequiredText("smoked", value)} />
                                 <ErrorText message={fieldErrors.smoked} />
                             </div>
                             <div>
                                 <label className={labelCls}>¿Consume alcohol?</label>
-                                <YesNoGroup name="alcohol" value={radioValue("alcohol", record?.cuerpo_ficha?.informacion_adicional_salud?.consume_alcohol)} />
+                                <YesNoGroup name="alcohol" value={requiredTextValues.alcohol} onChange={(value) => updateRequiredText("alcohol", value)} />
                                 <ErrorText message={fieldErrors.alcohol} />
                             </div>
                             <div>
                                 <label className={labelCls}>Síntomas recientes: ¿Sufre de mareos, falta de aire o dolor de pecho?</label>
-                                <YesNoGroup name="recent_symptoms" value={radioValue("recent_symptoms", record?.cuerpo_ficha?.informacion_adicional_salud?.mareos_falta_aire_o_dolor_pecho)} />
+                                <YesNoGroup name="recent_symptoms" value={requiredTextValues.recent_symptoms} onChange={(value) => updateRequiredText("recent_symptoms", value)} />
                                 <ErrorText message={fieldErrors.recent_symptoms} />
                             </div>
                             <div>
                                 <label className={labelCls}>Descanso: Horas de sueño promedio</label>
-                                <input name="sleep_hours" required className={inputCls} inputMode="numeric" defaultValue={fieldValue(values.sleep_hours, record?.cuerpo_ficha?.informacion_adicional_salud?.horas_sueno_promedio)} aria-invalid={Boolean(fieldErrors.sleep_hours)} />
+                                <input
+                                    name="sleep_hours"
+                                    required
+                                    className={inputCls}
+                                    inputMode="numeric"
+                                    value={requiredTextValues.sleep_hours}
+                                    onChange={(event) => updateRequiredText("sleep_hours", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.sleep_hours)}
+                                />
                                 <ErrorText message={fieldErrors.sleep_hours} />
                             </div>
                             <div>
                                 <label className={labelCls}>¿Dificultad para dormir?</label>
-                                <YesNoGroup name="sleep_difficulty" value={radioValue("sleep_difficulty", record?.cuerpo_ficha?.informacion_adicional_salud?.dificultad_para_dormir)} />
+                                <YesNoGroup name="sleep_difficulty" value={requiredTextValues.sleep_difficulty} onChange={(value) => updateRequiredText("sleep_difficulty", value)} />
                                 <ErrorText message={fieldErrors.sleep_difficulty} />
                             </div>
                             <div>
                                 <label className={labelCls}>Nutrición: ¿Sigue alguna dieta especial o suplementación?</label>
-                                <input name="diet_supplements" required className={inputCls} placeholder="No / detalle" defaultValue={fieldValue(values.diet_supplements, record?.cuerpo_ficha?.informacion_adicional_salud?.dieta_especial_o_suplementacion)} aria-invalid={Boolean(fieldErrors.diet_supplements)} />
+                                <input
+                                    name="diet_supplements"
+                                    required
+                                    className={inputCls}
+                                    placeholder="No / detalle"
+                                    value={requiredTextValues.diet_supplements}
+                                    onChange={(event) => updateRequiredText("diet_supplements", event.target.value)}
+                                    aria-invalid={Boolean(fieldErrors.diet_supplements)}
+                                />
                                 <ErrorText message={fieldErrors.diet_supplements} />
                             </div>
                         </div>
@@ -355,7 +488,7 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={labelCls}>¿Realiza actividad física actualmente?</label>
-                                <YesNoGroup name="physical_activity" value={radioValue("physical_activity", record?.cuerpo_ficha?.actividad_fisica_y_objetivos?.realiza_actividad_fisica_actualmente)} />
+                                <YesNoGroup name="physical_activity" value={requiredTextValues.physical_activity} onChange={(value) => updateRequiredText("physical_activity", value)} />
                                 <ErrorText message={fieldErrors.physical_activity} />
                             </div>
                             <div>
@@ -368,7 +501,13 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                             <div className="grid gap-2 sm:grid-cols-2">
                                 {goals.map((goal) => (
                                     <label key={goal} className={optionCls}>
-                                        <input name="goals" type="checkbox" value={goal} defaultChecked={selectedGoals.includes(goal)} />
+                                        <input
+                                            name="goals"
+                                            type="checkbox"
+                                            value={goal}
+                                            checked={selectedGoals.includes(goal)}
+                                            onChange={(event) => toggleGoal(goal, event.target.checked)}
+                                        />
                                         <span>{goal}</span>
                                     </label>
                                 ))}
@@ -384,7 +523,7 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                     </Link>
                     <button
                         type="submit"
-                        disabled={isPending}
+                        disabled={isPending || !canSubmit}
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-cef-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cef-primary/80 disabled:opacity-60"
                     >
                         {isPending ? <Loader2 className="mr-2 animate-spin" size={16} /> : null}

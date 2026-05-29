@@ -1,5 +1,5 @@
 import { getUsers } from "@/actions/users";
-import UsersManager from "@/components/UsersManager";
+import UsersTable from "@/components/UsersTable";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export default async function UsersPage() {
 
     return (
         <div className="space-y-6">
-            <UsersManager initialUsers={users} />
+            <UsersTable users={users} />
         </div>
     );
 }

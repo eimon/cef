@@ -20,6 +20,45 @@ function sumarUnaHora(hora: string): string {
     return `${String(h + 1).padStart(2, "0")}:00`;
 }
 
+function formatDateInput(value: string): string {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    if (digits.length > 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return digits;
+}
+
+function toIsoDate(value: string): string {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return "";
+
+    const [, day, month, year] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    const isValid =
+        date.getFullYear() === Number(year) &&
+        date.getMonth() === Number(month) - 1 &&
+        date.getDate() === Number(day);
+
+    return isValid ? `${year}-${month}-${day}` : "";
+}
+
+function getTodayIso(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function getDateError(value: string): string {
+    if (!value) return "";
+    if (value.length < 10) return "";
+
+    const isoDate = toIsoDate(value);
+    if (!isoDate || isoDate < getTodayIso()) return "Seleccione una fecha valida";
+
+    return "";
+}
+
 const emptyFields = {
     disciplina: "",
     fecha: "",
@@ -45,9 +84,17 @@ export default function AddClaseDialog() {
     const set = (k: keyof typeof emptyFields) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
         setFields((f: typeof emptyFields) => ({ ...f, [k]: e.target.value }));
 
+    const setDate = (e: ChangeEvent<HTMLInputElement>) => {
+        setFields((f: typeof emptyFields) => ({ ...f, fecha: formatDateInput(e.target.value) }));
+    };
+
+    const handleOpen = () => {
+        setIsLoadingOptions(true);
+        setIsOpen(true);
+    };
+
     useEffect(() => {
         if (!isOpen) return;
-        setIsLoadingOptions(true);
         Promise.all([getSalas(), getProfesores()]).then(([s, p]) => {
             setSalas(s);
             setProfesores(p);
@@ -58,9 +105,11 @@ export default function AddClaseDialog() {
     useEffect(() => {
         if (state.success) {
             showSuccess("Clase creada correctamente");
-            setIsOpen(false);
-            setFields(emptyFields);
-            router.refresh();
+            queueMicrotask(() => {
+                setIsOpen(false);
+                setFields(emptyFields);
+                router.refresh();
+            });
         }
     }, [state.success, showSuccess, router]);
 
@@ -70,11 +119,22 @@ export default function AddClaseDialog() {
     };
 
     const horaFin = fields.hora_inicio ? sumarUnaHora(fields.hora_inicio) : "--:--";
+    const isoFecha = toIsoDate(fields.fecha);
+    const dateError = getDateError(fields.fecha);
+    const canSubmit =
+        fields.disciplina.trim().length > 0 &&
+        isoFecha.length > 0 &&
+        !dateError &&
+        fields.hora_inicio.trim().length > 0 &&
+        fields.sala_id.trim().length > 0 &&
+        fields.profesor_id.trim().length > 0 &&
+        Number(fields.precio_suscripcion) > 0 &&
+        Number(fields.precio_individual) > 0;
 
     return (
         <>
             <button
-                onClick={() => setIsOpen(true)}
+                onClick={handleOpen}
                 className="inline-flex items-center px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg transition-colors text-sm font-medium"
             >
                 + Nueva Clase
@@ -115,7 +175,20 @@ export default function AddClaseDialog() {
 
                                     <div>
                                         <label className={labelCls}>Fecha</label>
-                                        <input name="fecha" type="date" required value={fields.fecha} onChange={set("fecha")} className={inputCls} />
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={10}
+                                            required
+                                            pattern="\d{2}/\d{2}/\d{4}"
+                                            placeholder="DD/MM/AAAA"
+                                            value={fields.fecha}
+                                            onChange={setDate}
+                                            aria-invalid={Boolean(dateError)}
+                                            className={inputCls}
+                                        />
+                                        <input type="hidden" name="fecha" value={isoFecha} />
+                                        {dateError && <p className="mt-1.5 text-xs text-cef-danger">{dateError}</p>}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
@@ -203,7 +276,7 @@ export default function AddClaseDialog() {
                                         </button>
                                         <button
                                             type="submit"
-                                            disabled={isPending}
+                                            disabled={isPending || !canSubmit}
                                             className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                                         >
                                             {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

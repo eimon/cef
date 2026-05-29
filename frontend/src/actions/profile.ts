@@ -59,6 +59,7 @@ export type EmailChangeState = {
 };
 
 const emailSchema = z.string().email("Email inválido");
+const registeredEmailMessage = "Email ya registrado";
 
 export async function requestEmailChange(
     prevState: EmailChangeState,
@@ -85,9 +86,13 @@ export async function requestEmailChange(
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            const message = data?.detail || "No pudimos enviar el email de confirmación.";
+            const detail = String(data?.detail || "");
+            const normalizedDetail = detail.toLowerCase();
+            const message = normalizedDetail.includes("email")
+                ? registeredEmailMessage
+                : detail || "No pudimos enviar el email de confirmación.";
             const fieldErrors: EmailChangeState["fieldErrors"] = {};
-            const normalizedMessage = String(message).toLowerCase();
+            const normalizedMessage = message.toLowerCase();
 
             if (normalizedMessage.includes("email")) {
                 fieldErrors.new_email = message;

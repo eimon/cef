@@ -1,6 +1,7 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { SERVER_API_URL } from "@/lib/server-api";
+
+export const dynamic = "force-dynamic";
 
 type ConfirmEmailPageProps = {
     searchParams: Promise<{ token?: string }>;
@@ -14,6 +15,7 @@ export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPag
     }
 
     let detail = "";
+    let errorMessage: string | null = null;
     try {
         const res = await fetch(`${SERVER_API_URL}/auth/email/change/confirm`, {
             method: "POST",
@@ -24,12 +26,16 @@ export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPag
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            return <VerificationError message={data?.detail || "No pudimos confirmar el nuevo email."} />;
+            errorMessage = data?.detail || "No pudimos confirmar el nuevo email.";
+        } else {
+            detail = data?.detail || "Tu email fue confirmado y actualizado correctamente.";
         }
-
-        detail = data?.detail || "Tu email fue confirmado y actualizado correctamente.";
     } catch {
-        return <VerificationError message="No pudimos confirmar tu nuevo email. Intentalo nuevamente." />;
+        errorMessage = "No pudimos confirmar tu nuevo email. Intentalo nuevamente.";
+    }
+
+    if (errorMessage) {
+        return <VerificationError message={errorMessage} />;
     }
 
     return (

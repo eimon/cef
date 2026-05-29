@@ -36,7 +36,8 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      # - /app/.next
+      # Keep Next/Turbopack cache inside Docker to avoid stale or corrupt host cache.
+      - /app/.next
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - INTERNAL_API_URL=http://cef_api:8000

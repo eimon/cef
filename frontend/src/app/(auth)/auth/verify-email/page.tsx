@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SERVER_API_URL } from "@/lib/server-api";
 
+export const dynamic = "force-dynamic";
+
 type VerifyEmailPageProps = {
     searchParams: Promise<{ token?: string }>;
 };
@@ -14,6 +16,7 @@ export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageP
     }
 
     let onboardingToken = "";
+    let errorMessage: string | null = null;
     try {
         const res = await fetch(`${SERVER_API_URL}/auth/verify-email`, {
             method: "POST",
@@ -24,11 +27,16 @@ export default async function VerifyEmailPage({ searchParams }: VerifyEmailPageP
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.onboarding_token) {
-            return <VerificationError message={data?.detail || "No pudimos confirmar tu email."} />;
+            errorMessage = data?.detail || "No pudimos confirmar tu email.";
+        } else {
+            onboardingToken = data.onboarding_token;
         }
-        onboardingToken = data.onboarding_token;
     } catch {
-        return <VerificationError message="No pudimos confirmar tu email. Intentalo nuevamente." />;
+        errorMessage = "No pudimos confirmar tu email. Intentalo nuevamente.";
+    }
+
+    if (errorMessage) {
+        return <VerificationError message={errorMessage} />;
     }
 
     redirect(`/auth/ficha-medica?token=${encodeURIComponent(onboardingToken)}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useActionState } from "react";
+import { useState, useEffect, useActionState, ChangeEvent } from "react";
 import { X, Loader2 } from "lucide-react";
 import { updateClase, ClaseFormState } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
@@ -24,6 +24,50 @@ function sumarUnaHora(hora: string): string {
     return `${String(h + 1).padStart(2, "0")}:00`;
 }
 
+function formatIsoToDateInput(value: string): string {
+    const [year, month, day] = value.split("-");
+    return year && month && day ? `${day}/${month}/${year}` : "";
+}
+
+function formatDateInput(value: string): string {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    if (digits.length > 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return digits;
+}
+
+function toIsoDate(value: string): string {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return "";
+
+    const [, day, month, year] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    const isValid =
+        date.getFullYear() === Number(year) &&
+        date.getMonth() === Number(month) - 1 &&
+        date.getDate() === Number(day);
+
+    return isValid ? `${year}-${month}-${day}` : "";
+}
+
+function getTodayIso(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function getDateError(value: string): string {
+    if (!value) return "";
+    if (value.length < 10) return "";
+
+    const isoDate = toIsoDate(value);
+    if (!isoDate || isoDate < getTodayIso()) return "Seleccione una fecha valida";
+
+    return "";
+}
+
 interface EditClaseDialogProps {
     clase: ClaseSemana;
     isOpen: boolean;
@@ -35,8 +79,12 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
     const { showSuccess } = useToast();
     const [salas, setSalas] = useState<Sala[]>([]);
     const [profesores, setProfesores] = useState<Profesor[]>([]);
-    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+    const [isLoadingOptions, setIsLoadingOptions] = useState(true);
     const [horaInicio, setHoraInicio] = useState(clase.hora_inicio.slice(0, 5));
+    const [fecha, setFecha] = useState(formatIsoToDateInput(clase.fecha_en_semana));
+    const [disciplina, setDisciplina] = useState(String(clase.disciplina || ""));
+    const [salaId, setSalaId] = useState(clase.sala_id ?? "");
+    const [profesorId, setProfesorId] = useState(clase.profesor_id ?? "");
 
     const initialState: ClaseFormState = {};
     const updateClaseWithId = updateClase.bind(null, clase.id);
@@ -44,14 +92,26 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
 
     useEffect(() => {
         if (!isOpen) return;
-        setHoraInicio(clase.hora_inicio.slice(0, 5));
-        setIsLoadingOptions(true);
         Promise.all([getSalas(), getProfesores()]).then(([s, p]) => {
             setSalas(s);
             setProfesores(p);
             setIsLoadingOptions(false);
         });
-    }, [isOpen, clase.hora_inicio]);
+    }, [isOpen]);
+
+    const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
+        setFecha(formatDateInput(event.target.value));
+    };
+
+    const isoFecha = toIsoDate(fecha);
+    const dateError = getDateError(fecha);
+    const canSubmit =
+        disciplina.trim().length > 0 &&
+        isoFecha.length > 0 &&
+        !dateError &&
+        horaInicio.trim().length > 0 &&
+        salaId.trim().length > 0 &&
+        profesorId.trim().length > 0;
 
     useEffect(() => {
         if (state.success) {
@@ -86,7 +146,13 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
 
                             <div>
                                 <label className={labelCls}>Disciplina</label>
-                                <select name="disciplina" required defaultValue={clase.disciplina} className={inputCls}>
+                                <select
+                                    name="disciplina"
+                                    required
+                                    value={disciplina}
+                                    onChange={(event) => setDisciplina(event.target.value)}
+                                    className={inputCls}
+                                >
                                     {disciplinas.map((d) => (
                                         <option key={d} value={d}>
                                             {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -98,12 +164,19 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                             <div>
                                 <label className={labelCls}>Fecha</label>
                                 <input
-                                    name="fecha"
-                                    type="date"
+                                    type="text"
+                                    inputMode="numeric"
+                                    maxLength={10}
                                     required
-                                    defaultValue={clase.fecha_en_semana}
+                                    pattern="\d{2}/\d{2}/\d{4}"
+                                    placeholder="DD/MM/AAAA"
+                                    value={fecha}
+                                    onChange={handleDateChange}
+                                    aria-invalid={Boolean(dateError)}
                                     className={inputCls}
                                 />
+                                <input type="hidden" name="fecha" value={isoFecha} />
+                                {dateError && <p className="mt-1.5 text-xs text-cef-danger">{dateError}</p>}
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -135,7 +208,13 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
 
                             <div>
                                 <label className={labelCls}>Sala</label>
-                                <select name="sala_id" required defaultValue={clase.sala_id ?? ""} className={inputCls}>
+                                <select
+                                    name="sala_id"
+                                    required
+                                    value={salaId}
+                                    onChange={(event) => setSalaId(event.target.value)}
+                                    className={inputCls}
+                                >
                                     <option value="">Seleccionar...</option>
                                     {salas.map((s) => (
                                         <option key={s.id} value={s.id}>{s.nombre}</option>
@@ -145,7 +224,13 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
 
                             <div>
                                 <label className={labelCls}>Profesor</label>
-                                <select name="profesor_id" required defaultValue={clase.profesor_id ?? ""} className={inputCls}>
+                                <select
+                                    name="profesor_id"
+                                    required
+                                    value={profesorId}
+                                    onChange={(event) => setProfesorId(event.target.value)}
+                                    className={inputCls}
+                                >
                                     <option value="">Seleccionar...</option>
                                     {profesores.map((p) => (
                                         <option key={p.id} value={p.id}>
@@ -165,7 +250,7 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={isPending}
+                                    disabled={isPending || !canSubmit}
                                     className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                                 >
                                     {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

@@ -1,5 +1,5 @@
 import { serverApi } from "@/lib/server-api";
-import { MedicalRecordProfile, User } from "@/types/api";
+import { MedicalRecordProfile, User, UserRole } from "@/types/api";
 import PersonalDataEditForm from "@/components/PersonalDataEditForm";
 import MedicalRecordEditForm from "@/components/MedicalRecordEditForm";
 import Link from "next/link";
@@ -15,7 +15,6 @@ import {
     IdCard,
     LockKeyhole,
     Mail,
-    Pencil,
     Phone,
     Pill,
     Stethoscope,
@@ -127,10 +126,16 @@ function SectionCard({
     );
 }
 
-function ProfileSectionSelector({ activeSection }: { activeSection: ProfileSection }) {
+function ProfileSectionSelector({
+    activeSection,
+    options,
+}: {
+    activeSection: ProfileSection;
+    options: typeof sectionOptions;
+}) {
     return (
-        <div className="grid gap-3 md:grid-cols-3">
-            {sectionOptions.map((section) => {
+        <div className={`grid gap-3 ${options.length > 1 ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
+            {options.map((section) => {
                 const isActive = activeSection === section.id;
 
                 return (
@@ -339,8 +344,16 @@ function MedicalRecordView({ record }: { record: MedicalRecordProfile | null }) 
     );
 }
 
-function normalizeSection(section?: string): ProfileSection {
-    if (section === "datos-personales" || section === "ficha-medica" || section === "cuenta") {
+function isClientRole(role?: string | UserRole | null): boolean {
+    return String(role || "").toLowerCase() === UserRole.CLIENTE;
+}
+
+function normalizeSection(section: string | undefined, canViewClientSections: boolean): ProfileSection {
+    if (section === "cuenta") {
+        return section;
+    }
+
+    if (canViewClientSections && (section === "datos-personales" || section === "ficha-medica")) {
         return section;
     }
 
@@ -352,11 +365,15 @@ type ProfilePageProps = {
 };
 
 export default async function ProfilePage({ searchParams }: ProfilePageProps) {
-    const { seccion } = await searchParams;
-    const activeSection = normalizeSection(seccion);
-    const [profile, medicalRecord] = await Promise.all([getProfile(), getMedicalRecord()]);
-
-    const isEditing = typeof seccion === "string" && (await searchParams).editar;
+    const { seccion, editar } = await searchParams;
+    const profile = await getProfile();
+    const canViewClientSections = isClientRole(profile?.role);
+    const activeSection = normalizeSection(seccion, canViewClientSections);
+    const visibleSectionOptions = canViewClientSections
+        ? sectionOptions
+        : sectionOptions.filter((section) => section.id === "cuenta");
+    const medicalRecord = canViewClientSections ? await getMedicalRecord() : null;
+    const isEditing = typeof seccion === "string" && Boolean(editar);
 
     return (
         <div className="mx-auto max-w-6xl space-y-6">
@@ -365,10 +382,10 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                 <p className="mt-1 text-sm text-slate-400">Elegí que informacion queres consultar.</p>
             </div>
 
-            <ProfileSectionSelector activeSection={activeSection} />
+            <ProfileSectionSelector activeSection={activeSection} options={visibleSectionOptions} />
 
             {activeSection === "cuenta" ? <AccountSection profile={profile} /> : null}
-            {activeSection === "datos-personales" ? (
+            {canViewClientSections && activeSection === "datos-personales" ? (
                 isEditing ? (
                     <PersonalDataEditForm profile={profile} />
                 ) : (
@@ -382,7 +399,7 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
                     </>
                 )
             ) : null}
-            {activeSection === "ficha-medica" ? (
+            {canViewClientSections && activeSection === "ficha-medica" ? (
                 isEditing ? (
                     <MedicalRecordEditForm record={medicalRecord} />
                 ) : (

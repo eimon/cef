@@ -14,12 +14,12 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
     const [state, formAction, isPending] = useActionState(requestEmailChange, { success: false, values: { new_email: "" } });
     const values = state.values || { new_email: "" };
     const fieldErrors = state.fieldErrors || {};
+    const newEmailError = fieldErrors.new_email || fieldErrors._form;
     const { showSuccess } = useToast();
 
     useEffect(() => {
         if (state?.success) {
             showSuccess("Te enviamos un email de confirmación al nuevo correo.");
-            setShowForm(false);
         }
     }, [state?.success, showSuccess]);
 
@@ -54,12 +54,6 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
                 </div>
             ) : (
                 <form action={formAction} noValidate className="space-y-4">
-                    {state?.error && (
-                        <div className="rounded-xl bg-cef-danger/10 border border-cef-danger/20 p-3 text-sm text-cef-danger">
-                            {state.error}
-                        </div>
-                    )}
-
                     <div>
                         <label className={labelCls}>Email actual</label>
                         <input className={inputCls + " bg-slate-100 text-slate-500"} value={currentEmail || ""} disabled />
@@ -77,9 +71,9 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
                             defaultValue={values.new_email || ""}
                             className={inputCls}
                             placeholder="nuevo@correo.com"
-                            aria-invalid={Boolean(fieldErrors.new_email)}
+                            aria-invalid={Boolean(newEmailError)}
                         />
-                        {fieldErrors.new_email && <p className="mt-1.5 text-xs text-cef-danger">{fieldErrors.new_email}</p>}
+                        {newEmailError && <p className="mt-1.5 text-xs text-cef-danger">{newEmailError}</p>}
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

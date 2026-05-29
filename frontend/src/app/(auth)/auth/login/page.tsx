@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { login, LoginState } from "@/actions/auth";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -9,6 +9,9 @@ import Link from "next/link";
 export default function LoginPage() {
     const initialState: LoginState = { error: "", success: false };
     const [state, formAction, isPending] = useActionState(login, initialState);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const canSubmit = email.trim().length > 0 && password.trim().length > 0;
 
     return (
         <div className="flex items-center justify-center min-h-screen p-4 bg-slate-50">
@@ -46,6 +49,8 @@ export default function LoginPage() {
                                 id="email"
                                 name="email"
                                 type="email"
+                                value={email}
+                                onChange={(event) => setEmail(event.target.value)}
                                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
                                 placeholder="correo@ejemplo.com"
                             />
@@ -62,6 +67,8 @@ export default function LoginPage() {
                                 id="password"
                                 name="password"
                                 type="password"
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
                                 className="w-full px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm"
                                 placeholder="********"
                             />
@@ -74,7 +81,7 @@ export default function LoginPage() {
 
                         <button
                             type="submit"
-                            disabled={isPending}
+                            disabled={isPending || !canSubmit}
                             className="w-full bg-cef-primary hover:bg-cef-primary/80 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-all flex items-center justify-center text-sm mt-2"
                         >
                             {isPending ? (
