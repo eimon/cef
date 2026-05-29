@@ -7,9 +7,11 @@ import { deleteUser } from "@/actions/users";
 import EditUserDialog from "@/components/EditUserDialog";
 import { useToast } from "@/context/ToastContext";
 import { useConfirm } from "@/context/ConfirmContext";
+import { useRouter } from "next/navigation";
 
 interface UsersTableProps {
     users: User[];
+    allowedRoles: UserRole[];
     emptyMessage?: string;
 }
 
@@ -75,20 +77,22 @@ function UserCardMenu({
     );
 }
 
-export default function UsersTable({ users, emptyMessage }: UsersTableProps) {
+export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError } = useToast();
     const { confirm } = useConfirm();
+    const { refresh } = useRouter();
 
     const handleDelete = async (user: User) => {
         if (!await confirm(`¿Estás seguro de que deseas eliminar al usuario ${user.email}? Esta acción no se puede deshacer.`)) return;
 
         setIsDeleting(user.id);
         const result = await deleteUser(user.id);
-
-        if (result.error) showError(result.error);
         setIsDeleting(null);
+
+        if (result.error) { showError(result.error); return; }
+        refresh();
     };
 
     if (users.length === 0) {
@@ -224,6 +228,7 @@ export default function UsersTable({ users, emptyMessage }: UsersTableProps) {
                     user={editingUser}
                     isOpen={true}
                     onClose={() => setEditingUser(null)}
+                    allowedRoles={allowedRoles}
                 />
             )}
         </>

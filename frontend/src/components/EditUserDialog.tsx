@@ -5,11 +5,14 @@ import { updateUser, UserFormState } from "@/actions/users";
 import { X, Loader2 } from "lucide-react";
 import { useActionState } from "react";
 import { User, UserRole } from "@/types/api";
+import { useToast } from "@/context/ToastContext";
+import { useRouter } from "next/navigation";
 
 interface EditUserDialogProps {
     user: User;
     isOpen: boolean;
     onClose: () => void;
+    allowedRoles: UserRole[];
 }
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
@@ -21,17 +24,19 @@ const roleLabels: Record<string, string> = {
     [UserRole.CLIENTE]: "Cliente",
 };
 
-export default function EditUserDialog({ user, isOpen, onClose }: EditUserDialogProps) {
-    const initialState: UserFormState = { error: "", success: false };
+export default function EditUserDialog({ user, isOpen, onClose, allowedRoles }: EditUserDialogProps) {
+    const { showSuccess } = useToast();
+    const { refresh } = useRouter();
 
     const updateUserWithId = updateUser.bind(null, user.id);
-    const [state, formAction, isPending] = useActionState(updateUserWithId, initialState);
+    const [state, formAction, isPending] = useActionState(updateUserWithId, {} as UserFormState);
 
     useEffect(() => {
-        if (state.success && isOpen) {
-            onClose();
-        }
-    }, [state.success, isOpen, onClose]);
+        if (!state.success) return;
+        showSuccess("Usuario actualizado correctamente");
+        onClose();
+        refresh();
+    }, [state.success, showSuccess, onClose, refresh]);
 
     if (!isOpen) return null;
 
@@ -40,7 +45,7 @@ export default function EditUserDialog({ user, isOpen, onClose }: EditUserDialog
             <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                     <h3 className="text-base font-semibold text-slate-800">Editar Usuario</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -77,16 +82,18 @@ export default function EditUserDialog({ user, isOpen, onClose }: EditUserDialog
                         </div>
                     </div>
 
-                    <div>
-                        <label className={labelCls}>Rol</label>
-                        <select name="role" defaultValue={user.role} className={inputCls}>
-                            {Object.values(UserRole).map((role) => (
-                                <option key={role} value={role}>
-                                    {roleLabels[role] ?? role}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    {allowedRoles.length > 0 && (
+                        <div>
+                            <label htmlFor="edit-user-role" className={labelCls}>Rol</label>
+                            <select id="edit-user-role" name="role" defaultValue={user.role} className={inputCls}>
+                                {allowedRoles.map((role) => (
+                                    <option key={role} value={role}>
+                                        {roleLabels[role] ?? role}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div>
                         <label className={labelCls}>Contraseña</label>

@@ -35,7 +35,7 @@ export default async function DashboardHome() {
 
             {/* Simple Dashboard Content */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Link href="/users" className="glass rounded-2xl p-6 hover:shadow-md hover:border-slate-300 transition-all group">
+                <Link href="/users/personal" className="glass rounded-2xl p-6 hover:shadow-md hover:border-slate-300 transition-all group">
                     <div className="w-12 h-12 rounded-xl bg-cef-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                         <Users className="text-cef-primary" size={24} />
                     </div>

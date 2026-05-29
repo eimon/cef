@@ -81,7 +81,8 @@ export async function createUser(prevState: UserFormState, formData: FormData): 
         return { error: "Something went wrong" };
     }
 
-    revalidatePath("/users");
+    revalidatePath("/users/personal");
+    revalidatePath("/users/clientes");
     return { success: true };
 }
 
@@ -124,7 +125,8 @@ export async function updateUser(
         return { error: "Something went wrong" };
     }
 
-    revalidatePath("/users");
+    revalidatePath("/users/personal");
+    revalidatePath("/users/clientes");
     return { success: true };
 }
 
@@ -143,6 +145,7 @@ export async function deleteUser(userId: string): Promise<{ success?: boolean; e
         return { error: "Something went wrong" };
     }
 
-    revalidatePath("/users");
+    revalidatePath("/users/personal");
+    revalidatePath("/users/clientes");
     return { success: true };
 }
