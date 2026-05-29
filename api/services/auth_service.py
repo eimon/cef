@@ -36,14 +36,14 @@ class AuthService:
     async def register_user(self, data: UsuarioCreate) -> Usuario:
         if await self.user_repo.get_by_email(data.email):
             raise ConflictException("Email ya registrado")
-        await self._validate_unique_optional_fields(data.dni, data.telefono)
+        await self._validate_unique_optional_fields(data.dni)
         hashed_password = get_password_hash(data.password)
         return await self.user_repo.create(data, hashed_password)
 
     async def signup_user(self, data: PublicSignupRequest) -> None:
         if await self.user_repo.get_by_email(data.email):
             raise ConflictException("Email ya registrado")
-        await self._validate_unique_optional_fields(data.dni, data.telefono)
+        await self._validate_unique_optional_fields(data.dni)
 
         hashed_password = get_password_hash(data.password)
         usuario = await self.user_repo.create_public_signup(data, hashed_password)
@@ -215,10 +215,6 @@ class AuthService:
             existing = await self.user_repo.get_by_dni(data.dni)
             if existing and existing.id != usuario_id:
                 raise ConflictException("DNI ya registrado")
-        if data.telefono:
-            existing = await self.user_repo.get_by_telefono(data.telefono)
-            if existing and existing.id != usuario_id:
-                raise ConflictException("Telefono ya registrado")
 
         update_data = UsuarioUpdate(
             **data.model_dump(
@@ -281,12 +277,9 @@ class AuthService:
     async def _validate_unique_optional_fields(
         self,
         dni: str | None,
-        telefono: str | None,
     ) -> None:
         if dni and await self.user_repo.get_by_dni(dni):
             raise ConflictException("DNI ya registrado")
-        if telefono and await self.user_repo.get_by_telefono(telefono):
-            raise ConflictException("Telefono ya registrado")
 
     async def _get_valid_registration_token(self, raw_token: str):
         token = await self.registration_token_repo.get_by_raw_token(raw_token)

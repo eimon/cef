@@ -23,10 +23,6 @@ class UserRepository:
         result = await self.db.execute(select(Usuario).where(Usuario.dni == dni))
         return result.scalars().first()
 
-    async def get_by_telefono(self, telefono: str) -> Usuario | None:
-        result = await self.db.execute(select(Usuario).where(Usuario.telefono == telefono))
-        return result.scalars().first()
-
     async def get_all(
         self,
         skip: int = 0,

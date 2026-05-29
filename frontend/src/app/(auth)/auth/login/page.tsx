@@ -5,13 +5,14 @@ import { login, LoginState } from "@/actions/auth";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { isValidEmail } from "@/lib/validation";
 
 export default function LoginPage() {
     const initialState: LoginState = { error: "", success: false };
     const [state, formAction, isPending] = useActionState(login, initialState);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const canSubmit = email.trim().length > 0 && password.trim().length > 0;
+    const canSubmit = isValidEmail(email) && password.trim().length > 0;
 
     return (
         <div className="flex items-center justify-center min-h-screen p-4 bg-slate-50">

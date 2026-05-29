@@ -5,6 +5,7 @@ import { useToast } from "@/context/ToastContext";
 import { Loader2, Mail, Pencil } from "lucide-react";
 
 import { requestEmailChange } from "@/actions/profile";
+import { isValidEmail } from "@/lib/validation";
 
 const inputCls = "w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-cef-primary/60 focus:bg-white focus:ring-2 focus:ring-cef-primary/15";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
@@ -17,7 +18,7 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
     const fieldErrors = state.fieldErrors || {};
     const newEmailError = fieldErrors.new_email || fieldErrors._form;
     const { showSuccess } = useToast();
-    const canSubmit = newEmail.trim().length > 0;
+    const canSubmit = isValidEmail(newEmail);
 
     useEffect(() => {
         if (state?.success) {

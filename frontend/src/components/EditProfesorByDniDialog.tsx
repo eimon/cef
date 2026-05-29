@@ -6,6 +6,7 @@ import { getProfesorByDni, updateProfesor, ProfesorFormState } from "@/actions/p
 import { Profesor } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
 import { useActionState } from "react";
+import { isEmptyOrValidEmail } from "@/lib/validation";
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
@@ -25,6 +26,8 @@ function EditProfesorForm({
     const initialState: ProfesorFormState = {};
     const updateProfesorWithId = updateProfesor.bind(null, profesor.id);
     const [state, formAction, isPending] = useActionState(updateProfesorWithId, initialState);
+    const [email, setEmail] = useState(profesor.email ?? "");
+    const canSubmit = isEmptyOrValidEmail(email);
 
     useEffect(() => {
         if (state.success) {
@@ -71,7 +74,7 @@ function EditProfesorForm({
                 <label className={labelCls}>
                     Email <span className="text-slate-300 normal-case tracking-normal">(opcional)</span>
                 </label>
-                <input name="email" type="email" defaultValue={profesor.email ?? ""} className={inputCls} />
+                <input name="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} className={inputCls} />
             </div>
 
             <div>
@@ -91,7 +94,7 @@ function EditProfesorForm({
                 </button>
                 <button
                     type="submit"
-                    disabled={isPending}
+                    disabled={isPending || !canSubmit}
                     className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                 >
                     {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

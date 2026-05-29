@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
 
 import { signup, SignupState } from "@/actions/auth";
+import { isValidEmail } from "@/lib/validation";
 
 const initialState: SignupState = {};
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
@@ -67,9 +68,9 @@ export default function RegisterPage() {
     const [fechaNacimiento, setFechaNacimiento] = useState(values.fecha_nacimiento || "");
     const [genero, setGenero] = useState(values.genero || "");
     const [password, setPassword] = useState("");
-    const canSubmit = [nombre, apellido, email, fechaNacimiento, genero, password].every(
-        (value) => value.trim().length > 0
-    );
+    const canSubmit =
+        [nombre, apellido, fechaNacimiento, genero, password].every((value) => value.trim().length > 0) &&
+        isValidEmail(email);
 
     function handleBirthChange(e: ChangeEvent<HTMLInputElement>) {
         let value = e.currentTarget.value.replace(/\D/g, "");

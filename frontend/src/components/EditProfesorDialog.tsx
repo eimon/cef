@@ -6,6 +6,7 @@ import { X, Loader2 } from "lucide-react";
 import { useActionState } from "react";
 import { Profesor } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
+import { isEmptyOrValidEmail } from "@/lib/validation";
 
 interface EditProfesorDialogProps {
     profesor: Profesor;
@@ -45,7 +46,8 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
         fields.dni.trim().length > 0 &&
         fields.nombre.trim().length > 0 &&
         fields.apellido.trim().length > 0 &&
-        fields.genero.trim().length > 0;
+        fields.genero.trim().length > 0 &&
+        isEmptyOrValidEmail(fields.email);
 
     useEffect(() => {
         if (!isOpen) return;

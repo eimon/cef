@@ -4,6 +4,7 @@ import { useState, useEffect, useActionState, ChangeEvent } from "react";
 import { createProfesor, ProfesorFormState } from "@/actions/profesores";
 import { Plus, X, Loader2 } from "lucide-react";
 import { useToast } from "@/context/ToastContext";
+import { isEmptyOrValidEmail } from "@/lib/validation";
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
@@ -30,7 +31,8 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
         fields.dni.trim().length > 0 &&
         fields.nombre.trim().length > 0 &&
         fields.apellido.trim().length > 0 &&
-        fields.genero.trim().length > 0;
+        fields.genero.trim().length > 0 &&
+        isEmptyOrValidEmail(fields.email);
 
     useEffect(() => {
         if (state.success && isOpen) {

@@ -12,8 +12,6 @@ export default async function DashboardHome() {
     }
 
     const firstName = user?.nombre || "";
-    const now = new Date();
-    const monthName = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(now);
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -24,7 +22,6 @@ export default async function DashboardHome() {
                     <h1 className="text-2xl font-bold text-slate-800">
                         {firstName ? `¡Hola de nuevo, ${firstName}!` : "Bienvenido"}
                     </h1>
-                    <p className="text-slate-400 mt-1 text-sm capitalize">Resumen del mes de {monthName}</p>
                 </div>
                 {user && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-cef-primary/10 text-cef-primary border border-cef-primary/20 capitalize self-start sm:self-auto">
