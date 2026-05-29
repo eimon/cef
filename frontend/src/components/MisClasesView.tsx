@@ -15,34 +15,42 @@ const DIA_LABELS: Record<string, string> = {
     jueves: "Jueves", viernes: "Viernes", sabado: "Sábado", domingo: "Domingo",
 };
 
+const fmtFecha      = new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short" });
+const fmtFechaLarga = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" });
+const fmtPrice      = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 });
+
 function formatTime(t: string) { return t.slice(0, 5); }
 
 function formatFecha(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short" })
-        .format(new Date(y, m - 1, d));
+    return fmtFecha.format(new Date(y, m - 1, d));
 }
 
 function formatFechaLarga(fechaStr: string): string {
     const [y, m, d] = fechaStr.split("-").map(Number);
-    return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" })
-        .format(new Date(y, m - 1, d));
+    return fmtFechaLarga.format(new Date(y, m - 1, d));
 }
 
 function formatPrice(n: number) {
-    return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 }).format(n);
+    return fmtPrice.format(n);
 }
 
-function isFuture(fechaStr: string): boolean {
+function isClaseUpcoming(fechaStr: string, horaInicioStr: string): boolean {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    const [h, min] = horaInicioStr.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min) > new Date();
+}
+
+function isFechaUpcoming(fechaStr: string): boolean {
     const [y, m, d] = fechaStr.split("-").map(Number);
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    return new Date(y, m - 1, d) > today;
+    return new Date(y, m - 1, d) >= today;
 }
 
 // ─── Individual: card ────────────────────────────────────────────────────────
 
 function ClaseIndividualCard({ clase }: { clase: MiClaseIndividual }) {
-    const upcoming = isFuture(clase.fecha);
+    const upcoming = isClaseUpcoming(clase.fecha, clase.hora_inicio);
     return (
         <div className="glass rounded-2xl p-5 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -103,7 +111,7 @@ function ClaseIndividualCard({ clase }: { clase: MiClaseIndividual }) {
 // ─── Suscripcion: instancia row ───────────────────────────────────────────────
 
 function InstanciaRow({ inst }: { inst: InstanciaEnSuscripcion }) {
-    const upcoming = isFuture(inst.fecha);
+    const upcoming = isFechaUpcoming(inst.fecha);
 
     return (
         <div className="flex items-center justify-between py-2.5 border-b border-slate-100 last:border-0">
@@ -212,7 +220,7 @@ function SuscripcionCard({ suscripcion: s }: { suscripcion: MiSuscripcion }) {
                 <div className="px-5 pb-4">
                     <div className="border-t border-slate-100 pt-1">
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 py-2">
-                            Clases del período — {s.instancias.length} {s.instancias.length === 1 ? "clase" : "clases"}
+                            Clases del período: {s.instancias.length} {s.instancias.length === 1 ? "clase" : "clases"}
                         </p>
                         {s.instancias.length === 0 ? (
                             <p className="text-xs text-slate-400 py-2">No hay clases agendadas en este período.</p>
@@ -241,8 +249,8 @@ export default function MisClasesView({
 }) {
     const [tab, setTab] = useState<Tab>("proximas");
 
-    const proximas = individuales.filter(c => isFuture(c.fecha));
-    const pasadas = individuales.filter(c => !isFuture(c.fecha));
+    const proximas = individuales.filter(c => isClaseUpcoming(c.fecha, c.hora_inicio));
+    const pasadas = individuales.filter(c => !isClaseUpcoming(c.fecha, c.hora_inicio));
     const listaActual = tab === "proximas" ? proximas : pasadas;
 
     return (

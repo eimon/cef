@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { ChangeEvent, useEffect, useState } from "react";
 import { updateProfesor, ProfesorFormState } from "@/actions/profesores";
 import { X, Loader2 } from "lucide-react";
 import { useActionState } from "react";
@@ -19,11 +19,38 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase trac
 
 const generoOptions = ["masculino", "femenino", "otro"];
 
+function getInitialFields(profesor: Profesor) {
+    return {
+        dni: profesor.dni ?? "",
+        nombre: profesor.nombre ?? "",
+        apellido: profesor.apellido ?? "",
+        genero: profesor.genero ?? "masculino",
+        email: profesor.email ?? "",
+        telefono: profesor.telefono ?? "",
+    };
+}
+
 export default function EditProfesorDialog({ profesor, isOpen, onClose, onSuccess }: EditProfesorDialogProps) {
     const { showSuccess } = useToast();
+    const [fields, setFields] = useState(() => getInitialFields(profesor));
     const initialState: ProfesorFormState = {};
     const updateProfesorWithId = updateProfesor.bind(null, profesor.id);
     const [state, formAction, isPending] = useActionState(updateProfesorWithId, initialState);
+
+    const set = (key: keyof typeof fields) =>
+        (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+            setFields((current) => ({ ...current, [key]: event.target.value }));
+
+    const canSubmit =
+        fields.dni.trim().length > 0 &&
+        fields.nombre.trim().length > 0 &&
+        fields.apellido.trim().length > 0 &&
+        fields.genero.trim().length > 0;
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setFields(getInitialFields(profesor));
+    }, [isOpen, profesor]);
 
     useEffect(() => {
         if (state.success && isOpen) {
@@ -58,7 +85,8 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                             name="dni"
                             type="text"
                             required
-                            defaultValue={profesor.dni}
+                            value={fields.dni}
+                            onChange={set("dni")}
                             className={inputCls}
                         />
                     </div>
@@ -70,7 +98,8 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                                 name="nombre"
                                 type="text"
                                 required
-                                defaultValue={profesor.nombre}
+                                value={fields.nombre}
+                                onChange={set("nombre")}
                                 className={inputCls}
                             />
                         </div>
@@ -80,7 +109,8 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                                 name="apellido"
                                 type="text"
                                 required
-                                defaultValue={profesor.apellido}
+                                value={fields.apellido}
+                                onChange={set("apellido")}
                                 className={inputCls}
                             />
                         </div>
@@ -88,7 +118,7 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
 
                     <div>
                         <label className={labelCls}>Género</label>
-                        <select name="genero" defaultValue={profesor.genero ?? ""} className={inputCls}>
+                        <select name="genero" required value={fields.genero} onChange={set("genero")} className={inputCls}>
                             {generoOptions.map((g) => (
                                 <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>
                             ))}
@@ -102,7 +132,8 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                         <input
                             name="email"
                             type="email"
-                            defaultValue={profesor.email ?? ""}
+                            value={fields.email}
+                            onChange={set("email")}
                             className={inputCls}
                         />
                     </div>
@@ -114,7 +145,8 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                         <input
                             name="telefono"
                             type="tel"
-                            defaultValue={profesor.telefono ?? ""}
+                            value={fields.telefono}
+                            onChange={set("telefono")}
                             className={inputCls}
                         />
                     </div>
@@ -129,7 +161,7 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                         </button>
                         <button
                             type="submit"
-                            disabled={isPending}
+                            disabled={isPending || !canSubmit}
                             className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                         >
                             {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

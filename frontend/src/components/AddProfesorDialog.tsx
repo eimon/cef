@@ -26,6 +26,12 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
     const set = (k: keyof typeof emptyFields) => (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
         setFields((f: typeof emptyFields) => ({ ...f, [k]: e.target.value }));
 
+    const canSubmit =
+        fields.dni.trim().length > 0 &&
+        fields.nombre.trim().length > 0 &&
+        fields.apellido.trim().length > 0 &&
+        fields.genero.trim().length > 0;
+
     useEffect(() => {
         if (state.success && isOpen) {
             showSuccess("Profesor agregado correctamente");
@@ -116,7 +122,7 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={isPending}
+                                    disabled={isPending || !canSubmit}
                                     className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                                 >
                                     {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useActionState, ChangeEvent } from "react";
+import { ChangeEvent, useReducer, useEffect, useActionState } from "react";
 import { X, Loader2 } from "lucide-react";
 import { updateClase, ClaseFormState } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
@@ -13,10 +13,17 @@ const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-30
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
 const disciplinas = ["yoga", "pilates", "funcional"];
-
+const diasSemana = [
+    { value: "lunes", label: "Lun" },
+    { value: "martes", label: "Mar" },
+    { value: "miercoles", label: "Mié" },
+    { value: "jueves", label: "Jue" },
+    { value: "viernes", label: "Vie" },
+    { value: "sabado", label: "Sáb" },
+];
 const horasDisponibles = Array.from({ length: 15 }, (_, i) => {
-    const h = String(i + 7).padStart(2, "0");
-    return `${h}:00`;
+    const hora = String(i + 7).padStart(2, "0");
+    return `${hora}:00`;
 });
 
 function sumarUnaHora(hora: string): string {
@@ -24,48 +31,47 @@ function sumarUnaHora(hora: string): string {
     return `${String(h + 1).padStart(2, "0")}:00`;
 }
 
-function formatIsoToDateInput(value: string): string {
-    const [year, month, day] = value.split("-");
-    return year && month && day ? `${day}/${month}/${year}` : "";
-}
+type State = {
+    salas: Sala[];
+    profesores: Profesor[];
+    isLoadingOptions: boolean;
+    disciplina: string;
+    horaInicio: string;
+    diaSemana: string;
+    capacidadMaxima: string;
+    salaId: string;
+    profesorId: string;
+};
 
-function formatDateInput(value: string): string {
-    const digits = value.replace(/\D/g, "").slice(0, 8);
-    if (digits.length > 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-    if (digits.length > 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return digits;
-}
+type Action =
+    | { type: "OPEN"; clase: ClaseSemana }
+    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[] }
+    | { type: "SET_FIELD"; key: "disciplina" | "capacidadMaxima" | "salaId" | "profesorId"; value: string }
+    | { type: "SET_HORA"; value: string }
+    | { type: "SET_DIA"; value: string };
 
-function toIsoDate(value: string): string {
-    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (!match) return "";
-
-    const [, day, month, year] = match;
-    const date = new Date(Number(year), Number(month) - 1, Number(day));
-    const isValid =
-        date.getFullYear() === Number(year) &&
-        date.getMonth() === Number(month) - 1 &&
-        date.getDate() === Number(day);
-
-    return isValid ? `${year}-${month}-${day}` : "";
-}
-
-function getTodayIso(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-}
-
-function getDateError(value: string): string {
-    if (!value) return "";
-    if (value.length < 10) return "";
-
-    const isoDate = toIsoDate(value);
-    if (!isoDate || isoDate < getTodayIso()) return "Seleccione una fecha valida";
-
-    return "";
+function reducer(state: State, action: Action): State {
+    switch (action.type) {
+        case "OPEN":
+            return {
+                ...state,
+                isLoadingOptions: true,
+                disciplina: String(action.clase.disciplina || ""),
+                horaInicio: action.clase.hora_inicio.slice(0, 5),
+                diaSemana: action.clase.dia_semana,
+                capacidadMaxima: String(action.clase.capacidad_maxima ?? ""),
+                salaId: action.clase.sala_id ?? "",
+                profesorId: action.clase.profesor_id ?? "",
+            };
+        case "SET_OPTIONS":
+            return { ...state, salas: action.salas, profesores: action.profesores, isLoadingOptions: false };
+        case "SET_FIELD":
+            return { ...state, [action.key]: action.value };
+        case "SET_HORA":
+            return { ...state, horaInicio: action.value };
+        case "SET_DIA":
+            return { ...state, diaSemana: action.value };
+    }
 }
 
 interface EditClaseDialogProps {
@@ -75,64 +81,62 @@ interface EditClaseDialogProps {
 }
 
 export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDialogProps) {
-    const router = useRouter();
+    const { refresh } = useRouter();
     const { showSuccess } = useToast();
-    const [salas, setSalas] = useState<Sala[]>([]);
-    const [profesores, setProfesores] = useState<Profesor[]>([]);
-    const [isLoadingOptions, setIsLoadingOptions] = useState(true);
-    const [horaInicio, setHoraInicio] = useState(clase.hora_inicio.slice(0, 5));
-    const [fecha, setFecha] = useState(formatIsoToDateInput(clase.fecha_en_semana));
-    const [disciplina, setDisciplina] = useState(String(clase.disciplina || ""));
-    const [salaId, setSalaId] = useState(clase.sala_id ?? "");
-    const [profesorId, setProfesorId] = useState(clase.profesor_id ?? "");
+    const [ui, dispatch] = useReducer(reducer, {
+        salas: [],
+        profesores: [],
+        isLoadingOptions: false,
+        disciplina: String(clase.disciplina || ""),
+        horaInicio: clase.hora_inicio.slice(0, 5),
+        diaSemana: clase.dia_semana,
+        capacidadMaxima: String(clase.capacidad_maxima ?? ""),
+        salaId: clase.sala_id ?? "",
+        profesorId: clase.profesor_id ?? "",
+    });
 
-    const initialState: ClaseFormState = {};
     const updateClaseWithId = updateClase.bind(null, clase.id);
-    const [state, formAction, isPending] = useActionState(updateClaseWithId, initialState);
+    const [state, formAction, isPending] = useActionState(updateClaseWithId, {} as ClaseFormState);
 
     useEffect(() => {
         if (!isOpen) return;
-        Promise.all([getSalas(), getProfesores()]).then(([s, p]) => {
-            setSalas(s);
-            setProfesores(p);
-            setIsLoadingOptions(false);
+        dispatch({ type: "OPEN", clase });
+        Promise.all([getSalas(), getProfesores()]).then(([salas, profesores]) => {
+            dispatch({ type: "SET_OPTIONS", salas, profesores });
         });
-    }, [isOpen]);
-
-    const handleDateChange = (event: ChangeEvent<HTMLInputElement>) => {
-        setFecha(formatDateInput(event.target.value));
-    };
-
-    const isoFecha = toIsoDate(fecha);
-    const dateError = getDateError(fecha);
-    const canSubmit =
-        disciplina.trim().length > 0 &&
-        isoFecha.length > 0 &&
-        !dateError &&
-        horaInicio.trim().length > 0 &&
-        salaId.trim().length > 0 &&
-        profesorId.trim().length > 0;
+    }, [isOpen, clase]);
 
     useEffect(() => {
-        if (state.success) {
-            showSuccess("Clase editada correctamente");
-            onClose();
-            router.refresh();
-        }
-    }, [state.success, showSuccess, onClose, router]);
+        if (!state.success) return;
+        showSuccess("Clase editada correctamente");
+        onClose();
+        refresh();
+    }, [state.success, showSuccess, onClose, refresh]);
+
+    const setField = (key: "disciplina" | "capacidadMaxima" | "salaId" | "profesorId") =>
+        (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+            dispatch({ type: "SET_FIELD", key, value: event.target.value });
+
+    const canSubmit =
+        ui.disciplina.trim().length > 0 &&
+        ui.diaSemana.trim().length > 0 &&
+        ui.horaInicio.trim().length > 0 &&
+        Number(ui.capacidadMaxima) > 0 &&
+        ui.salaId.trim().length > 0 &&
+        ui.profesorId.trim().length > 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                     <h3 className="text-base font-semibold text-slate-800">Editar Clase</h3>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
                         <X size={18} />
                     </button>
                 </div>
 
                 <div className="p-6">
-                    {isLoadingOptions ? (
+                    {ui.isLoadingOptions ? (
                         <div className="flex justify-center py-8">
                             <Loader2 className="animate-spin text-slate-400" size={24} />
                         </div>
@@ -145,102 +149,110 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                             )}
 
                             <div>
-                                <label className={labelCls}>Disciplina</label>
+                                <label htmlFor="edit-disciplina" className={labelCls}>Disciplina</label>
                                 <select
+                                    id="edit-disciplina"
                                     name="disciplina"
                                     required
-                                    value={disciplina}
-                                    onChange={(event) => setDisciplina(event.target.value)}
+                                    value={ui.disciplina}
+                                    onChange={setField("disciplina")}
                                     className={inputCls}
                                 >
-                                    {disciplinas.map((d) => (
-                                        <option key={d} value={d}>
-                                            {d.charAt(0).toUpperCase() + d.slice(1)}
+                                    {disciplinas.map((disciplina) => (
+                                        <option key={disciplina} value={disciplina}>
+                                            {disciplina.charAt(0).toUpperCase() + disciplina.slice(1)}
                                         </option>
                                     ))}
                                 </select>
                             </div>
 
-                            <div>
-                                <label className={labelCls}>Fecha</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    maxLength={10}
-                                    required
-                                    pattern="\d{2}/\d{2}/\d{4}"
-                                    placeholder="DD/MM/AAAA"
-                                    value={fecha}
-                                    onChange={handleDateChange}
-                                    aria-invalid={Boolean(dateError)}
-                                    className={inputCls}
-                                />
-                                <input type="hidden" name="fecha" value={isoFecha} />
-                                {dateError && <p className="mt-1.5 text-xs text-cef-danger">{dateError}</p>}
-                            </div>
+                            <fieldset className="border-0 p-0 m-0 min-w-0">
+                                <legend className={labelCls}>Día de la semana</legend>
+                                <input type="hidden" name="dia_semana" value={ui.diaSemana} />
+                                <div className="grid grid-cols-6 gap-1.5">
+                                    {diasSemana.map((dia) => (
+                                        <button
+                                            key={dia.value}
+                                            type="button"
+                                            onClick={() => dispatch({ type: "SET_DIA", value: dia.value })}
+                                            className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                                                ui.diaSemana === dia.value
+                                                    ? "bg-cef-primary text-white"
+                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                            }`}
+                                        >
+                                            {dia.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </fieldset>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className={labelCls}>Hora inicio</label>
+                                    <label htmlFor="edit-hora-inicio" className={labelCls}>Hora inicio</label>
                                     <select
+                                        id="edit-hora-inicio"
                                         name="hora_inicio"
                                         required
-                                        value={horaInicio}
-                                        onChange={(e) => setHoraInicio(e.target.value)}
+                                        value={ui.horaInicio}
+                                        onChange={(event) => dispatch({ type: "SET_HORA", value: event.target.value })}
                                         className={inputCls}
                                     >
-                                        {horasDisponibles.map((h) => (
-                                            <option key={h} value={h}>{h}</option>
+                                        {horasDisponibles.map((hora) => (
+                                            <option key={hora} value={hora}>{hora}</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className={labelCls}>Hora fin</label>
+                                    <label htmlFor="edit-hora-fin" className={labelCls}>Hora fin</label>
                                     <input
+                                        id="edit-hora-fin"
                                         name="hora_fin"
                                         type="text"
                                         readOnly
-                                        value={sumarUnaHora(horaInicio)}
+                                        value={sumarUnaHora(ui.horaInicio)}
                                         className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className={labelCls}>Sala</label>
-                                <select
-                                    name="sala_id"
+                                <label htmlFor="edit-capacidad" className={labelCls}>Cupo máximo</label>
+                                <input
+                                    id="edit-capacidad"
+                                    name="capacidad_maxima"
+                                    type="number"
+                                    min={1}
                                     required
-                                    value={salaId}
-                                    onChange={(event) => setSalaId(event.target.value)}
+                                    value={ui.capacidadMaxima}
+                                    onChange={setField("capacidadMaxima")}
                                     className={inputCls}
-                                >
-                                    <option value="">Seleccionar...</option>
-                                    {salas.map((s) => (
-                                        <option key={s.id} value={s.id}>{s.nombre}</option>
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="edit-sala" className={labelCls}>Sala</label>
+                                <select id="edit-sala" name="sala_id" required value={ui.salaId} onChange={setField("salaId")} className={inputCls}>
+                                    <option value="">Seleccionar…</option>
+                                    {ui.salas.map((sala) => (
+                                        <option key={sala.id} value={sala.id}>{sala.nombre}</option>
                                     ))}
                                 </select>
                             </div>
 
                             <div>
-                                <label className={labelCls}>Profesor</label>
-                                <select
-                                    name="profesor_id"
-                                    required
-                                    value={profesorId}
-                                    onChange={(event) => setProfesorId(event.target.value)}
-                                    className={inputCls}
-                                >
-                                    <option value="">Seleccionar...</option>
-                                    {profesores.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.nombre} {p.apellido}
+                                <label htmlFor="edit-profesor" className={labelCls}>Profesor</label>
+                                <select id="edit-profesor" name="profesor_id" required value={ui.profesorId} onChange={setField("profesorId")} className={inputCls}>
+                                    <option value="">Seleccionar…</option>
+                                    {ui.profesores.map((profesor) => (
+                                        <option key={profesor.id} value={profesor.id}>
+                                            {profesor.nombre} {profesor.apellido}
                                         </option>
                                     ))}
                                 </select>
                             </div>
 
-                            <div className="pt-2 flex justify-end space-x-3">
+                            <div className="pt-2 flex justify-end gap-3">
                                 <button
                                     type="button"
                                     onClick={onClose}

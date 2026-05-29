@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getClases } from "@/actions/clases";
+import { getDisciplinaPrecios } from "@/actions/disciplinas";
 import { getSenaMinima } from "@/actions/config";
-import { ClaseTemplate } from "@/types/api";
+import { PrecioDisciplina } from "@/types/api";
 import PreciosTable from "@/components/PreciosTable";
 import SenaMinimaCard from "@/components/SenaMinimaCard";
 
@@ -11,20 +11,20 @@ type Tab = "precios" | "sena";
 
 export default function PreciosPage() {
     const [activeTab, setActiveTab] = useState<Tab>("precios");
-    const [clases, setClases] = useState<ClaseTemplate[]>([]);
+    const [precios, setPrecios] = useState<PrecioDisciplina[]>([]);
     const [senaMinima, setSenaMinima] = useState<string>("0");
     const [isLoading, setIsLoading] = useState(true);
 
     const refresh = useCallback(async () => {
         try {
-            const [dataClases, dataSena] = await Promise.all([
-                getClases(),
+            const [dataPrecios, dataSena] = await Promise.all([
+                getDisciplinaPrecios(),
                 getSenaMinima(),
             ]);
-            setClases(dataClases);
+            setPrecios(dataPrecios);
             setSenaMinima(dataSena);
         } catch {
-            setClases([]);
+            setPrecios([]);
         } finally {
             setIsLoading(false);
         }
@@ -70,7 +70,7 @@ export default function PreciosPage() {
             ) : (
                 <>
                     {activeTab === "precios" && (
-                        <PreciosTable clases={clases} onSuccess={refresh} />
+                        <PreciosTable precios={precios} onSuccess={refresh} />
                     )}
                     {activeTab === "sena" && (
                         <SenaMinimaCard valorActual={senaMinima} onSuccess={refresh} />

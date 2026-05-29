@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse, ClasePrecioUpdate
+from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
 from schemas.clase_semana import ClaseSemanaResponse
 from schemas.asistencia import AsistenciaRecepcionResponse
 from services.clase_template_service import ClaseTemplateService
@@ -46,16 +46,6 @@ async def delete_clase(
     await ClaseTemplateService(db).delete(clase_id)
 
 
-@router.put("/{clase_id}/precio", response_model=ClaseTemplateResponse)
-async def update_precio_clase(
-    clase_id: UUID,
-    data: ClasePrecioUpdate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(has_role(Role.ROLE_PRECIO_UPDATE)),
-):
-    return await ClaseTemplateService(db).update_precio(clase_id, data)
-
-
 @router.get("/semana", response_model=List[ClaseSemanaResponse])
 async def get_clases_semana(
     fecha: date = Query(..., description="Cualquier fecha dentro de la semana (YYYY-MM-DD)"),
@@ -91,3 +81,7 @@ async def get_clase(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await ClaseTemplateService(db).get(clase_id)
+
+@router.get("/date")
+async def get_date():
+    return datetime.now(timezone.utc)

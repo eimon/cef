@@ -1,28 +1,63 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign } from "lucide-react";
+import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
+import type { LucideIcon } from "lucide-react";
 
-const navigation = [
-    { name: "Clases", href: "/clases", icon: BookOpen, adminOnly: false, clientOnly: false, staffOnly: false },
+type NavChild = { name: string; href: string };
+
+type NavItem = {
+    name: string;
+    href?: string;
+    icon: LucideIcon;
+    adminOnly: boolean;
+    clientOnly: boolean;
+    staffOnly: boolean;
+    children?: NavChild[];
+};
+
+const navigation: NavItem[] = [
+    { name: "Clases",     href: "/clases",     icon: BookOpen,   adminOnly: false, clientOnly: false, staffOnly: false },
     { name: "Mis Clases", href: "/mis-clases", icon: CalendarCheck, adminOnly: false, clientOnly: true, staffOnly: false },
-    { name: "Perfil", href: "/profile", icon: UserRound, adminOnly: false, clientOnly: false, staffOnly: false },
-    { name: "Usuarios", href: "/users", icon: UserCog, adminOnly: true, clientOnly: false, staffOnly: false },
+    { name: "Perfil",     href: "/profile",    icon: UserRound,  adminOnly: false, clientOnly: false, staffOnly: false },
+    {
+        name: "Usuarios",
+        icon: UserCog,
+        adminOnly: true,
+        clientOnly: false,
+        staffOnly: false,
+        children: [
+            { name: "Personal", href: "/users/personal" },
+            { name: "Clientes", href: "/users/clientes" },
+        ],
+    },
     { name: "Profesores", href: "/profesores", icon: GraduationCap, adminOnly: false, clientOnly: false, staffOnly: true },
-    { name: "Precios", href: "/precios", icon: DollarSign, adminOnly: true, clientOnly: false, staffOnly: false },
+    { name: "Precios",    href: "/precios",    icon: DollarSign, adminOnly: true,  clientOnly: false, staffOnly: false },
 ];
 
 export default function Sidebar({ userRole }: { userRole: string | null }) {
     const { isOpen, close } = useSidebar();
+    const pathname = usePathname();
+    const [openGroup, setOpenGroup] = useState<string | null>(null);
+
+    useEffect(() => {
+        for (const item of navigation) {
+            if (item.children?.some(c => pathname.startsWith(c.href))) {
+                setOpenGroup(item.name);
+                return;
+            }
+        }
+    }, [pathname]);
+
     const visibleNavigation = navigation.filter(item =>
         (!item.adminOnly || userRole === "admin") &&
         (!item.clientOnly || userRole === "cliente") &&
         (!item.staffOnly || userRole === "admin" || userRole === "recepcion")
     );
-    const pathname = usePathname();
 
     return (
         <>
@@ -38,10 +73,9 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
 
             {/* Sidebar Panel */}
             <div
-                className={`fixed inset-y-0 left-0 z-50 w-64 glass-sidebar shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto lg:flex lg:flex-col lg:border-r lg:shadow-none ${isOpen ? "translate-x-0" : "-translate-x-full"
-                    }`}
+                className={`fixed inset-y-0 left-0 z-50 w-64 glass-sidebar shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto lg:flex lg:flex-col lg:border-r lg:shadow-none ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
             >
-                {/* Header — height matches navbar (h-16) with close button on mobile */}
+                {/* Header */}
                 <div className="flex items-center justify-end h-16 px-5 border-b border-slate-200">
                     <button
                         type="button"
@@ -55,39 +89,74 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
 
                 <div className="flex-1 overflow-y-auto">
                     <nav className="px-3 py-4 space-y-0.5">
-                        {/* Dashboard / Home — solo para admin y recepción */}
                         {userRole !== "cliente" && (
-                        <Link
-                            href="/"
-                            onClick={close}
-                            className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${pathname === "/"
-                                ? "bg-cef-primary/10 text-cef-primary"
-                                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            <Link
+                                href="/"
+                                onClick={close}
+                                className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${pathname === "/"
+                                    ? "bg-cef-primary/10 text-cef-primary"
+                                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                 }`}
-                        >
-                            <Home
-                                className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${pathname === "/" ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`}
-                            />
-                            Panel Principal
-                        </Link>
+                            >
+                                <Home className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${pathname === "/" ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                Panel Principal
+                            </Link>
                         )}
 
                         {visibleNavigation.map((item) => {
-                            const isActive = pathname.startsWith(item.href);
+                            if (item.children) {
+                                const isGroupActive = item.children.some(c => pathname.startsWith(c.href));
+                                const isGroupOpen = openGroup === item.name;
+                                return (
+                                    <div key={item.name}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpenGroup(isGroupOpen ? null : item.name)}
+                                            className={`group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${isGroupActive
+                                                ? "bg-cef-primary/10 text-cef-primary"
+                                                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                            }`}
+                                        >
+                                            <item.icon className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${isGroupActive ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                            {item.name}
+                                            <ChevronDown className={`ml-auto h-4 w-4 transition-transform duration-200 ${isGroupOpen ? "rotate-180" : ""}`} />
+                                        </button>
+                                        {isGroupOpen && (
+                                            <div className="mt-0.5 ml-9 space-y-0.5">
+                                                {item.children.map((child) => {
+                                                    const isChildActive = pathname.startsWith(child.href);
+                                                    return (
+                                                        <Link
+                                                            key={child.href}
+                                                            href={child.href}
+                                                            onClick={close}
+                                                            className={`block px-3 py-2 text-sm font-medium rounded-lg transition-all ${isChildActive
+                                                                ? "bg-cef-primary/10 text-cef-primary"
+                                                                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                                            }`}
+                                                        >
+                                                            {child.name}
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+
+                            const isActive = pathname.startsWith(item.href!);
                             return (
                                 <Link
                                     key={item.href}
-                                    href={item.href}
+                                    href={item.href!}
                                     onClick={close}
                                     className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${isActive
                                         ? "bg-cef-primary/10 text-cef-primary"
                                         : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                                        }`}
+                                    }`}
                                 >
-                                    <item.icon
-                                        className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${isActive ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"
-                                            }`}
-                                    />
+                                    <item.icon className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${isActive ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`} />
                                     {item.name}
                                 </Link>
                             );

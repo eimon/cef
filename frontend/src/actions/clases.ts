@@ -36,31 +36,26 @@ function isValidFutureOrTodayDate(value: string): boolean {
 
 const claseBaseSchema = z.object({
     disciplina: z.string().min(1, "La disciplina es requerida"),
-    fecha: z.string().min(1, invalidDateMessage).refine(isValidFutureOrTodayDate, invalidDateMessage),
+    dia_semana: z.string().min(1, "El día es requerido"),
     hora_inicio: z.string().min(1, "La hora de inicio es requerida"),
     hora_fin: z.string().min(1, "La hora de fin es requerida"),
     sala_id: z.string().uuid("Sala inválida"),
     profesor_id: z.string().uuid("Profesor inválido"),
-});
-
-const createClaseSchema = claseBaseSchema.extend({
-    precio_individual: z.coerce.number().gt(0, "El precio debe ser un valor mayor a cero"),
-    precio_suscripcion: z.coerce.number().gt(0, "El precio debe ser un valor mayor a cero"),
+    capacidad_maxima: z.coerce.number().int().min(1, "El cupo debe ser al menos 1"),
 });
 
 export async function createClase(
     prevState: ClaseFormState,
     formData: FormData
 ): Promise<ClaseFormState> {
-    const validated = createClaseSchema.safeParse({
+    const validated = claseBaseSchema.safeParse({
         disciplina: formData.get("disciplina"),
-        fecha: formData.get("fecha"),
+        dia_semana: formData.get("dia_semana"),
         hora_inicio: formData.get("hora_inicio"),
         hora_fin: formData.get("hora_fin"),
         sala_id: formData.get("sala_id"),
         profesor_id: formData.get("profesor_id"),
-        precio_individual: formData.get("precio_individual"),
-        precio_suscripcion: formData.get("precio_suscripcion"),
+        capacidad_maxima: formData.get("capacidad_maxima"),
     });
 
     if (!validated.success) {
@@ -93,11 +88,12 @@ export async function updateClase(
 ): Promise<ClaseFormState> {
     const validated = claseBaseSchema.safeParse({
         disciplina: formData.get("disciplina"),
-        fecha: formData.get("fecha"),
+        dia_semana: formData.get("dia_semana"),
         hora_inicio: formData.get("hora_inicio"),
         hora_fin: formData.get("hora_fin"),
         sala_id: formData.get("sala_id"),
         profesor_id: formData.get("profesor_id"),
+        capacidad_maxima: formData.get("capacidad_maxima"),
     });
 
     if (!validated.success) {
@@ -138,48 +134,6 @@ export async function deleteClase(
     }
     revalidatePath("/clases");
     return { success: true };
-}
-
-export type ClasePrecioFormState = {
-    error?: string;
-    success?: boolean;
-    tipo?: string;
-    precio?: number;
-};
-
-export async function updateClasePrecio(
-    claseId: string,
-    prevState: ClasePrecioFormState,
-    formData: FormData
-): Promise<ClasePrecioFormState> {
-    const tipo = formData.get("tipo") as string;
-    const precioRaw = formData.get("precio") as string;
-    const precio = parseFloat(precioRaw);
-
-    if (!tipo || (tipo !== "mensualidad" && tipo !== "individual")) {
-        return { error: "Tipo de precio inválido" };
-    }
-    if (isNaN(precio) || precio <= 0) {
-        return { error: "El precio debe ser un valor mayor a cero" };
-    }
-
-    try {
-        const res = await serverApi(`/clases/${claseId}/precio`, {
-            method: "PUT",
-            body: JSON.stringify({ tipo, precio }),
-        });
-
-        if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            return { error: errorData.detail || "Error al actualizar el precio" };
-        }
-    } catch (error) {
-        console.error("Update Precio Error:", error);
-        return { error: "Something went wrong" };
-    }
-
-    revalidatePath("/clases");
-    return { success: true, tipo, precio };
 }
 
 export async function getClases(): Promise<ClaseTemplate[]> {

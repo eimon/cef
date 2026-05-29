@@ -1,6 +1,6 @@
 from pydantic import BaseModel, UUID4, Field
-from typing import Literal, Optional
-from datetime import date, datetime, time
+from typing import Optional
+from datetime import datetime, time
 
 from core.enums import DiaSemana, Disciplina
 
@@ -19,27 +19,22 @@ class ClaseTemplateBase(BaseModel):
 
 class ClaseTemplateCreate(BaseModel):
     disciplina: Disciplina
-    fecha: date
+    dia_semana: DiaSemana
     hora_inicio: time
     hora_fin: time
     sala_id: UUID4
     profesor_id: UUID4
-    precio_individual: float = Field(..., gt=0)
-    precio_suscripcion: float = Field(..., gt=0)
+    capacidad_maxima: int = Field(..., ge=1)
 
 
 class ClaseTemplateUpdate(BaseModel):
     disciplina: Disciplina
-    fecha: date
+    dia_semana: DiaSemana
     hora_inicio: time
     hora_fin: time
     sala_id: UUID4
     profesor_id: UUID4
-
-
-class ClasePrecioUpdate(BaseModel):
-    tipo: Literal["mensualidad", "individual"]
-    precio: float = Field(..., gt=0, description="Debe ser mayor a cero")
+    capacidad_maxima: int = Field(..., ge=1)
 
 
 class ClaseTemplateResponse(ClaseTemplateBase):

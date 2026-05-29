@@ -11,17 +11,23 @@ const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase trac
 
 export default function ChangeEmailForm({ currentEmail }: { currentEmail?: string | null }) {
     const [showForm, setShowForm] = useState(false);
+    const [newEmail, setNewEmail] = useState("");
     const [state, formAction, isPending] = useActionState(requestEmailChange, { success: false, values: { new_email: "" } });
     const values = state.values || { new_email: "" };
     const fieldErrors = state.fieldErrors || {};
     const newEmailError = fieldErrors.new_email || fieldErrors._form;
     const { showSuccess } = useToast();
+    const canSubmit = newEmail.trim().length > 0;
 
     useEffect(() => {
         if (state?.success) {
             showSuccess("Te enviamos un email de confirmación al nuevo correo.");
         }
     }, [state?.success, showSuccess]);
+
+    useEffect(() => {
+        setNewEmail(values.new_email || "");
+    }, [values.new_email]);
 
     return (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -68,7 +74,8 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
                             name="new_email"
                             type="email"
                             required
-                            defaultValue={values.new_email || ""}
+                            value={newEmail}
+                            onChange={(event) => setNewEmail(event.target.value)}
                             className={inputCls}
                             placeholder="nuevo@correo.com"
                             aria-invalid={Boolean(newEmailError)}
@@ -79,7 +86,7 @@ export default function ChangeEmailForm({ currentEmail }: { currentEmail?: strin
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <button
                             type="submit"
-                            disabled={isPending}
+                            disabled={isPending || !canSubmit}
                             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cef-primary px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-cef-primary/90 disabled:opacity-60 sm:w-auto"
                         >
                             {isPending ? (

@@ -1,10 +1,12 @@
 import uuid
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.timezone import LOCAL_TZ
 from repositories.inscripcion_repository import InscripcionRepository
+from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
 from schemas.inscripcion import InscripcionIndividualCreate, InscripcionResponse
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
@@ -26,7 +28,8 @@ class InscripcionService:
         if not template:
             raise NotFoundException("Clase no encontrada")
 
-        if fecha <= date.today():
+        clase_inicio = datetime.combine(fecha, template.hora_inicio, tzinfo=LOCAL_TZ)
+        if clase_inicio <= datetime.now(LOCAL_TZ):
             raise BadRequestException("Solo podés inscribirte a clases futuras")
 
         instancia = await self.repo.get_instancia(clase_template_id, fecha)
@@ -79,7 +82,10 @@ class InscripcionService:
 
         instancia, template = await self._validar_elegibilidad(current_user, clase_template_id, fecha)
 
-        precio = Decimal(str(template.precio_individual))
+        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        if not precio_disciplina:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+        precio = Decimal(str(precio_disciplina.precio_individual))
         monto_minimo = precio / 2
 
         if data.monto < monto_minimo:
