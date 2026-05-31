@@ -181,47 +181,39 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                 </select>
                             </div>
 
-                            <fieldset className="border-0 p-0 m-0 min-w-0">
-                                <legend className={labelCls}>Día de la semana</legend>
+                            <div>
+                                <label className={labelCls}>Día de la semana</label>
                                 <input type="hidden" name="dia_semana" value={ui.diaSemana} />
                                 <div className="grid grid-cols-6 gap-1.5">
                                     {diasSemana.map((dia) => (
-                                        <button
+                                        <div
                                             key={dia.value}
-                                            type="button"
-                                            onClick={() => dispatch({ type: "SET_DIA", value: dia.value })}
-                                            className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                                            className={`py-2 rounded-lg text-xs font-medium text-center cursor-default ${
                                                 ui.diaSemana === dia.value
-                                                    ? "bg-cef-primary text-white"
-                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                                    ? "bg-cef-primary/30 text-cef-primary"
+                                                    : "bg-slate-100 text-slate-400"
                                             }`}
                                         >
                                             {dia.label}
-                                        </button>
+                                        </div>
                                     ))}
                                 </div>
-                            </fieldset>
+                            </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label htmlFor="edit-hora-inicio" className={labelCls}>Hora inicio</label>
-                                    <select
-                                        id="edit-hora-inicio"
+                                    <label className={labelCls}>Hora inicio</label>
+                                    <input
                                         name="hora_inicio"
-                                        required
+                                        type="text"
+                                        readOnly
                                         value={ui.horaInicio}
-                                        onChange={(event) => dispatch({ type: "SET_HORA", value: event.target.value })}
-                                        className={inputCls}
-                                    >
-                                        {horasDisponibles.map((hora) => (
-                                            <option key={hora} value={hora}>{hora}</option>
-                                        ))}
-                                    </select>
+                                        className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
+                                    />
                                 </div>
                                 <div>
-                                    <label htmlFor="edit-hora-fin" className={labelCls}>Hora fin</label>
+                                    <label className={labelCls}>Hora fin</label>
                                     <input
-                                        id="edit-hora-fin"
                                         name="hora_fin"
                                         type="text"
                                         readOnly
