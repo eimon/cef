@@ -39,7 +39,36 @@ bash scripts/setup-ssl.sh
 
 **Hacer que el navegador confíe en los certificados:**
 
-Los certificados son válidos para Chrome y Edge sin configuración adicional en Linux nativo. En **WSL2** (browser corriendo en Windows) hay un paso extra:
+Los certificados son válidos para Chrome y Edge sin configuración adicional en Linux nativo. En **WSL2** (browser corriendo en Windows) hay un paso extra para instalar la CA en el almacén de Windows.
+
+**Opción A — mkcert nativo en Windows (recomendado, sin WSL):**
+
+Abrir PowerShell y ejecutar:
+
+```powershell
+# Instalar mkcert en Windows (una sola vez por máquina)
+winget install FiloSottile.mkcert
+
+# Instalar la CA en el almacén de Windows
+# (también la propaga a WSL automáticamente si está disponible)
+mkcert -install
+
+# Generar los certificados directamente en la carpeta del proyecto
+cd ruta\al\proyecto\cef\frontend\certs
+mkcert localhost 127.0.0.1
+```
+
+Esto reemplaza el script `setup-ssl.sh`: los archivos `localhost+1.pem` y `localhost+1-key.pem` quedan listos en `frontend\certs\` sin pasos adicionales.
+
+**Opción B — PowerShell + mkcert en WSL (una sola línea):**
+
+Abrir PowerShell **como Administrador** y ejecutar:
+
+```powershell
+Import-Certificate -FilePath ((wsl wslpath -w ((wsl mkcert -CAROOT).Trim() + '/rootCA.pem')).Trim()) -CertStoreLocation 'Cert:\LocalMachine\Root'
+```
+
+**Opción C — Manual (bash + asistente de Windows):**
 
 ```bash
 # Copiar la CA de mkcert al Escritorio de Windows
