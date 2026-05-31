@@ -27,13 +27,13 @@ _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
 }
 
 _DIA_OFFSET: dict[DiaSemana, int] = {
-    DiaSemana.LUNES: 0,
-    DiaSemana.MARTES: 1,
-    DiaSemana.MIERCOLES: 2,
-    DiaSemana.JUEVES: 3,
-    DiaSemana.VIERNES: 4,
-    DiaSemana.SABADO: 5,
-    DiaSemana.DOMINGO: 6,
+    DiaSemana.DOMINGO: 0,
+    DiaSemana.LUNES: 1,
+    DiaSemana.MARTES: 2,
+    DiaSemana.MIERCOLES: 3,
+    DiaSemana.JUEVES: 4,
+    DiaSemana.VIERNES: 5,
+    DiaSemana.SABADO: 6,
 }
 
 
@@ -150,7 +150,7 @@ class ClaseTemplateService:
         return self._to_response(clase, precios)
 
     async def get_semana(self, fecha: date) -> list[ClaseSemanaResponse]:
-        week_start = fecha - timedelta(days=fecha.weekday())
+        week_start = fecha - timedelta(days=(fecha.weekday() + 1) % 7)
         fechas = [week_start + timedelta(days=i) for i in range(7)]
 
         templates = await self.repo.get_all()
