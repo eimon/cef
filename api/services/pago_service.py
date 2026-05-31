@@ -67,8 +67,8 @@ class PagoService:
 
         if monto < monto_minimo:
             raise BadRequestException(f"El monto mínimo es ${monto_minimo:.2f}")
-        if monto >= precio:
-            raise BadRequestException(f"El monto parcial debe ser menor al precio total: ${precio:.2f}")
+        if monto > precio:
+            raise BadRequestException(f"El monto no puede superar el precio de la clase: ${precio:.2f}")
 
         dia = template.dia_semana.value.capitalize()
         hora = template.hora_inicio.strftime("%H:%M")

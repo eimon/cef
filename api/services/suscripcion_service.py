@@ -87,7 +87,7 @@ class SuscripcionService:
             fecha_fin,
             clase_template_id,
         ):
-            raise ConflictException("Ya tenés una suscripción activa en el mismo día y horario")
+            raise ConflictException("Ya tenés otra inscripción en el mismo horario para esta fecha")
 
         conflicto_fecha = await self.repo.get_conflicto_individual(
             current_user.id, fechas_clases, template.hora_inicio, template.hora_fin
