@@ -62,7 +62,7 @@ function formatFechaCorta(fechaStr: string): string {
     return `${parseInt(dia)}/${parseInt(mes)}`;
 }
 
-export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]; userRole: string | null }) {
+export default function ClasesGrid({ clases, userRole, senaMinima }: { clases: ClaseSemana[]; userRole: string | null; senaMinima?: string }) {
     const [selectedClase, setSelectedClase] = useState<ClaseSemana | null>(null);
     const [claseToEdit, setClaseToEdit] = useState<ClaseSemana | null>(null);
     const [claseToDelete, setClaseToDelete] = useState<ClaseSemana | null>(null);
@@ -252,6 +252,7 @@ export default function ClasesGrid({ clases, userRole }: { clases: ClaseSemana[]
                 isOpen={selectedClase !== null}
                 onClose={() => setSelectedClase(null)}
                 userRole={userRole}
+                senaMinima={senaMinima ?? "50"}
             />
 
             {claseToEdit && (

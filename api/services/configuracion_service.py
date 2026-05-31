@@ -19,23 +19,22 @@ class ConfiguracionService:
         if not config:
             return ConfiguracionResponse(
                 clave=CLAVE_SENA_MINIMA,
-                valor="0",
+                valor="50",
                 updated_at=datetime.now(timezone.utc),
             )
         return ConfiguracionResponse.model_validate(config)
 
     async def update_sena_minima(self, data: SenaMinimaUpdate) -> ConfiguracionResponse:
-        valor_limpio = data.valor.strip().replace("$", "").replace(".", "").replace(",", ".")
         try:
-            monto = float(valor_limpio)
+            porcentaje = float(data.valor.strip())
         except ValueError:
             raise BadRequestException(
-                "El precio debe ser un valor mayor a cero"
+                "El porcentaje debe ser un valor entre 50 y 100"
             )
-        if monto <= 0:
+        if porcentaje < 50 or porcentaje > 100:
             raise BadRequestException(
-                "El precio debe ser un valor mayor a cero"
+                "El porcentaje debe ser un valor entre 50 y 100"
             )
 
-        config = await self.repo.upsert(CLAVE_SENA_MINIMA, str(monto))
+        config = await self.repo.upsert(CLAVE_SENA_MINIMA, str(porcentaje))
         return ConfiguracionResponse.model_validate(config)
