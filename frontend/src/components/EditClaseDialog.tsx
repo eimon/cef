@@ -1,8 +1,8 @@
 "use client";
 
-import { ChangeEvent, useReducer, useEffect, useActionState } from "react";
+import { ChangeEvent, FormEvent, useReducer, useEffect, useRef, useState } from "react";
 import { X, Loader2 } from "lucide-react";
-import { updateClase, ClaseFormState } from "@/actions/clases";
+import { updateClase } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
 import { getProfesores } from "@/actions/profesores";
 import { ClaseSemana, Sala, Profesor } from "@/types/api";
@@ -83,6 +83,9 @@ interface EditClaseDialogProps {
 export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDialogProps) {
     const { refresh } = useRouter();
     const { showSuccess } = useToast();
+    const initializedClaseId = useRef<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [isPending, setIsPending] = useState(false);
     const [ui, dispatch] = useReducer(reducer, {
         salas: [],
         profesores: [],
@@ -95,27 +98,39 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
         profesorId: clase.profesor_id ?? "",
     });
 
-    const updateClaseWithId = updateClase.bind(null, clase.id);
-    const [state, formAction, isPending] = useActionState(updateClaseWithId, {} as ClaseFormState);
-
     useEffect(() => {
         if (!isOpen) return;
-        dispatch({ type: "OPEN", clase });
+        if (initializedClaseId.current !== clase.id) {
+            initializedClaseId.current = clase.id;
+            setError(null);
+            dispatch({ type: "OPEN", clase });
+        }
         Promise.all([getSalas(), getProfesores()]).then(([salas, profesores]) => {
             dispatch({ type: "SET_OPTIONS", salas, profesores });
         });
     }, [isOpen, clase]);
 
-    useEffect(() => {
-        if (!state.success) return;
-        showSuccess("Clase editada correctamente");
-        onClose();
-        refresh();
-    }, [state.success, showSuccess, onClose, refresh]);
-
     const setField = (key: "disciplina" | "capacidadMaxima" | "salaId" | "profesorId") =>
         (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
             dispatch({ type: "SET_FIELD", key, value: event.target.value });
+
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setError(null);
+        setIsPending(true);
+
+        const result = await updateClase(clase.id, {}, new FormData(event.currentTarget));
+        setIsPending(false);
+
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+
+        showSuccess("Clase editada correctamente");
+        onClose();
+        refresh();
+    };
 
     const canSubmit =
         ui.disciplina.trim().length > 0 &&
@@ -141,10 +156,10 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                             <Loader2 className="animate-spin text-slate-400" size={24} />
                         </div>
                     ) : (
-                        <form action={formAction} className="space-y-4">
-                            {state?.error && (
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {error && (
                                 <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
-                                    {state.error}
+                                    {error}
                                 </div>
                             )}
 

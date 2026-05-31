@@ -1,11 +1,11 @@
 "use client";
 
-import { useReducer, useEffect, useActionState, ChangeEvent } from "react";
+import { type Dispatch, type ChangeEvent, type FormEvent, useEffect, useReducer, useState } from "react";
 import { X, Loader2 } from "lucide-react";
-import { createClase, ClaseFormState } from "@/actions/clases";
+import { createClase } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
 import { getProfesores } from "@/actions/profesores";
-import { Sala, Profesor } from "@/types/api";
+import { type Sala, type Profesor } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
 import { useRouter } from "next/navigation";
 
@@ -85,10 +85,7 @@ function reducer(state: State, action: Action): State {
 }
 
 export default function AddClaseDialog() {
-    const { refresh } = useRouter();
-    const { showSuccess } = useToast();
     const [ui, dispatch] = useReducer(reducer, initialState);
-    const [state, formAction, isPending] = useActionState(createClase, {} as ClaseFormState);
 
     useEffect(() => {
         if (!ui.isOpen) return;
@@ -96,13 +93,6 @@ export default function AddClaseDialog() {
             dispatch({ type: "SET_OPTIONS", salas, profesores });
         });
     }, [ui.isOpen]);
-
-    useEffect(() => {
-        if (!state.success) return;
-        showSuccess("Clase creada correctamente");
-        dispatch({ type: "CLOSE" });
-        refresh();
-    }, [state.success, showSuccess, refresh]);
 
     const set = (key: keyof ClaseFields) =>
         (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -143,125 +133,172 @@ export default function AddClaseDialog() {
                                     <Loader2 className="animate-spin text-slate-400" size={24} />
                                 </div>
                             ) : (
-                                <form action={formAction} className="space-y-4">
-                                    {state?.error && (
-                                        <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
-                                            {state.error}
-                                        </div>
-                                    )}
-
-                                    <div>
-                                        <label htmlFor="add-disciplina" className={labelCls}>Disciplina</label>
-                                        <select id="add-disciplina" name="disciplina" required value={ui.fields.disciplina} onChange={set("disciplina")} className={inputCls}>
-                                            <option value="">Seleccionar…</option>
-                                            {disciplinas.map((disciplina) => (
-                                                <option key={disciplina} value={disciplina}>{disciplina.charAt(0).toUpperCase() + disciplina.slice(1)}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <fieldset className="border-0 p-0 m-0 min-w-0">
-                                        <legend className={labelCls}>Día de la semana</legend>
-                                        <input type="hidden" name="dia_semana" value={ui.diaSemana} />
-                                        <div className="grid grid-cols-6 gap-1.5">
-                                            {diasSemana.map((dia) => (
-                                                <button
-                                                    key={dia.value}
-                                                    type="button"
-                                                    onClick={() => dispatch({ type: "SET_DIA", value: dia.value })}
-                                                    className={`py-2 rounded-lg text-xs font-medium transition-colors ${
-                                                        ui.diaSemana === dia.value
-                                                            ? "bg-cef-primary text-white"
-                                                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                                    }`}
-                                                >
-                                                    {dia.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </fieldset>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label htmlFor="add-hora-inicio" className={labelCls}>Hora inicio</label>
-                                            <select id="add-hora-inicio" name="hora_inicio" required value={ui.fields.hora_inicio} onChange={set("hora_inicio")} className={inputCls}>
-                                                <option value="">--:--</option>
-                                                {horasDisponibles.map((hora) => (
-                                                    <option key={hora} value={hora}>{hora}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label htmlFor="add-hora-fin" className={labelCls}>Hora fin</label>
-                                            <input
-                                                id="add-hora-fin"
-                                                name="hora_fin"
-                                                type="text"
-                                                readOnly
-                                                value={horaFin}
-                                                className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="add-capacidad" className={labelCls}>Cupo máximo</label>
-                                        <input
-                                            id="add-capacidad"
-                                            name="capacidad_maxima"
-                                            type="number"
-                                            min={1}
-                                            required
-                                            value={ui.fields.capacidad_maxima}
-                                            onChange={set("capacidad_maxima")}
-                                            className={inputCls}
-                                            placeholder="Ej: 15"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="add-sala" className={labelCls}>Sala</label>
-                                        <select id="add-sala" name="sala_id" required value={ui.fields.sala_id} onChange={set("sala_id")} className={inputCls}>
-                                            <option value="">Seleccionar…</option>
-                                            {ui.salas.map((sala) => (
-                                                <option key={sala.id} value={sala.id}>{sala.nombre}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label htmlFor="add-profesor" className={labelCls}>Profesor</label>
-                                        <select id="add-profesor" name="profesor_id" required value={ui.fields.profesor_id} onChange={set("profesor_id")} className={inputCls}>
-                                            <option value="">Seleccionar…</option>
-                                            {ui.profesores.map((profesor) => (
-                                                <option key={profesor.id} value={profesor.id}>{profesor.nombre} {profesor.apellido}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="pt-2 flex justify-end gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => dispatch({ type: "CLOSE" })}
-                                            className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg transition-colors"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            disabled={isPending || !canSubmit}
-                                            className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
-                                        >
-                                            {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}
-                                            Agregar
-                                        </button>
-                                    </div>
-                                </form>
+                                <AddClaseForm
+                                    ui={ui}
+                                    canSubmit={canSubmit}
+                                    horaFin={horaFin}
+                                    set={set}
+                                    dispatch={dispatch}
+                                />
                             )}
                         </div>
                     </div>
                 </div>
             )}
         </>
+    );
+}
+
+function AddClaseForm({
+    ui,
+    canSubmit,
+    horaFin,
+    set,
+    dispatch,
+}: {
+    ui: State;
+    canSubmit: boolean;
+    horaFin: string;
+    set: (key: keyof ClaseFields) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+    dispatch: Dispatch<Action>;
+}) {
+    const { refresh } = useRouter();
+    const { showSuccess } = useToast();
+    const [error, setError] = useState<string | null>(null);
+    const [isPending, setIsPending] = useState(false);
+
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        setError(null);
+        setIsPending(true);
+
+        const result = await createClase({}, new FormData(event.currentTarget));
+        setIsPending(false);
+
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+
+        showSuccess("Clase creada correctamente");
+        dispatch({ type: "CLOSE" });
+        refresh();
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+                <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
+                    {error}
+                </div>
+            )}
+
+            <div>
+                <label htmlFor="add-disciplina" className={labelCls}>Disciplina</label>
+                <select id="add-disciplina" name="disciplina" required value={ui.fields.disciplina} onChange={set("disciplina")} className={inputCls}>
+                    <option value="">Seleccionar…</option>
+                    {disciplinas.map((disciplina) => (
+                        <option key={disciplina} value={disciplina}>{disciplina.charAt(0).toUpperCase() + disciplina.slice(1)}</option>
+                    ))}
+                </select>
+            </div>
+
+            <fieldset className="border-0 p-0 m-0 min-w-0">
+                <legend className={labelCls}>Día de la semana</legend>
+                <input type="hidden" name="dia_semana" value={ui.diaSemana} />
+                <div className="grid grid-cols-6 gap-1.5">
+                    {diasSemana.map((dia) => (
+                        <button
+                            key={dia.value}
+                            type="button"
+                            onClick={() => dispatch({ type: "SET_DIA", value: dia.value })}
+                            className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                                ui.diaSemana === dia.value
+                                    ? "bg-cef-primary text-white"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                        >
+                            {dia.label}
+                        </button>
+                    ))}
+                </div>
+            </fieldset>
+
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <label htmlFor="add-hora-inicio" className={labelCls}>Hora inicio</label>
+                    <select id="add-hora-inicio" name="hora_inicio" required value={ui.fields.hora_inicio} onChange={set("hora_inicio")} className={inputCls}>
+                        <option value="">--:--</option>
+                        {horasDisponibles.map((hora) => (
+                            <option key={hora} value={hora}>{hora}</option>
+                        ))}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="add-hora-fin" className={labelCls}>Hora fin</label>
+                    <input
+                        id="add-hora-fin"
+                        name="hora_fin"
+                        type="text"
+                        readOnly
+                        value={horaFin}
+                        className={`${inputCls} bg-slate-100 text-slate-400 cursor-default`}
+                    />
+                </div>
+            </div>
+
+            <div>
+                <label htmlFor="add-capacidad" className={labelCls}>Cupo máximo</label>
+                <input
+                    id="add-capacidad"
+                    name="capacidad_maxima"
+                    type="number"
+                    min={1}
+                    required
+                    value={ui.fields.capacidad_maxima}
+                    onChange={set("capacidad_maxima")}
+                    className={inputCls}
+                    placeholder="Ej: 15"
+                />
+            </div>
+
+            <div>
+                <label htmlFor="add-sala" className={labelCls}>Sala</label>
+                <select id="add-sala" name="sala_id" required value={ui.fields.sala_id} onChange={set("sala_id")} className={inputCls}>
+                    <option value="">Seleccionar…</option>
+                    {ui.salas.map((sala) => (
+                        <option key={sala.id} value={sala.id}>{sala.nombre}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div>
+                <label htmlFor="add-profesor" className={labelCls}>Profesor</label>
+                <select id="add-profesor" name="profesor_id" required value={ui.fields.profesor_id} onChange={set("profesor_id")} className={inputCls}>
+                    <option value="">Seleccionar…</option>
+                    {ui.profesores.map((profesor) => (
+                        <option key={profesor.id} value={profesor.id}>{profesor.nombre} {profesor.apellido}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-3">
+                <button
+                    type="button"
+                    onClick={() => dispatch({ type: "CLOSE" })}
+                    className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-lg transition-colors"
+                >
+                    Cancelar
+                </button>
+                <button
+                    type="submit"
+                    disabled={isPending || !canSubmit}
+                    className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
+                >
+                    {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}
+                    Agregar
+                </button>
+            </div>
+        </form>
     );
 }
