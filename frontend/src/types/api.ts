@@ -165,6 +165,7 @@ export interface MiClaseIndividual {
     sala_nombre: string | null;
     monto_pagado: number | null;
     estado_pago: EstadoPago | null;
+    precio_clase: number | null;
     asistio: boolean;
     cancelo: boolean;
 }

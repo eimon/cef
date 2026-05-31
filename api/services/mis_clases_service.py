@@ -29,6 +29,7 @@ class MisClasesService:
                 sala_nombre=row.sala_nombre,
                 monto_pagado=float(row.monto_pagado) if row.monto_pagado is not None else None,
                 estado_pago=row.estado_pago,
+                precio_clase=float(row.precio_clase) if row.precio_clase is not None else None,
                 asistio=row.asistio,
                 cancelo=row.cancelo,
             )

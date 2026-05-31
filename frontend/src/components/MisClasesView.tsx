@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, CalendarDays, MapPin, User, DollarSign, QrCode, XCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { Clock, CalendarDays, MapPin, User, DollarSign, QrCode, XCircle, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { MiClaseIndividual, MiSuscripcion, InstanciaEnSuscripcion, Disciplina } from "@/types/api";
+import { crearPreferenciaDeudaMP } from "@/actions/pagos";
 
 const DISCIPLINA_LABELS: Record<Disciplina, string> = {
     [Disciplina.YOGA]: "Yoga",
@@ -50,7 +51,30 @@ function isFechaUpcoming(fechaStr: string): boolean {
 // ─── Individual: card ────────────────────────────────────────────────────────
 
 function ClaseIndividualCard({ clase }: { clase: MiClaseIndividual }) {
+    const [paying, setPaying] = useState(false);
+    const [payError, setPayError] = useState("");
     const upcoming = isClaseUpcoming(clase.fecha, clase.hora_inicio);
+
+    const montoRestante =
+        clase.precio_clase !== null && clase.monto_pagado !== null
+            ? clase.precio_clase - clase.monto_pagado
+            : 0;
+    const tieneDeuda = !clase.cancelo && montoRestante > 0;
+
+    async function handleSaldarDeuda() {
+        setPaying(true);
+        setPayError("");
+        const result = await crearPreferenciaDeudaMP(clase.asistencia_id);
+        if (result.error) {
+            setPaying(false);
+            setPayError(result.error);
+            return;
+        }
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
+    }
+
     return (
         <div className="glass rounded-2xl p-5 space-y-3">
             <div className="flex items-start justify-between gap-3">
@@ -101,7 +125,35 @@ function ClaseIndividualCard({ clase }: { clase: MiClaseIndividual }) {
             {clase.monto_pagado !== null && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 pt-1 border-t border-slate-100">
                     <DollarSign size={13} className="text-slate-400" />
-                    <span>Abonado: <span className="font-semibold text-slate-700">{formatPrice(clase.monto_pagado)}</span></span>
+                    <span>
+                        Abonado: <span className="font-semibold text-slate-700">{formatPrice(clase.monto_pagado)}</span>
+                        {tieneDeuda && clase.precio_clase !== null && (
+                            <span className="ml-1 text-cef-warning">/ {formatPrice(clase.precio_clase)}</span>
+                        )}
+                    </span>
+                </div>
+            )}
+
+            {tieneDeuda && (
+                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                    {payError && (
+                        <p className="text-xs text-cef-danger flex items-center gap-1">
+                            <AlertCircle size={12} className="flex-shrink-0" />
+                            {payError}
+                        </p>
+                    )}
+                    <button
+                        type="button"
+                        onClick={handleSaldarDeuda}
+                        disabled={paying}
+                        className="w-full py-2 px-3 rounded-lg bg-cef-warning/10 hover:bg-cef-warning/20 text-cef-warning border border-cef-warning/20 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60"
+                    >
+                        {paying ? (
+                            <><Loader2 size={12} className="animate-spin" />Redirigiendo...</>
+                        ) : (
+                            <>Saldar deuda — {formatPrice(montoRestante)}</>
+                        )}
+                    </button>
                 </div>
             )}
         </div>

@@ -38,6 +38,38 @@ export async function crearPreferenciaMP(
     }
 }
 
+export async function crearPreferenciaDeudaMP(asistenciaId: string): Promise<PreferenciaResult> {
+    try {
+        const res = await serverApi("/pagos/mp/preferencia-deuda", {
+            method: "POST",
+            params: { asistencia_id: asistenciaId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al iniciar el pago de deuda" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function confirmarDeudaMP(paymentId: string): Promise<ConfirmarPagoResult> {
+    try {
+        const res = await serverApi("/pagos/mp/confirmar-deuda", {
+            method: "POST",
+            params: { payment_id: paymentId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al confirmar el pago de deuda" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
 export async function confirmarPagoMP(paymentId: string): Promise<ConfirmarPagoResult> {
     try {
         const res = await serverApi("/pagos/mp/confirmar", {

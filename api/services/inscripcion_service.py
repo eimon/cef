@@ -93,9 +93,9 @@ class InscripcionService:
             raise BadRequestException(
                 f"El monto mínimo es el 50% del precio: ${float(monto_minimo):.2f}"
             )
-        if data.monto > precio:
+        if data.monto >= precio:
             raise BadRequestException(
-                f"El monto no puede superar el precio de la clase: ${float(precio):.2f}"
+                f"El monto parcial debe ser menor al precio total: ${float(precio):.2f}"
             )
 
         if instancia is None:

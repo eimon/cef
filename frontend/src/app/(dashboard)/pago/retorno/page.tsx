@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
-import { confirmarPagoMP } from "@/actions/pagos";
+import { confirmarPagoMP, confirmarDeudaMP } from "@/actions/pagos";
 
 export default async function PagoRetornoPage({
     searchParams,
@@ -10,15 +10,19 @@ export default async function PagoRetornoPage({
         payment_id?: string;
         collection_id?: string;
         collection_status?: string;
+        tipo?: string;
     }>;
 }) {
     const params = await searchParams;
     const status = params.status || params.collection_status;
     const rawPaymentId = params.payment_id || params.collection_id;
     const paymentId = rawPaymentId && rawPaymentId !== "null" ? rawPaymentId : undefined;
+    const esDeuda = params.tipo === "deuda";
 
     if (status === "approved" && paymentId) {
-        const result = await confirmarPagoMP(paymentId);
+        const result = esDeuda
+            ? await confirmarDeudaMP(paymentId)
+            : await confirmarPagoMP(paymentId);
 
         if (result.error) {
             return (

@@ -1,13 +1,16 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
 import mercadopago
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from core.config import settings
-from exceptions.general import BadRequestException, ConflictException, NotFoundException
+from core.enums import EstadoPago
+from exceptions.general import BadRequestException, NotFoundException
+from models.asistencia import Asistencia
 from models.pagos import Pago
 from models.usuario import Usuario
 from repositories.inscripcion_repository import InscripcionRepository
@@ -52,8 +55,8 @@ class PagoService:
 
         if monto < monto_minimo:
             raise BadRequestException(f"El monto mínimo es ${monto_minimo:.2f}")
-        if monto > precio:
-            raise BadRequestException(f"El monto no puede superar ${precio:.2f}")
+        if monto >= precio:
+            raise BadRequestException(f"El monto parcial debe ser menor al precio total: ${precio:.2f}")
 
         dia = template.dia_semana.value.capitalize()
         hora = template.hora_inicio.strftime("%H:%M")
@@ -148,3 +151,153 @@ class PagoService:
         )
 
         return {"status": "approved", **result.model_dump()}
+
+    def _make_preference(
+        self,
+        title: str,
+        monto: float,
+        back_url_suffix: str,
+        metadata: dict,
+        external_reference: str,
+    ) -> dict:
+        frontend_url = settings.FRONTEND_PUBLIC_URL.rstrip("/")
+        back_url = f"{frontend_url}/pago/retorno{back_url_suffix}"
+        data: dict = {
+            "items": [{"title": title, "quantity": 1, "unit_price": round(monto, 2), "currency_id": "ARS"}],
+            "back_urls": {"success": back_url, "failure": back_url, "pending": back_url},
+            "auto_return": "approved",
+            "metadata": metadata,
+            "external_reference": external_reference,
+        }
+        if settings.MP_NOTIFICATION_URL:
+            data["notification_url"] = settings.MP_NOTIFICATION_URL
+        return data
+
+    def _init_point_from_response(self, pref: dict) -> str:
+        is_sandbox = settings.MP_ACCESS_TOKEN.startswith("TEST-")
+        return pref.get("sandbox_init_point") if is_sandbox else pref.get("init_point")
+
+    async def crear_preferencia_deuda_mp(
+        self,
+        current_user: Usuario,
+        asistencia_id: UUID,
+    ) -> dict:
+        from models.clase_instancia import ClaseInstancia
+        from models.clase_template import ClaseTemplate
+
+        stmt = (
+            select(Asistencia, ClaseInstancia, ClaseTemplate)
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .where(
+                Asistencia.id == asistencia_id,
+                Asistencia.usuario_id == current_user.id,
+                Asistencia.cancelo == False,
+            )
+        )
+        row = (await self.db.execute(stmt)).first()
+        if not row:
+            raise NotFoundException("Asistencia no encontrada")
+
+        asistencia, instancia, template = row
+
+        total_pagado = Decimal(str(
+            (await self.db.execute(
+                select(func.coalesce(func.sum(Pago.monto), 0))
+                .where(
+                    Pago.usuario_id == current_user.id,
+                    Pago.clase_instancia_id == asistencia.clase_instancia_id,
+                    Pago.activo == True,
+                )
+            )).scalar()
+        ))
+
+        precio_disc = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        if not precio_disc:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+
+        precio_total = Decimal(str(precio_disc.precio_individual))
+        monto_restante = precio_total - total_pagado
+
+        if monto_restante <= 0:
+            raise BadRequestException("No tenés deuda pendiente para esta clase")
+
+        dia = template.dia_semana.value.capitalize()
+        hora = template.hora_inicio.strftime("%H:%M")
+        pref_data = self._make_preference(
+            title=f"Saldo — {template.nombre} {dia} {hora}",
+            monto=float(monto_restante),
+            back_url_suffix="?tipo=deuda",
+            metadata={"asistencia_id": str(asistencia_id), "usuario_id": str(current_user.id), "tipo": "deuda"},
+            external_reference=f"deuda|{asistencia_id}|{current_user.id}",
+        )
+
+        response = self.sdk.preference().create(pref_data)
+        if response["status"] not in (200, 201):
+            raise BadRequestException("Error al conectar con MercadoPago")
+
+        pref = response["response"]
+        return {
+            "init_point": self._init_point_from_response(pref),
+            "preference_id": pref["id"],
+            "monto_restante": float(monto_restante),
+        }
+
+    async def confirmar_deuda_mp(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+    ) -> dict:
+        payment_response = self.sdk.payment().get(payment_id)
+        if payment_response["status"] != 200:
+            raise NotFoundException("Pago no encontrado en MercadoPago")
+
+        payment = payment_response["response"]
+        if payment.get("status") != "approved":
+            return {"status": payment.get("status")}
+
+        existing = await self.db.execute(
+            select(Pago).where(Pago.mp_payment_id == str(payment_id))
+        )
+        if existing.scalars().first():
+            return {"status": "approved", "already_processed": True}
+
+        metadata = payment.get("metadata", {})
+        external_ref = payment.get("external_reference", "")
+        try:
+            if metadata.get("asistencia_id"):
+                asistencia_id = UUID(str(metadata["asistencia_id"]))
+                usuario_id = str(metadata["usuario_id"])
+            else:
+                parts = external_ref.split("|")
+                asistencia_id = UUID(parts[1])
+                usuario_id = parts[2]
+        except (KeyError, ValueError, IndexError):
+            raise BadRequestException("Metadatos del pago inválidos")
+
+        if str(current_user.id) != usuario_id:
+            raise BadRequestException("Este pago no corresponde a tu usuario")
+
+        asistencia = (await self.db.execute(
+            select(Asistencia).where(
+                Asistencia.id == asistencia_id,
+                Asistencia.usuario_id == current_user.id,
+            )
+        )).scalars().first()
+        if not asistencia:
+            raise NotFoundException("Asistencia no encontrada")
+
+        pago = Pago(
+            usuario_id=current_user.id,
+            clase_instancia_id=asistencia.clase_instancia_id,
+            monto=Decimal(str(payment["transaction_amount"])),
+            fecha_pago=datetime.now(timezone.utc),
+            estado=EstadoPago.PAGADO,
+            mp_payment_id=str(payment_id),
+            descripcion="Pago saldo pendiente",
+            activo=True,
+        )
+        self.db.add(pago)
+        await self.db.flush()
+
+        return {"status": "approved", "pago_id": str(pago.id)}

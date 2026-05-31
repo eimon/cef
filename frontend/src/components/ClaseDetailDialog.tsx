@@ -54,6 +54,12 @@ function hasClaseEmpezado(fechaStr: string, horaInicioStr: string): boolean {
     return new Date(y, m - 1, d, h, min) <= new Date();
 }
 
+function isMoreThan24hAway(fechaStr: string, horaInicioStr: string): boolean {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    const [h, min] = horaInicioStr.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min).getTime() - Date.now() > 24 * 60 * 60 * 1000;
+}
+
 function hasClaseTerminado(fechaStr: string, horaFinStr: string): boolean {
     const [y, m, d] = fechaStr.split("-").map(Number);
     const [h, min] = horaFinStr.split(":").map(Number);
@@ -71,11 +77,13 @@ interface PaymentAmountStepProps {
     amountError: string;
     onTypeChange: (type: "full" | "partial") => void;
     onAmountChange: (value: string) => void;
+    allowPartial?: boolean;
 }
 
 function PaymentAmountStep({
     inputId, precioActual, montoMinimoActual, paymentType,
     partialAmount, amountError, onTypeChange, onAmountChange,
+    allowPartial = true,
 }: PaymentAmountStepProps) {
     return (
         <div className="space-y-3">
@@ -97,25 +105,27 @@ function PaymentAmountStep({
                 </div>
             </button>
 
-            <button
-                type="button"
-                onClick={() => onTypeChange("partial")}
-                className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                    paymentType === "partial"
-                        ? "border-cef-primary bg-cef-primary/5"
-                        : "border-slate-200 hover:border-slate-300"
-                }`}
-            >
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                            Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
-                        </p>
+            {allowPartial ? (
+                <button
+                    type="button"
+                    onClick={() => onTypeChange("partial")}
+                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                        paymentType === "partial"
+                            ? "border-cef-primary bg-cef-primary/5"
+                            : "border-slate-200 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Mínimo {formatPrice(montoMinimoActual)} (50% o más)
+                            </p>
+                        </div>
+                        <p className="text-xs text-slate-400">A definir</p>
                     </div>
-                    <p className="text-xs text-slate-400">A definir</p>
-                </div>
-            </button>
+                </button>
+            ) : null}
 
             {paymentType === "partial" && (
                 <div>
@@ -127,12 +137,12 @@ function PaymentAmountStep({
                         <input
                             id={inputId}
                             type="number"
-                            min={montoMinimoActual + 1}
-                            max={precioActual}
+                            min={montoMinimoActual}
+                            max={precioActual - 1}
                             step="1"
                             value={partialAmount}
                             onChange={(e) => onAmountChange(e.target.value)}
-                            placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
+                            placeholder={`${montoMinimoActual} – ${precioActual - 1}`}
                             className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
                         />
                     </div>
@@ -262,6 +272,8 @@ export default function ClaseDetailDialog({
             setCheckError(result.error);
             return;
         }
+        setPaymentType("full");
+        setPartialAmount("");
         setStep("amount");
     }
 
@@ -284,9 +296,9 @@ export default function ClaseDetailDialog({
     async function handleContinuarPago() {
         if (paymentType === "partial") {
             const monto = parseFloat(partialAmount);
-            if (isNaN(monto) || monto <= montoMinimoActual || monto > precioActual) {
+            if (isNaN(monto) || monto < montoMinimoActual || monto >= precioActual) {
                 setAmountError(
-                    `El monto parcial debe ser mayor al 50% (${formatPrice(montoMinimoActual)}) y menor o igual al precio completo`
+                    `El monto debe ser entre ${formatPrice(montoMinimoActual)} (50%) y ${formatPrice(precioActual-1)} (100%)`
                 );
                 return;
             }
@@ -564,6 +576,7 @@ export default function ClaseDetailDialog({
                                 amountError={amountError}
                                 onTypeChange={setPaymentType}
                                 onAmountChange={(v) => { setPartialAmount(v); setAmountError(""); }}
+                                allowPartial={isMoreThan24hAway(clase.fecha_en_semana, clase.hora_inicio)}
                             />
                         </div>
                     )}
@@ -602,6 +615,7 @@ export default function ClaseDetailDialog({
                                 amountError={amountError}
                                 onTypeChange={setPaymentType}
                                 onAmountChange={(v) => { setPartialAmount(v); setAmountError(""); }}
+                                allowPartial={false}
                             />
                         </div>
                     )}
