@@ -14,6 +14,7 @@ services:
       RESEND_FROM_EMAIL: "${RESEND_FROM_EMAIL:-CEF <onboarding@resend.dev>}"
       FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
       EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS: ${EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS:-24}
+      PASSWORD_RESET_TOKEN_EXPIRE_HOURS: ${PASSWORD_RESET_TOKEN_EXPIRE_HOURS:-24}
       TZ: America/Argentina/Buenos_Aires
     depends_on:
       db:

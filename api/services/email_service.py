@@ -140,6 +140,7 @@ class EmailService:
                 "<p>Hola,</p>"
                 "<p>Pulsa el siguiente enlace para cambiar tu contraseña en CEF:</p>"
                 f'<p><a href="{verification_url}">Cambiar contraseña</a></p>'
+                "<p>Este enlace vence a las 24 horas.</p>"
                 "<p>Si no solicitaste este cambio, podes ignorar este mensaje.</p>"
             ),
         }

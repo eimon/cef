@@ -1,6 +1,6 @@
 import uuid
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from schemas.usuario import (
 )
 from services.email_service import EmailService
 from services.refresh_token_service import RefreshTokenService
+from core.config import settings
 from core.security import verify_password, get_password_hash
 
 
@@ -94,7 +95,7 @@ class AuthService:
         token = await self.password_reset_token_repo.get_by_raw_token(raw_token)
         if not token:
             raise UnauthorizedException("Token inválido")
-        if token.expires_at < datetime.now(timezone.utc):
+        if self._is_password_reset_token_expired(token):
             raise BadRequestException("El enlace de reseteo expiró")
         if token.used_at is not None:
             raise BadRequestException("El enlace ya fue utilizado")
@@ -288,3 +289,24 @@ class AuthService:
         if token.expires_at < datetime.now(timezone.utc):
             raise UnauthorizedException("Token expirado")
         return token
+
+    def _is_password_reset_token_expired(self, token) -> bool:
+        now = datetime.now(timezone.utc)
+        expires_at = self._as_utc(token.expires_at)
+        if expires_at is None or expires_at < now:
+            return True
+
+        created_at = self._as_utc(token.created_at)
+        if created_at is None:
+            return True
+
+        max_age = timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
+        return created_at + max_age < now
+
+    @staticmethod
+    def _as_utc(value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)

@@ -15,7 +15,9 @@ class PasswordResetTokenRepository:
 
     async def create(self, usuario_id: uuid.UUID) -> tuple[PasswordResetToken, str]:
         raw_token, token_hash = generate_refresh_token()
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=getattr(settings, "PASSWORD_RESET_TOKEN_EXPIRE_HOURS", settings.EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS))
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS
+        )
         obj = PasswordResetToken(
             token_hash=token_hash,
             usuario_id=usuario_id,

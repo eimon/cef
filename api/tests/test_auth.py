@@ -1,4 +1,8 @@
 import pytest
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+from services.auth_service import AuthService
 
 
 # ---------- Register ----------
@@ -78,6 +82,16 @@ async def test_password_forgot_nonexistent_email(client):
     })
     assert resp.status_code == 400
     assert resp.json()["detail"] == "El email ingresado no se encuentra registrado"
+
+
+def test_password_reset_token_expires_after_24_hours_even_with_future_expires_at():
+    now = datetime.now(timezone.utc)
+    token = SimpleNamespace(
+        created_at=now - timedelta(hours=25),
+        expires_at=now + timedelta(days=7),
+    )
+
+    assert AuthService.__new__(AuthService)._is_password_reset_token_expired(token) is True
 
 
 # ---------- Perfil ----------
