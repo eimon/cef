@@ -288,9 +288,49 @@ function SuscripcionCard({ suscripcion: s }: { suscripcion: MiSuscripcion }) {
     );
 }
 
+// ─── Shared UI helpers ───────────────────────────────────────────────────────
+
+function PillTabs<T extends string>({
+    options,
+    active,
+    onChange,
+}: {
+    options: { value: T; label: string }[];
+    active: T;
+    onChange: (v: T) => void;
+}) {
+    return (
+        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+            {options.map(({ value, label }) => (
+                <button
+                    key={value}
+                    type="button"
+                    onClick={() => onChange(value)}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        active === value
+                            ? "bg-white text-slate-800 shadow-sm"
+                            : "text-slate-500 hover:text-slate-700"
+                    }`}
+                >
+                    {label}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return (
+        <div className="glass rounded-2xl p-10 text-center">
+            <p className="text-slate-400 text-sm">{message}</p>
+        </div>
+    );
+}
+
 // ─── Main view ────────────────────────────────────────────────────────────────
 
-type Tab = "proximas" | "pasadas";
+type TopTab = "individuales" | "suscripciones";
+type SubTab = "proximas" | "pasadas";
 
 export default function MisClasesView({
     individuales,
@@ -299,69 +339,85 @@ export default function MisClasesView({
     individuales: MiClaseIndividual[];
     suscripciones: MiSuscripcion[];
 }) {
-    const [tab, setTab] = useState<Tab>("proximas");
+    const [topTab, setTopTab] = useState<TopTab>("individuales");
+    const [subTabInd, setSubTabInd] = useState<SubTab>("proximas");
+    const [subTabSus, setSubTabSus] = useState<SubTab>("proximas");
 
-    const proximas = individuales.filter(c => isClaseUpcoming(c.fecha, c.hora_inicio));
-    const pasadas = individuales.filter(c => !isClaseUpcoming(c.fecha, c.hora_inicio));
-    const listaActual = tab === "proximas" ? proximas : pasadas;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    const indProximas = individuales.filter(c => isClaseUpcoming(c.fecha, c.hora_inicio));
+    const indPasadas  = individuales.filter(c => !isClaseUpcoming(c.fecha, c.hora_inicio));
+    const indLista    = subTabInd === "proximas" ? indProximas : indPasadas;
+
+    const susActivas = suscripciones.filter(s => s.activo && new Date(s.fecha_fin + "T12:00:00") >= today);
+    const susPasadas = suscripciones.filter(s => !s.activo || new Date(s.fecha_fin + "T12:00:00") < today);
+    const susLista   = subTabSus === "proximas" ? susActivas : susPasadas;
 
     return (
-        <div className="space-y-10">
-            {/* ── Clases individuales ── */}
-            <section className="space-y-4">
-                <h2 className="text-lg font-bold text-slate-800 tracking-tight">Clases Individuales</h2>
+        <div className="space-y-6">
+            {/* ── Pestañas principales ── */}
+            <PillTabs
+                options={[
+                    { value: "individuales", label: `Individuales` },
+                    { value: "suscripciones", label: `Suscripciones` },
+                ]}
+                active={topTab}
+                onChange={setTopTab}
+            />
 
-                {/* Tabs */}
-                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-                    {(["proximas", "pasadas"] as Tab[]).map(t => (
-                        <button
-                            key={t}
-                            type="button"
-                            onClick={() => setTab(t)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                tab === t
-                                    ? "bg-white text-slate-800 shadow-sm"
-                                    : "text-slate-500 hover:text-slate-700"
-                            }`}
-                        >
-                            {t === "proximas" ? `Próximas (${proximas.length})` : `Pasadas (${pasadas.length})`}
-                        </button>
-                    ))}
-                </div>
-
-                {listaActual.length === 0 ? (
-                    <div className="glass rounded-2xl p-10 text-center">
-                        <p className="text-slate-400 text-sm">
-                            {tab === "proximas"
-                                ? "No tenés clases individuales próximas."
-                                : "No tenés clases individuales pasadas."}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {listaActual.map(c => (
-                            <ClaseIndividualCard key={c.asistencia_id} clase={c} />
-                        ))}
-                    </div>
-                )}
-            </section>
+            {/* ── Individuales ── */}
+            {topTab === "individuales" && (
+                <section className="space-y-4">
+                    <PillTabs
+                        options={[
+                            { value: "proximas", label: `Próximas (${indProximas.length})` },
+                            { value: "pasadas",  label: `Pasadas (${indPasadas.length})` },
+                        ]}
+                        active={subTabInd}
+                        onChange={setSubTabInd}
+                    />
+                    {indLista.length === 0 ? (
+                        <EmptyState
+                            message={
+                                subTabInd === "proximas"
+                                    ? "No tenés clases individuales próximas."
+                                    : "No tenés clases individuales pasadas."
+                            }
+                        />
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {indLista.map(c => <ClaseIndividualCard key={c.asistencia_id} clase={c} />)}
+                        </div>
+                    )}
+                </section>
+            )}
 
             {/* ── Suscripciones ── */}
-            <section className="space-y-4">
-                <h2 className="text-lg font-bold text-slate-800 tracking-tight">Mis Suscripciones</h2>
-
-                {suscripciones.length === 0 ? (
-                    <div className="glass rounded-2xl p-10 text-center">
-                        <p className="text-slate-400 text-sm">No tenés suscripciones activas.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {suscripciones.map(s => (
-                            <SuscripcionCard key={s.id} suscripcion={s} />
-                        ))}
-                    </div>
-                )}
-            </section>
+            {topTab === "suscripciones" && (
+                <section className="space-y-4">
+                    <PillTabs
+                        options={[
+                            { value: "proximas", label: `Activas (${susActivas.length})` },
+                            { value: "pasadas",  label: `Pasadas (${susPasadas.length})` },
+                        ]}
+                        active={subTabSus}
+                        onChange={setSubTabSus}
+                    />
+                    {susLista.length === 0 ? (
+                        <EmptyState
+                            message={
+                                subTabSus === "proximas"
+                                    ? "No tenés suscripciones activas."
+                                    : "No tenés suscripciones pasadas."
+                            }
+                        />
+                    ) : (
+                        <div className="space-y-4">
+                            {susLista.map(s => <SuscripcionCard key={s.id} suscripcion={s} />)}
+                        </div>
+                    )}
+                </section>
+            )}
         </div>
     );
 }

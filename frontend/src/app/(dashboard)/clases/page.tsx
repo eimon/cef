@@ -8,13 +8,12 @@ import { getUserRole } from "@/lib/auth";
 
 const fmtArgDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" });
 
-function getMonday(dateStr?: string): string {
+function getSunday(dateStr?: string): string {
     const date = dateStr
         ? new Date(dateStr + "T12:00:00")
         : new Date(fmtArgDate.format(new Date()) + "T12:00:00");
-    const day = date.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    date.setDate(date.getDate() + diff);
+    const day = date.getDay(); // 0 = Sunday
+    date.setDate(date.getDate() - day);
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
@@ -27,16 +26,16 @@ export default async function ClasesPage({
     searchParams: Promise<{ fecha?: string }>;
 }) {
     const { fecha } = await searchParams;
-    const monday = getMonday(fecha);
-    const currentMonday = getMonday();
+    const weekStart = getSunday(fecha);
+    const currentWeekStart = getSunday();
     const userRole = await getUserRole();
     const isStaff = userRole === "admin" || userRole === "recepcion";
-    if (!isStaff && monday < currentMonday) redirect("/clases");
+    if (!isStaff && weekStart < currentWeekStart) redirect("/clases");
     const [clases, senaMinima] = await Promise.all([
-        getClasesSemana(monday),
+        getClasesSemana(weekStart),
         getSenaMinima(),
     ]);
-    const isPastWeek = monday < currentMonday;
+    const isPastWeek = weekStart < currentWeekStart;
     const clasesVisibles = isPastWeek && isStaff ? clases.filter((c) => c.instancia !== null) : clases;
 
     return (
@@ -48,7 +47,7 @@ export default async function ClasesPage({
                 </div>
                 <div className="flex items-center gap-3">
                     {isStaff && <AddClaseDialog />}
-                    <WeekNavigation monday={monday} canNavigatePast={isStaff} />
+                    <WeekNavigation weekStart={weekStart} canNavigatePast={isStaff} />
                 </div>
             </div>
 

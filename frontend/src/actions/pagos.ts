@@ -38,6 +38,25 @@ export async function crearPreferenciaMP(
     }
 }
 
+export async function crearPreferenciaSuscripcionMP(
+    claseTemplateId: string,
+    monto: number,
+): Promise<PreferenciaResult> {
+    try {
+        const res = await serverApi("/pagos/mp/preferencia-suscripcion", {
+            method: "POST",
+            params: { clase_template_id: claseTemplateId, monto: monto.toString() },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al iniciar el pago de suscripción" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
 export async function crearPreferenciaDeudaMP(asistenciaId: string): Promise<PreferenciaResult> {
     try {
         const res = await serverApi("/pagos/mp/preferencia-deuda", {
@@ -63,6 +82,22 @@ export async function confirmarDeudaMP(paymentId: string): Promise<ConfirmarPago
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             return { error: error.detail || "Error al confirmar el pago de deuda" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function confirmarSuscripcionMP(paymentId: string): Promise<ConfirmarPagoResult> {
+    try {
+        const res = await serverApi("/pagos/mp/confirmar-suscripcion", {
+            method: "POST",
+            params: { payment_id: paymentId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al confirmar la suscripción" };
         }
         return res.json();
     } catch {

@@ -52,7 +52,7 @@ async def get_clases_semana(
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    return await ClaseTemplateService(db).get_semana(fecha)
+    return await ClaseTemplateService(db).get_semana(fecha, current_user)
 
 
 @router.get("/", response_model=List[ClaseTemplateResponse])

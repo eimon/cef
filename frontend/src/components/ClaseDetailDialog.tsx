@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2 } from "lucide-react";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2, CheckCircle2 } from "lucide-react";
 import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
 import { checkElegibilidadIndividual } from "@/actions/inscripciones";
-import { checkElegibilidadSuscripcion, suscribirse } from "@/actions/suscripciones";
+import { checkElegibilidadSuscripcion } from "@/actions/suscripciones";
 import { getAsistenciasClase } from "@/actions/asistencias";
-import { crearPreferenciaMP } from "@/actions/pagos";
-import MockPaymentModal from "@/components/MockPaymentModal";
+import { crearPreferenciaMP, crearPreferenciaSuscripcionMP } from "@/actions/pagos";
 
 const DIA_LABELS: Record<string, string> = {
     lunes: "Lunes",
@@ -217,7 +216,6 @@ export default function ClaseDetailDialog({
     const [step, setStep] = useState<Step>("detail");
     const [paymentType, setPaymentType] = useState<"full" | "partial">("full");
     const [partialAmount, setPartialAmount] = useState("");
-    const [showPayment, setShowPayment] = useState(false);
     const [amountError, setAmountError] = useState("");
 
     const [checkLoading, setCheckLoading] = useState(false);
@@ -257,7 +255,6 @@ export default function ClaseDetailDialog({
         setCheckError("");
         setMpLoading(false);
         setMpError("");
-        setShowPayment(false);
         setSuscripcionData(null);
         setSuscripcionCheckLoading(false);
         setSuscripcionCheckError("");
@@ -308,17 +305,14 @@ export default function ClaseDetailDialog({
             }
         }
         setAmountError("");
-
-        if (step === "amount-suscripcion") {
-            setShowPayment(true);
-            return;
-        }
-
-        // Individual: redirect to MercadoPago checkout
         if (!clase) return;
         setMpLoading(true);
         setMpError("");
-        const result = await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
+
+        const result = step === "amount-suscripcion"
+            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto)
+            : await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
+
         if (result.error) {
             setMpLoading(false);
             setMpError(result.error);
@@ -327,16 +321,6 @@ export default function ClaseDetailDialog({
         if (result.init_point) {
             window.location.href = result.init_point;
         }
-    }
-
-    async function handlePay() {
-        if (!clase) return { error: "Clase no disponible" };
-        return await suscribirse(clase.id, selectedMonto);
-    }
-
-    function handlePaymentClose() {
-        setShowPayment(false);
-        handleClose();
     }
 
     async function handleVerAsistencias() {
@@ -458,7 +442,16 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Pago único por clase</p>
                                         </div>
-                                        {canEnroll ? (
+                                        {clase.inscrito ? (
+                                            <div className="w-full py-2.5 px-3 rounded-lg bg-cef-success/10 border border-cef-success/20 text-xs font-semibold text-cef-success flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 size={14} />
+                                                Inscripto
+                                            </div>
+                                        ) : clase.suscrito ? (
+                                            <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
+                                                Ya tenés suscripción
+                                            </button>
+                                        ) : canEnroll ? (
                                             <div className="space-y-2">
                                                 <button
                                                     type="button"
@@ -512,32 +505,43 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Acceso mensual garantizado</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <button
-                                                type="button"
-                                                onClick={handleSuscribirse}
-                                                disabled={suscripcionCheckLoading}
-                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
-                                            >
-                                                {suscripcionCheckLoading ? (
-                                                    <>
-                                                        <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Verificando…
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>Suscribirme</span>
-                                                        <ChevronRight size={14} />
-                                                    </>
-                                                )}
+                                        {clase.suscrito ? (
+                                            <div className="w-full py-2.5 px-3 rounded-lg bg-cef-success/10 border border-cef-success/20 text-xs font-semibold text-cef-success flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 size={14} />
+                                                Suscripto
+                                            </div>
+                                        ) : clase.inscrito ? (
+                                            <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
+                                                Ya tenés inscripción
                                             </button>
-                                            {suscripcionCheckError && (
-                                                <div className="flex items-start gap-1.5">
-                                                    <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
-                                                    <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSuscribirse}
+                                                    disabled={suscripcionCheckLoading}
+                                                    className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                >
+                                                    {suscripcionCheckLoading ? (
+                                                        <>
+                                                            <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            Verificando…
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>Suscribirme</span>
+                                                            <ChevronRight size={14} />
+                                                        </>
+                                                    )}
+                                                </button>
+                                                {suscripcionCheckError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -697,13 +701,6 @@ export default function ClaseDetailDialog({
                 </div>
             </div>
 
-            {/* Mock Payment Modal (above everything) */}
-            <MockPaymentModal
-                isOpen={showPayment}
-                monto={selectedMonto}
-                onClose={handlePaymentClose}
-                onPay={handlePay}
-            />
         </>,
         document.body
     );

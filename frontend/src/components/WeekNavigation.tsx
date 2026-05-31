@@ -13,41 +13,40 @@ function addDays(dateStr: string, days: number): string {
     return `${ny}-${nm}-${nd}`;
 }
 
-function getCurrentMonday(): string {
+function getCurrentSunday(): string {
     const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diff);
-    const y = monday.getFullYear();
-    const m = String(monday.getMonth() + 1).padStart(2, "0");
-    const d = String(monday.getDate()).padStart(2, "0");
+    const day = today.getDay(); // 0 = Sunday
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - day);
+    const y = sunday.getFullYear();
+    const m = String(sunday.getMonth() + 1).padStart(2, "0");
+    const d = String(sunday.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
 }
 
-function formatWeekRange(mondayStr: string): string {
-    const [y, m, d] = mondayStr.split("-").map(Number);
-    const monday = new Date(y, m - 1, d);
-    const sunday = new Date(y, m - 1, d + 6);
+function formatWeekRange(sundayStr: string): string {
+    const [y, m, d] = sundayStr.split("-").map(Number);
+    const sunday = new Date(y, m - 1, d);
+    const saturday = new Date(y, m - 1, d + 6);
 
-    const sameMonth = monday.getMonth() === sunday.getMonth();
-    const startDay = monday.getDate();
-    const endDay = sunday.getDate();
-    const endMonth = new Intl.DateTimeFormat("es-AR", { month: "long" }).format(sunday);
-    const year = sunday.getFullYear();
+    const sameMonth = sunday.getMonth() === saturday.getMonth();
+    const startDay = sunday.getDate();
+    const endDay = saturday.getDate();
+    const endMonth = new Intl.DateTimeFormat("es-AR", { month: "long" }).format(saturday);
+    const year = saturday.getFullYear();
 
     if (sameMonth) {
         return `${startDay} – ${endDay} de ${endMonth} ${year}`;
     }
-    const startMonth = new Intl.DateTimeFormat("es-AR", { month: "short" }).format(monday);
+    const startMonth = new Intl.DateTimeFormat("es-AR", { month: "short" }).format(sunday);
     return `${startDay} ${startMonth} – ${endDay} de ${endMonth} ${year}`;
 }
 
-export default function WeekNavigation({ monday, canNavigatePast = false }: { monday: string; canNavigatePast?: boolean }) {
+export default function WeekNavigation({ weekStart, canNavigatePast = false }: { weekStart: string; canNavigatePast?: boolean }) {
     const router = useRouter();
     const pathname = usePathname();
-    const currentMonday = getCurrentMonday();
-    const isCurrentWeek = monday === currentMonday;
+    const currentWeekStart = getCurrentSunday();
+    const isCurrentWeek = weekStart === currentWeekStart;
     const isPreviousDisabled = isCurrentWeek && !canNavigatePast;
 
     const navigate = (dateStr: string) => {
@@ -58,7 +57,7 @@ export default function WeekNavigation({ monday, canNavigatePast = false }: { mo
         <div className="flex items-center gap-2">
             <button
                 type="button"
-                onClick={() => navigate(addDays(monday, -7))}
+                onClick={() => navigate(addDays(weekStart, -7))}
                 disabled={isPreviousDisabled}
                 className="p-2 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:hover:text-slate-500 disabled:hover:bg-transparent"
                 aria-label="Semana anterior"
@@ -68,7 +67,7 @@ export default function WeekNavigation({ monday, canNavigatePast = false }: { mo
 
             <div className="flex flex-col items-center min-w-[200px]">
                 <span className="text-sm font-medium text-slate-700 capitalize leading-tight">
-                    {formatWeekRange(monday)}
+                    {formatWeekRange(weekStart)}
                 </span>
                 {isCurrentWeek && (
                     <span className="text-[10px] font-semibold text-cef-primary uppercase tracking-wider mt-0.5">
@@ -79,7 +78,7 @@ export default function WeekNavigation({ monday, canNavigatePast = false }: { mo
 
             <button
                 type="button"
-                onClick={() => navigate(addDays(monday, 7))}
+                onClick={() => navigate(addDays(weekStart, 7))}
                 className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
                 aria-label="Semana siguiente"
             >
@@ -89,7 +88,7 @@ export default function WeekNavigation({ monday, canNavigatePast = false }: { mo
             {!isCurrentWeek && (
                 <button
                     type="button"
-                    onClick={() => navigate(currentMonday)}
+                    onClick={() => navigate(currentWeekStart)}
                     className="ml-1 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition-all"
                 >
                     Hoy
