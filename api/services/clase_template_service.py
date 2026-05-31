@@ -11,10 +11,12 @@ from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, Cla
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
-from core.enums import DiaSemana, Disciplina
+from core.enums import DiaSemana, Disciplina, TipoInscripcion
+from models.asistencia import Asistencia
 from models.clase_template import ClaseTemplate
 from models.precio_disciplina import PrecioDisciplina
 from models.suscripciones import Suscripcion
+from models.usuario import Usuario
 
 _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
     0: DiaSemana.LUNES,
@@ -149,7 +151,7 @@ class ClaseTemplateService:
         precios = await self._load_precios()
         return self._to_response(clase, precios)
 
-    async def get_semana(self, fecha: date) -> list[ClaseSemanaResponse]:
+    async def get_semana(self, fecha: date, current_user: Usuario | None = None) -> list[ClaseSemanaResponse]:
         week_start = fecha - timedelta(days=(fecha.weekday() + 1) % 7)
         fechas = [week_start + timedelta(days=i) for i in range(7)]
 
@@ -171,6 +173,34 @@ class ClaseTemplateService:
         def count_subs(template_id: uuid.UUID) -> int:
             return sum(1 for s in subs if s.clase_template_id == template_id)
 
+        # Enrollment status for current user
+        inscrito_instancia_ids: set = set()
+        user_subs: list = []
+        if current_user:
+            instancia_ids = [i.id for i in instancias]
+            if instancia_ids:
+                asistencias_result = await self.db.execute(
+                    select(Asistencia.clase_instancia_id).where(
+                        Asistencia.usuario_id == current_user.id,
+                        Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                        Asistencia.cancelo == False,
+                        Asistencia.clase_instancia_id.in_(instancia_ids),
+                    )
+                )
+                inscrito_instancia_ids = {r[0] for r in asistencias_result.all()}
+
+            user_subs_result = await self.db.execute(
+                select(
+                    Suscripcion.clase_template_id,
+                    Suscripcion.fecha_inicio,
+                    Suscripcion.fecha_fin,
+                ).where(
+                    Suscripcion.usuario_id == current_user.id,
+                    Suscripcion.activo == True,
+                )
+            )
+            user_subs = user_subs_result.all()
+
         result = []
         for template in templates:
             offset = _DIA_OFFSET[template.dia_semana]
@@ -183,6 +213,13 @@ class ClaseTemplateService:
                 cupo_disponible = template.capacidad_maxima - count_subs(template.id)
 
             pi, ps = precios.get(template.disciplina, (0.0, 0.0))
+
+            inscrito = instancia is not None and instancia.id in inscrito_instancia_ids
+            suscrito = any(
+                s.clase_template_id == template.id
+                and s.fecha_inicio <= fecha_clase <= s.fecha_fin
+                for s in user_subs
+            )
 
             result.append(ClaseSemanaResponse(
                 id=template.id,
@@ -210,6 +247,8 @@ class ClaseTemplateService:
                     cancelada=instancia.cancelada,
                     cupo=instancia.cupo,
                 ) if instancia else None,
+                inscrito=inscrito,
+                suscrito=suscrito,
             ))
 
         return sorted(result, key=lambda x: (_DIA_OFFSET[x.dia_semana], x.hora_inicio))

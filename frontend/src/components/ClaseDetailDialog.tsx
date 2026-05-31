@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2 } from "lucide-react";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2, CheckCircle2 } from "lucide-react";
 import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
 import { checkElegibilidadIndividual } from "@/actions/inscripciones";
 import { checkElegibilidadSuscripcion } from "@/actions/suscripciones";
@@ -438,7 +438,16 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Pago único por clase</p>
                                         </div>
-                                        {canEnroll ? (
+                                        {clase.inscrito ? (
+                                            <div className="w-full py-2.5 px-3 rounded-lg bg-cef-success/10 border border-cef-success/20 text-xs font-semibold text-cef-success flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 size={14} />
+                                                Inscripto
+                                            </div>
+                                        ) : clase.suscrito ? (
+                                            <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
+                                                Ya tenés suscripción
+                                            </button>
+                                        ) : canEnroll ? (
                                             <div className="space-y-2">
                                                 <button
                                                     type="button"
@@ -492,32 +501,43 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Acceso mensual garantizado</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <button
-                                                type="button"
-                                                onClick={handleSuscribirse}
-                                                disabled={suscripcionCheckLoading}
-                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
-                                            >
-                                                {suscripcionCheckLoading ? (
-                                                    <>
-                                                        <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Verificando…
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>Suscribirme</span>
-                                                        <ChevronRight size={14} />
-                                                    </>
-                                                )}
+                                        {clase.suscrito ? (
+                                            <div className="w-full py-2.5 px-3 rounded-lg bg-cef-success/10 border border-cef-success/20 text-xs font-semibold text-cef-success flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 size={14} />
+                                                Suscripto
+                                            </div>
+                                        ) : clase.inscrito ? (
+                                            <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
+                                                Ya tenés inscripción
                                             </button>
-                                            {suscripcionCheckError && (
-                                                <div className="flex items-start gap-1.5">
-                                                    <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
-                                                    <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSuscribirse}
+                                                    disabled={suscripcionCheckLoading}
+                                                    className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                >
+                                                    {suscripcionCheckLoading ? (
+                                                        <>
+                                                            <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            Verificando…
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>Suscribirme</span>
+                                                            <ChevronRight size={14} />
+                                                        </>
+                                                    )}
+                                                </button>
+                                                {suscripcionCheckError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (

@@ -33,3 +33,5 @@ class ClaseSemanaResponse(BaseModel):
     fecha_en_semana: date
     cupo_disponible: int
     instancia: Optional[InstanciaSemanaResponse] = None
+    inscrito: bool = False
+    suscrito: bool = False
