@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createUser, UserFormState } from "@/actions/users";
 import { Plus, X, Loader2 } from "lucide-react";
 import { useActionState } from "react";
 import { UserRole } from "@/types/api";
 import { isValidEmail } from "@/lib/validation";
+import { useToast } from "@/context/ToastContext";
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
@@ -16,25 +17,36 @@ const roleLabels: Record<string, string> = {
     [UserRole.CLIENTE]: "Cliente",
 };
 
-export default function AddUserDialog() {
+interface AddUserDialogProps {
+    onSuccess?: () => void;
+    roleOptions?: UserRole[];
+}
+
+export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const handledSuccessRef = useRef(false);
+    const { showSuccess } = useToast();
     const initialState: UserFormState = { error: "", success: false };
 
     const [state, formAction, isPending] = useActionState(createUser, initialState);
     const canSubmit = isValidEmail(email) && password.trim().length > 0;
+    const availableRoles = roleOptions?.length ? roleOptions : Object.values(UserRole);
 
-    const closeDialog = () => {
+    const closeDialog = useCallback(() => {
         setIsOpen(false);
         setEmail("");
         setPassword("");
-    };
+    }, []);
 
-    if (state.success && isOpen) {
+    useEffect(() => {
+        if (!state.success || !isOpen || handledSuccessRef.current) return;
+        handledSuccessRef.current = true;
+        showSuccess("Usuario agregado correctamente");
         closeDialog();
-        state.success = false;
-    }
+        onSuccess?.();
+    }, [state.success, isOpen, showSuccess, closeDialog, onSuccess]);
 
     return (
         <>
@@ -59,7 +71,11 @@ export default function AddUserDialog() {
                             </button>
                         </div>
 
-                        <form action={formAction} className="p-6 space-y-4">
+                        <form
+                            action={formAction}
+                            onSubmit={() => { handledSuccessRef.current = false; }}
+                            className="p-6 space-y-4"
+                        >
                             {state?.error && (
                                 <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
                                     {state.error}
@@ -96,7 +112,7 @@ export default function AddUserDialog() {
                             <div>
                                 <label className={labelCls}>Rol</label>
                                 <select name="role" className={inputCls}>
-                                    {Object.values(UserRole).map((role) => (
+                                    {availableRoles.map((role) => (
                                         <option key={role} value={role}>
                                             {roleLabels[role] ?? role}
                                         </option>

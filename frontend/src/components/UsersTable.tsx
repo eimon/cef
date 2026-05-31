@@ -13,6 +13,7 @@ interface UsersTableProps {
     users: User[];
     allowedRoles: UserRole[];
     emptyMessage?: string;
+    onSuccess?: () => void;
 }
 
 const roleBadgeClass: Record<string, string> = {
@@ -77,7 +78,7 @@ function UserCardMenu({
     );
 }
 
-export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersTableProps) {
+export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError } = useToast();
@@ -92,6 +93,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersT
         setIsDeleting(null);
 
         if (result.error) { showError(result.error); return; }
+        onSuccess?.();
         refresh();
     };
 
@@ -141,6 +143,12 @@ export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersT
                                     <span>{user.telefono}</span>
                                 </>
                             )}
+                            {user.dni && (
+                                <>
+                                    <span className="text-slate-200">-</span>
+                                    <span>DNI: {user.dni}</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -157,6 +165,9 @@ export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersT
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Email
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    DNI
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Teléfono
@@ -180,6 +191,9 @@ export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersT
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.email}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                        {user.dni || "-"}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.telefono || "—"}
@@ -229,6 +243,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage }: UsersT
                     isOpen={true}
                     onClose={() => setEditingUser(null)}
                     allowedRoles={allowedRoles}
+                    onSuccess={onSuccess}
                 />
             )}
         </>

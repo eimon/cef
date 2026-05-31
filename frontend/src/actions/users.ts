@@ -27,11 +27,13 @@ export type UserFormState = {
     success?: boolean;
 };
 
-export async function getUsers(filters?: {
+export type GetUsersParams = {
     dni?: string;
     nombre?: string;
     apellido?: string;
-}): Promise<User[]> {
+};
+
+export async function getUsers(filters?: GetUsersParams): Promise<User[]> {
     try {
         const params = filters
             ? Object.fromEntries(

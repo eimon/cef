@@ -27,9 +27,9 @@ const navigation: NavItem[] = [
     {
         name: "Usuarios",
         icon: UserCog,
-        adminOnly: true,
+        adminOnly: false,
         clientOnly: false,
-        staffOnly: false,
+        staffOnly: true,
         children: [
             { name: "Personal", href: "/users/personal" },
             { name: "Clientes", href: "/users/clientes" },
@@ -39,18 +39,20 @@ const navigation: NavItem[] = [
     { name: "Precios",    href: "/precios",    icon: DollarSign, adminOnly: true,  clientOnly: false, staffOnly: false },
 ];
 
+function getActiveGroup(pathname: string) {
+    return navigation.find((item) => item.children?.some((child) => pathname.startsWith(child.href)))?.name ?? null;
+}
+
 export default function Sidebar({ userRole }: { userRole: string | null }) {
     const { isOpen, close } = useSidebar();
     const pathname = usePathname();
-    const [openGroup, setOpenGroup] = useState<string | null>(null);
+    const [openGroup, setOpenGroup] = useState<string | null>(() => getActiveGroup(pathname));
 
     useEffect(() => {
-        for (const item of navigation) {
-            if (item.children?.some(c => pathname.startsWith(c.href))) {
-                setOpenGroup(item.name);
-                return;
-            }
-        }
+        const activeGroup = getActiveGroup(pathname);
+        if (!activeGroup) return;
+        const timeoutId = window.setTimeout(() => setOpenGroup(activeGroup), 0);
+        return () => window.clearTimeout(timeoutId);
     }, [pathname]);
 
     const visibleNavigation = navigation.filter(item =>

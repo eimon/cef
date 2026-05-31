@@ -13,6 +13,7 @@ interface EditUserDialogProps {
     isOpen: boolean;
     onClose: () => void;
     allowedRoles: UserRole[];
+    onSuccess?: () => void;
 }
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
@@ -24,7 +25,7 @@ const roleLabels: Record<string, string> = {
     [UserRole.CLIENTE]: "Cliente",
 };
 
-export default function EditUserDialog({ user, isOpen, onClose, allowedRoles }: EditUserDialogProps) {
+export default function EditUserDialog({ user, isOpen, onClose, allowedRoles, onSuccess }: EditUserDialogProps) {
     const { showSuccess } = useToast();
     const { refresh } = useRouter();
 
@@ -35,8 +36,9 @@ export default function EditUserDialog({ user, isOpen, onClose, allowedRoles }: 
         if (!state.success) return;
         showSuccess("Usuario actualizado correctamente");
         onClose();
+        onSuccess?.();
         refresh();
-    }, [state.success, showSuccess, onClose, refresh]);
+    }, [state.success, showSuccess, onClose, onSuccess, refresh]);
 
     if (!isOpen) return null;
 
