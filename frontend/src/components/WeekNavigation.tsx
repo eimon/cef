@@ -43,11 +43,12 @@ function formatWeekRange(mondayStr: string): string {
     return `${startDay} ${startMonth} – ${endDay} de ${endMonth} ${year}`;
 }
 
-export default function WeekNavigation({ monday }: { monday: string }) {
+export default function WeekNavigation({ monday, canNavigatePast = false }: { monday: string; canNavigatePast?: boolean }) {
     const router = useRouter();
     const pathname = usePathname();
     const currentMonday = getCurrentMonday();
     const isCurrentWeek = monday === currentMonday;
+    const isPreviousDisabled = isCurrentWeek && !canNavigatePast;
 
     const navigate = (dateStr: string) => {
         router.push(`${pathname}?fecha=${dateStr}`);
@@ -58,7 +59,7 @@ export default function WeekNavigation({ monday }: { monday: string }) {
             <button
                 type="button"
                 onClick={() => navigate(addDays(monday, -7))}
-                disabled={isCurrentWeek}
+                disabled={isPreviousDisabled}
                 className="p-2 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:hover:text-slate-500 disabled:hover:bg-transparent"
                 aria-label="Semana anterior"
             >

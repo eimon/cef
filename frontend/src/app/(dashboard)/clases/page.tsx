@@ -28,13 +28,10 @@ export default async function ClasesPage({
     const { fecha } = await searchParams;
     const monday = getMonday(fecha);
     const currentMonday = getMonday();
-    if (monday < currentMonday) redirect("/clases");
-    const [clases, userRole] = await Promise.all([
-        getClasesSemana(monday),
-        getUserRole(),
-    ]);
-
+    const userRole = await getUserRole();
     const isStaff = userRole === "admin" || userRole === "recepcion";
+    if (!isStaff && monday < currentMonday) redirect("/clases");
+    const clases = await getClasesSemana(monday);
 
     return (
         <div className="space-y-6">
@@ -45,7 +42,7 @@ export default async function ClasesPage({
                 </div>
                 <div className="flex items-center gap-3">
                     {isStaff && <AddClaseDialog />}
-                    <WeekNavigation monday={monday} />
+                    <WeekNavigation monday={monday} canNavigatePast={isStaff} />
                 </div>
             </div>
 
