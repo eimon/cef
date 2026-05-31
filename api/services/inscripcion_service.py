@@ -76,6 +76,7 @@ class InscripcionService:
         self,
         current_user: Usuario,
         data: InscripcionIndividualCreate,
+        mp_payment_id: str = "mock",
     ) -> InscripcionResponse:
         clase_template_id = uuid.UUID(str(data.clase_template_id))
         fecha = data.fecha
@@ -103,7 +104,7 @@ class InscripcionService:
             instancia = await self.repo.get_or_create_instancia(clase_template_id, fecha, cupo_disponible)
 
         asistencia, pago = await self.repo.create_inscripcion_individual(
-            current_user.id, instancia, data.monto
+            current_user.id, instancia, data.monto, mp_payment_id=mp_payment_id
         )
 
         return InscripcionResponse(

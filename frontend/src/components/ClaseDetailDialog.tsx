@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar } from "lucide-react";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2 } from "lucide-react";
 import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
-import { checkElegibilidadIndividual, inscribirseIndividual } from "@/actions/inscripciones";
+import { checkElegibilidadIndividual } from "@/actions/inscripciones";
 import { checkElegibilidadSuscripcion, suscribirse } from "@/actions/suscripciones";
 import { getAsistenciasClase } from "@/actions/asistencias";
+import { crearPreferenciaMP } from "@/actions/pagos";
 import MockPaymentModal from "@/components/MockPaymentModal";
 
 const DIA_LABELS: Record<string, string> = {
@@ -207,6 +208,8 @@ export default function ClaseDetailDialog({
 
     const [checkLoading, setCheckLoading] = useState(false);
     const [checkError, setCheckError] = useState("");
+    const [mpLoading, setMpLoading] = useState(false);
+    const [mpError, setMpError] = useState("");
 
     const [suscripcionData, setSuscripcionData] = useState<SuscripcionCheckResponse | null>(null);
     const [suscripcionCheckLoading, setSuscripcionCheckLoading] = useState(false);
@@ -238,6 +241,8 @@ export default function ClaseDetailDialog({
         setPartialAmount("");
         setAmountError("");
         setCheckError("");
+        setMpLoading(false);
+        setMpError("");
         setShowPayment(false);
         setSuscripcionData(null);
         setSuscripcionCheckLoading(false);
@@ -276,7 +281,7 @@ export default function ClaseDetailDialog({
         setStep("amount-suscripcion");
     }
 
-    function handleContinuarPago() {
+    async function handleContinuarPago() {
         if (paymentType === "partial") {
             const monto = parseFloat(partialAmount);
             if (isNaN(monto) || monto <= montoMinimoActual || monto > precioActual) {
@@ -287,15 +292,30 @@ export default function ClaseDetailDialog({
             }
         }
         setAmountError("");
-        setShowPayment(true);
+
+        if (step === "amount-suscripcion") {
+            setShowPayment(true);
+            return;
+        }
+
+        // Individual: redirect to MercadoPago checkout
+        if (!clase) return;
+        setMpLoading(true);
+        setMpError("");
+        const result = await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
+        if (result.error) {
+            setMpLoading(false);
+            setMpError(result.error);
+            return;
+        }
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
     }
 
     async function handlePay() {
         if (!clase) return { error: "Clase no disponible" };
-        if (step === "amount-suscripcion") {
-            return await suscribirse(clase.id, selectedMonto);
-        }
-        return await inscribirseIndividual(clase.id, clase.fecha_en_semana, selectedMonto);
+        return await suscribirse(clase.id, selectedMonto);
     }
 
     function handlePaymentClose() {
@@ -613,9 +633,17 @@ export default function ClaseDetailDialog({
                             </button>
                         ) : (
                             <>
+                                <div className="flex-1">
+                                    {mpError && (
+                                        <p className="text-xs text-cef-danger flex items-center gap-1.5">
+                                            <AlertCircle size={13} className="flex-shrink-0" />
+                                            {mpError}
+                                        </p>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => { setStep("detail"); setAmountError(""); }}
+                                    onClick={() => { setStep("detail"); setAmountError(""); setMpError(""); }}
                                     className="px-4 py-2 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-700 hover:bg-slate-100 transition-colors"
                                 >
                                     Volver
@@ -623,10 +651,25 @@ export default function ClaseDetailDialog({
                                 <button
                                     type="button"
                                     onClick={handleContinuarPago}
-                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 transition-colors flex items-center gap-1.5"
+                                    disabled={mpLoading}
+                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5"
                                 >
-                                    Continuar
-                                    <ChevronRight size={15} />
+                                    {mpLoading ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            Redirigiendo...
+                                        </>
+                                    ) : step === "amount" ? (
+                                        <>
+                                            Pagar con MercadoPago
+                                            <ChevronRight size={15} />
+                                        </>
+                                    ) : (
+                                        <>
+                                            Continuar
+                                            <ChevronRight size={15} />
+                                        </>
+                                    )}
                                 </button>
                             </>
                         )}
