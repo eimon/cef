@@ -72,6 +72,7 @@ interface PaymentAmountStepProps {
     inputId: string;
     precioActual: number;
     montoMinimoActual: number;
+    porcentajeSena: number;
     paymentType: "full" | "partial";
     partialAmount: string;
     amountError: string;
@@ -81,7 +82,7 @@ interface PaymentAmountStepProps {
 }
 
 function PaymentAmountStep({
-    inputId, precioActual, montoMinimoActual, paymentType,
+    inputId, precioActual, montoMinimoActual, porcentajeSena, paymentType,
     partialAmount, amountError, onTypeChange, onAmountChange,
     allowPartial = true,
 }: PaymentAmountStepProps) {
@@ -119,7 +120,7 @@ function PaymentAmountStep({
                         <div>
                             <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
                             <p className="text-xs text-slate-400 mt-0.5">
-                                Mínimo {formatPrice(montoMinimoActual)} (50% o más)
+                                Mínimo {formatPrice(montoMinimoActual)} ({porcentajeSena}% o más)
                             </p>
                         </div>
                         <p className="text-xs text-slate-400">A definir</p>
@@ -204,12 +205,15 @@ export default function ClaseDetailDialog({
     isOpen,
     onClose,
     userRole,
+    senaMinima = "50",
 }: {
     clase: ClaseSemana | null;
     isOpen: boolean;
     onClose: () => void;
     userRole: string | null;
+    senaMinima?: string;
 }) {
+    const porcentajeSena = parseFloat(senaMinima) || 50;
     const [step, setStep] = useState<Step>("detail");
     const [paymentType, setPaymentType] = useState<"full" | "partial">("full");
     const [partialAmount, setPartialAmount] = useState("");
@@ -238,8 +242,8 @@ export default function ClaseDetailDialog({
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
         : clase.precio_individual;
     const montoMinimoActual = step === "amount-suscripcion"
-        ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion / 2)
-        : clase.precio_individual / 2;
+        ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion * porcentajeSena / 100)
+        : clase.precio_individual * porcentajeSena / 100;
     const selectedMonto =
         paymentType === "full"
             ? precioActual
@@ -298,7 +302,7 @@ export default function ClaseDetailDialog({
             const monto = parseFloat(partialAmount);
             if (isNaN(monto) || monto < montoMinimoActual || monto >= precioActual) {
                 setAmountError(
-                    `El monto debe ser entre ${formatPrice(montoMinimoActual)} (50%) y ${formatPrice(precioActual-1)} (100%)`
+                    `El monto debe ser entre ${formatPrice(montoMinimoActual)} (${porcentajeSena}%) y ${formatPrice(precioActual-1)} (100%)`
                 );
                 return;
             }
@@ -571,6 +575,7 @@ export default function ClaseDetailDialog({
                                 inputId="individual-amount"
                                 precioActual={precioActual}
                                 montoMinimoActual={montoMinimoActual}
+                                porcentajeSena={porcentajeSena}
                                 paymentType={paymentType}
                                 partialAmount={partialAmount}
                                 amountError={amountError}
@@ -610,6 +615,7 @@ export default function ClaseDetailDialog({
                                 inputId="suscripcion-amount"
                                 precioActual={precioActual}
                                 montoMinimoActual={montoMinimoActual}
+                                porcentajeSena={porcentajeSena}
                                 paymentType={paymentType}
                                 partialAmount={partialAmount}
                                 amountError={amountError}

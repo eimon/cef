@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useActionState } from "react";
+import { useState, useEffect, useActionState } from "react";
 import { Loader2 } from "lucide-react";
 import { updateSenaMinima, SenaMinimaFormState } from "@/actions/config";
 import { useToast } from "@/context/ToastContext";
@@ -15,21 +15,25 @@ interface SenaMinimaCardProps {
 
 export default function SenaMinimaCard({ valorActual, onSuccess }: SenaMinimaCardProps) {
     const { showSuccess } = useToast();
+    const [porcentajeActual, setPorcentajeActual] = useState(parseFloat(valorActual) || 50);
+    const [inputValue, setInputValue] = useState("");
     const initialState: SenaMinimaFormState = {};
     const [state, formAction, isPending] = useActionState(updateSenaMinima, initialState);
 
     useEffect(() => {
-        if (state.success) {
-            showSuccess("Monto mínimo de seña actualizado correctamente");
+        if (state.success && state.nuevoValor !== undefined) {
+            setPorcentajeActual(state.nuevoValor);
+            setInputValue("");
+            showSuccess("Porcentaje mínimo de seña actualizado correctamente");
             onSuccess();
         }
-    }, [state.success, showSuccess, onSuccess]);
+    }, [state.success, state.nuevoValor, showSuccess, onSuccess]);
 
     return (
         <div className="glass rounded-xl p-6">
-            <h2 className="text-base font-semibold text-slate-800 mb-1">Monto mínimo de seña</h2>
+            <h2 className="text-base font-semibold text-slate-800 mb-1">Porcentaje mínimo de seña</h2>
             <p className="text-sm text-slate-400 mb-5">
-                Definí el importe mínimo requerido para reservas con pago parcial.
+                Definí el porcentaje mínimo del precio de la clase requerido para reservas con pago parcial. El sistema calculará el monto de seña según el precio de cada clase. Mínimo: 50%.
             </p>
 
             <form action={formAction} className="space-y-4">
@@ -40,34 +44,37 @@ export default function SenaMinimaCard({ valorActual, onSuccess }: SenaMinimaCar
                 )}
 
                 <div>
-                    <label className={labelCls}>Monto actual</label>
+                    <label className={labelCls}>Porcentaje actual</label>
                     <p className="text-sm text-slate-500 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
-                        ${new Intl.NumberFormat("es-AR").format(parseFloat(valorActual) || 0)}
+                        {porcentajeActual}%
                     </p>
                 </div>
 
                 <div>
-                    <label className={labelCls}>Nuevo monto</label>
+                    <label className={labelCls}>Nuevo porcentaje</label>
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">$</span>
                         <input
                             name="valor"
                             type="number"
-                            step="0.01"
+                            step="1"
                             required
-                            className={inputCls + " pl-7"}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => ["-", "+", "e", "E", "."].includes(e.key) && e.preventDefault()}
+                            className={inputCls + " pr-8"}
                         />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">%</span>
                     </div>
                 </div>
 
                 <div className="flex justify-end">
                     <button
                         type="submit"
-                        disabled={isPending}
+                        disabled={isPending || inputValue.trim() === ""}
                         className="px-4 py-2 bg-cef-primary hover:bg-cef-primary/80 text-white rounded-lg disabled:opacity-60 flex items-center text-sm font-medium transition-colors"
                     >
                         {isPending ? <Loader2 className="animate-spin mr-2" size={15} /> : null}
-                        Actualizar Monto
+                        Actualizar Porcentaje
                     </button>
                 </div>
             </form>

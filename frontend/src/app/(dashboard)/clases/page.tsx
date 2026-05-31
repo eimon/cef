@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getClasesSemana } from "@/actions/clases";
+import { getSenaMinima } from "@/actions/config";
 import ClasesGrid from "@/components/ClasesGrid";
 import WeekNavigation from "@/components/WeekNavigation";
 import AddClaseDialog from "@/components/AddClaseDialog";
@@ -31,7 +32,10 @@ export default async function ClasesPage({
     const userRole = await getUserRole();
     const isStaff = userRole === "admin" || userRole === "recepcion";
     if (!isStaff && monday < currentMonday) redirect("/clases");
-    const clases = await getClasesSemana(monday);
+    const [clases, senaMinima] = await Promise.all([
+        getClasesSemana(monday),
+        getSenaMinima(),
+    ]);
     const isPastWeek = monday < currentMonday;
     const clasesVisibles = isPastWeek && isStaff ? clases.filter((c) => c.instancia !== null) : clases;
 
@@ -48,7 +52,7 @@ export default async function ClasesPage({
                 </div>
             </div>
 
-            <ClasesGrid clases={clasesVisibles} userRole={userRole} />
+            <ClasesGrid clases={clasesVisibles} userRole={userRole} senaMinima={senaMinima} />
         </div>
     );
 }

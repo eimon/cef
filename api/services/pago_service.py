@@ -15,8 +15,17 @@ from models.pagos import Pago
 from models.usuario import Usuario
 from repositories.inscripcion_repository import InscripcionRepository
 from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.inscripcion import InscripcionIndividualCreate
 from services.inscripcion_service import InscripcionService
+
+
+async def _get_porcentaje_sena(db) -> float:
+    config = await ConfiguracionRepository(db).get_by_clave("sena_minima")
+    try:
+        return float(config.valor) if config else 50.0
+    except (ValueError, TypeError):
+        return 50.0
 
 
 class PagoService:
@@ -51,7 +60,8 @@ class PagoService:
             raise BadRequestException("No hay precio configurado para esta disciplina")
 
         precio = float(precio_disciplina.precio_individual)
-        monto_minimo = precio / 2
+        porcentaje = await _get_porcentaje_sena(self.db)
+        monto_minimo = precio * porcentaje / 100
 
         if monto < monto_minimo:
             raise BadRequestException(f"El monto mínimo es ${monto_minimo:.2f}")
