@@ -117,7 +117,7 @@ class SuscripcionService:
         )
 
     async def suscribirse(
-        self, current_user: Usuario, data: SuscripcionCreate
+        self, current_user: Usuario, data: SuscripcionCreate, mp_payment_id: str = "mock"
     ) -> SuscripcionResponse:
         clase_template_id = uuid.UUID(str(data.clase_template_id))
         template, fecha_inicio, fecha_fin, fechas_clases = await self._validar_elegibilidad(
@@ -162,6 +162,7 @@ class SuscripcionService:
             usuario_id=current_user.id,
             suscripcion_id=suscripcion.id,
             monto=data.monto,
+            mp_payment_id=mp_payment_id,
         )
 
         return SuscripcionResponse(

@@ -175,6 +175,7 @@ class SuscripcionRepository:
         usuario_id: uuid.UUID,
         suscripcion_id: uuid.UUID,
         monto: Decimal,
+        mp_payment_id: str = "mock",
     ) -> Pago:
         pago = Pago(
             usuario_id=usuario_id,
@@ -182,8 +183,8 @@ class SuscripcionRepository:
             monto=monto,
             fecha_pago=datetime.now(timezone.utc),
             estado=EstadoPago.PAGADO,
-            mp_payment_id="mock",
-            descripcion="Pago suscripción mock",
+            mp_payment_id=mp_payment_id,
+            descripcion="Pago suscripción" if mp_payment_id != "mock" else "Pago suscripción mock",
             activo=True,
         )
         self.db.add(pago)

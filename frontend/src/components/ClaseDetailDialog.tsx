@@ -5,10 +5,9 @@ import { createPortal } from "react-dom";
 import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2 } from "lucide-react";
 import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
 import { checkElegibilidadIndividual } from "@/actions/inscripciones";
-import { checkElegibilidadSuscripcion, suscribirse } from "@/actions/suscripciones";
+import { checkElegibilidadSuscripcion } from "@/actions/suscripciones";
 import { getAsistenciasClase } from "@/actions/asistencias";
-import { crearPreferenciaMP } from "@/actions/pagos";
-import MockPaymentModal from "@/components/MockPaymentModal";
+import { crearPreferenciaMP, crearPreferenciaSuscripcionMP } from "@/actions/pagos";
 
 const DIA_LABELS: Record<string, string> = {
     lunes: "Lunes",
@@ -213,7 +212,6 @@ export default function ClaseDetailDialog({
     const [step, setStep] = useState<Step>("detail");
     const [paymentType, setPaymentType] = useState<"full" | "partial">("full");
     const [partialAmount, setPartialAmount] = useState("");
-    const [showPayment, setShowPayment] = useState(false);
     const [amountError, setAmountError] = useState("");
 
     const [checkLoading, setCheckLoading] = useState(false);
@@ -253,7 +251,6 @@ export default function ClaseDetailDialog({
         setCheckError("");
         setMpLoading(false);
         setMpError("");
-        setShowPayment(false);
         setSuscripcionData(null);
         setSuscripcionCheckLoading(false);
         setSuscripcionCheckError("");
@@ -304,17 +301,14 @@ export default function ClaseDetailDialog({
             }
         }
         setAmountError("");
-
-        if (step === "amount-suscripcion") {
-            setShowPayment(true);
-            return;
-        }
-
-        // Individual: redirect to MercadoPago checkout
         if (!clase) return;
         setMpLoading(true);
         setMpError("");
-        const result = await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
+
+        const result = step === "amount-suscripcion"
+            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto)
+            : await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
+
         if (result.error) {
             setMpLoading(false);
             setMpError(result.error);
@@ -323,16 +317,6 @@ export default function ClaseDetailDialog({
         if (result.init_point) {
             window.location.href = result.init_point;
         }
-    }
-
-    async function handlePay() {
-        if (!clase) return { error: "Clase no disponible" };
-        return await suscribirse(clase.id, selectedMonto);
-    }
-
-    function handlePaymentClose() {
-        setShowPayment(false);
-        handleClose();
     }
 
     async function handleVerAsistencias() {
@@ -691,13 +675,6 @@ export default function ClaseDetailDialog({
                 </div>
             </div>
 
-            {/* Mock Payment Modal (above everything) */}
-            <MockPaymentModal
-                isOpen={showPayment}
-                monto={selectedMonto}
-                onClose={handlePaymentClose}
-                onPay={handlePay}
-            />
         </>,
         document.body
     );

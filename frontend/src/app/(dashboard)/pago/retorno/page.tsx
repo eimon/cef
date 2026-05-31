@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
-import { confirmarPagoMP, confirmarDeudaMP } from "@/actions/pagos";
+import { confirmarPagoMP, confirmarDeudaMP, confirmarSuscripcionMP } from "@/actions/pagos";
 
 export default async function PagoRetornoPage({
     searchParams,
@@ -17,12 +17,13 @@ export default async function PagoRetornoPage({
     const status = params.status || params.collection_status;
     const rawPaymentId = params.payment_id || params.collection_id;
     const paymentId = rawPaymentId && rawPaymentId !== "null" ? rawPaymentId : undefined;
-    const esDeuda = params.tipo === "deuda";
+    const tipo = params.tipo;
 
     if (status === "approved" && paymentId) {
-        const result = esDeuda
-            ? await confirmarDeudaMP(paymentId)
-            : await confirmarPagoMP(paymentId);
+        const result =
+            tipo === "deuda"        ? await confirmarDeudaMP(paymentId) :
+            tipo === "suscripcion"  ? await confirmarSuscripcionMP(paymentId) :
+                                     await confirmarPagoMP(paymentId);
 
         if (result.error) {
             return (
@@ -36,11 +37,18 @@ export default async function PagoRetornoPage({
             );
         }
 
+        const esSuscripcion = tipo === "suscripcion";
         return (
             <RetornoLayout
                 icon={<CheckCircle size={40} className="text-cef-success" />}
-                title="¡Pago exitoso!"
-                message="Tu inscripción fue confirmada. Ya podés ver tu clase en Mis Clases."
+                title={esSuscripcion ? "¡Suscripción confirmada!" : "¡Pago exitoso!"}
+                message={
+                    esSuscripcion
+                        ? "Tu suscripción fue activada. Ya podés verla en Mis Clases."
+                        : tipo === "deuda"
+                        ? "Tu deuda fue saldada. Ya podés verlo en Mis Clases."
+                        : "Tu inscripción fue confirmada. Ya podés ver tu clase en Mis Clases."
+                }
                 linkHref="/mis-clases"
                 linkLabel="Ver mis clases"
             />

@@ -48,3 +48,22 @@ async def confirmar_deuda_mp(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await PagoService(db).confirmar_deuda_mp(current_user, payment_id)
+
+
+@router.post("/mp/preferencia-suscripcion")
+async def crear_preferencia_suscripcion_mp(
+    clase_template_id: UUID = Query(...),
+    monto: float = Query(..., gt=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).crear_preferencia_suscripcion_mp(current_user, clase_template_id, monto)
+
+
+@router.post("/mp/confirmar-suscripcion")
+async def confirmar_suscripcion_mp(
+    payment_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).confirmar_suscripcion_mp(current_user, payment_id)

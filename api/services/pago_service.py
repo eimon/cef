@@ -16,7 +16,9 @@ from models.usuario import Usuario
 from repositories.inscripcion_repository import InscripcionRepository
 from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
 from schemas.inscripcion import InscripcionIndividualCreate
+from schemas.suscripcion import SuscripcionCreate
 from services.inscripcion_service import InscripcionService
+from services.suscripcion_service import SuscripcionService
 
 
 class PagoService:
@@ -301,3 +303,86 @@ class PagoService:
         await self.db.flush()
 
         return {"status": "approved", "pago_id": str(pago.id)}
+
+    async def crear_preferencia_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        clase_template_id: UUID,
+        monto: float,
+    ) -> dict:
+        await SuscripcionService(self.db).check_elegibilidad(current_user, clase_template_id)
+
+        repo = InscripcionRepository(self.db)
+        template = await repo.get_template(clase_template_id)
+        if not template:
+            raise NotFoundException("Clase no encontrada")
+
+        precio_disc = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        if not precio_disc:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+
+        precio = float(precio_disc.precio_suscripcion)
+        if round(monto, 2) != round(precio, 2):
+            raise BadRequestException(f"El monto debe ser el precio completo: ${precio:.2f}")
+
+        dia = template.dia_semana.value.capitalize()
+        pref_data = self._make_preference(
+            title=f"Suscripción — {template.nombre} {dia}",
+            monto=round(monto, 2),
+            back_url_suffix="?tipo=suscripcion",
+            metadata={"clase_template_id": str(clase_template_id), "usuario_id": str(current_user.id), "tipo": "suscripcion"},
+            external_reference=f"suscripcion|{clase_template_id}|{current_user.id}",
+        )
+
+        response = self.sdk.preference().create(pref_data)
+        if response["status"] not in (200, 201):
+            raise BadRequestException("Error al conectar con MercadoPago")
+
+        pref = response["response"]
+        return {
+            "init_point": self._init_point_from_response(pref),
+            "preference_id": pref["id"],
+        }
+
+    async def confirmar_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+    ) -> dict:
+        payment_response = self.sdk.payment().get(payment_id)
+        if payment_response["status"] != 200:
+            raise NotFoundException("Pago no encontrado en MercadoPago")
+
+        payment = payment_response["response"]
+        if payment.get("status") != "approved":
+            return {"status": payment.get("status")}
+
+        existing = await self.db.execute(
+            select(Pago).where(Pago.mp_payment_id == str(payment_id))
+        )
+        if existing.scalars().first():
+            return {"status": "approved", "already_processed": True}
+
+        metadata = payment.get("metadata", {})
+        external_ref = payment.get("external_reference", "")
+        try:
+            if metadata.get("clase_template_id"):
+                clase_template_id = UUID(str(metadata["clase_template_id"]))
+                usuario_id = str(metadata["usuario_id"])
+            else:
+                parts = external_ref.split("|")
+                clase_template_id = UUID(parts[1])
+                usuario_id = parts[2]
+        except (KeyError, ValueError, IndexError):
+            raise BadRequestException("Metadatos del pago inválidos")
+
+        if str(current_user.id) != usuario_id:
+            raise BadRequestException("Este pago no corresponde a tu usuario")
+
+        monto = Decimal(str(payment["transaction_amount"]))
+        data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto)
+        result = await SuscripcionService(self.db).suscribirse(
+            current_user, data, mp_payment_id=str(payment_id)
+        )
+
+        return {"status": "approved", **result.model_dump()}
