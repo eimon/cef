@@ -19,6 +19,7 @@ export default async function ClientesPage() {
             allowedRoles={editableRoles}
             emptyMessage="No hay clientes registrados."
             filteredEmptyMessage="No se encontraron clientes con los filtros ingresados"
+            showAddButton={false}
         />
     );
 }

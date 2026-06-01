@@ -19,7 +19,7 @@ export default async function PagoRetornoPage({
     const paymentId = rawPaymentId && rawPaymentId !== "null" ? rawPaymentId : undefined;
     const tipo = params.tipo;
 
-    if (status === "approved" && paymentId) {
+    if ((status === "approved" || status === "pending") && paymentId) {
         const result =
             tipo === "deuda"        ? await confirmarDeudaMP(paymentId) :
             tipo === "suscripcion"  ? await confirmarSuscripcionMP(paymentId) :

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { updateUser, UserFormState } from "@/actions/users";
 import { X, Loader2 } from "lucide-react";
 import { useActionState } from "react";
@@ -28,9 +28,11 @@ const roleLabels: Record<string, string> = {
 export default function EditUserDialog({ user, isOpen, onClose, allowedRoles, onSuccess }: EditUserDialogProps) {
     const { showSuccess } = useToast();
     const { refresh } = useRouter();
+    const [selectedRole, setSelectedRole] = useState<string>(user.role);
 
     const updateUserWithId = updateUser.bind(null, user.id);
     const [state, formAction, isPending] = useActionState(updateUserWithId, {} as UserFormState);
+    const requiresDni = selectedRole !== UserRole.CLIENTE;
 
     useEffect(() => {
         if (!state.success) return;
@@ -87,7 +89,13 @@ export default function EditUserDialog({ user, isOpen, onClose, allowedRoles, on
                     {allowedRoles.length > 0 && (
                         <div>
                             <label htmlFor="edit-user-role" className={labelCls}>Rol</label>
-                            <select id="edit-user-role" name="role" defaultValue={user.role} className={inputCls}>
+                            <select
+                                id="edit-user-role"
+                                name="role"
+                                defaultValue={user.role}
+                                className={inputCls}
+                                onChange={(e) => setSelectedRole(e.target.value)}
+                            >
                                 {allowedRoles.map((role) => (
                                     <option key={role} value={role}>
                                         {roleLabels[role] ?? role}
@@ -96,6 +104,22 @@ export default function EditUserDialog({ user, isOpen, onClose, allowedRoles, on
                             </select>
                         </div>
                     )}
+
+                    <div>
+                        <label className={labelCls}>
+                            DNI {requiresDni
+                                ? null
+                                : <span className="text-slate-300 normal-case tracking-normal">(opcional)</span>
+                            }
+                        </label>
+                        <input
+                            name="dni"
+                            type="text"
+                            required={requiresDni}
+                            defaultValue={user.dni ?? ""}
+                            className={inputCls}
+                        />
+                    </div>
 
                     <div>
                         <label className={labelCls}>Contraseña</label>

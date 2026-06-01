@@ -13,13 +13,30 @@ const createUserSchema = z.object({
     dni: z.string().optional(),
     role: z.nativeEnum(UserRole),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+}).superRefine((data, ctx) => {
+    if (data.role !== UserRole.CLIENTE && !data.dni?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "El DNI es obligatorio para usuarios no clientes",
+            path: ["dni"],
+        });
+    }
 });
 
 const updateUserSchema = z.object({
     nombre: z.string().optional(),
     apellido: z.string().optional(),
+    dni: z.string().optional(),
     role: z.nativeEnum(UserRole).optional(),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional().or(z.literal("")),
+}).superRefine((data, ctx) => {
+    if (data.role && data.role !== UserRole.CLIENTE && !data.dni?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "El DNI es obligatorio para usuarios no clientes",
+            path: ["dni"],
+        });
+    }
 });
 
 export type UserFormState = {
@@ -100,6 +117,7 @@ export async function updateUser(
     const validatedFields = updateUserSchema.safeParse({
         nombre: formData.get("nombre") || undefined,
         apellido: formData.get("apellido") || undefined,
+        dni: formData.get("dni") || undefined,
         role: formData.get("role") || undefined,
         password: rawPassword || undefined,
     });

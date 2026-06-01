@@ -14,6 +14,7 @@ interface UsersTableProps {
     allowedRoles: UserRole[];
     emptyMessage?: string;
     onSuccess?: () => void;
+    currentUserId?: string;
 }
 
 const roleBadgeClass: Record<string, string> = {
@@ -34,10 +35,12 @@ function displayValue(value: string | null | undefined): string {
 
 function UserCardMenu({
     isDeleting,
+    editDisabled,
     onEdit,
     onDelete,
 }: {
     isDeleting: boolean;
+    editDisabled?: boolean;
     onEdit: () => void;
     onDelete: () => void;
 }) {
@@ -74,7 +77,7 @@ function UserCardMenu({
 
             {open && (
                 <div className="absolute right-0 top-8 z-30 w-40 glass-modal rounded-xl overflow-hidden py-1">
-                    {item("Editar", onEdit, "text-cef-primary")}
+                    {item("Editar", onEdit, "text-cef-primary", editDisabled)}
                     {item("Eliminar", onDelete, "text-cef-danger", isDeleting)}
                 </div>
             )}
@@ -82,7 +85,7 @@ function UserCardMenu({
     );
 }
 
-export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess }: UsersTableProps) {
+export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess, currentUserId }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError, showSuccess } = useToast();
@@ -135,6 +138,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                             {allowedRoles.includes(user.role as UserRole) && (
                                 <UserCardMenu
                                     isDeleting={isDeleting === user.id}
+                                    editDisabled={currentUserId === user.id}
                                     onEdit={() => setEditingUser(user)}
                                     onDelete={() => handleDelete(user)}
                                 />
@@ -229,7 +233,8 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                             <div className="flex items-center justify-end space-x-1">
                                                 <button
                                                     onClick={() => setEditingUser(user)}
-                                                    className="p-1.5 text-cef-primary/70 hover:bg-cef-primary/10 hover:text-cef-primary rounded-lg transition-colors"
+                                                    disabled={currentUserId === user.id}
+                                                    className="p-1.5 text-cef-primary/70 hover:bg-cef-primary/10 hover:text-cef-primary rounded-lg transition-colors disabled:opacity-40 disabled:pointer-events-none"
                                                     title="Editar"
                                                 >
                                                     <Pencil size={15} />
