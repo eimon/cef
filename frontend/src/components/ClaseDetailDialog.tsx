@@ -245,10 +245,19 @@ export default function ClaseDetailDialog({
     const montoMinimoActual = step === "amount-suscripcion"
         ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion * porcentajeSena / 100)
         : clase.precio_individual * porcentajeSena / 100;
+    const partialAmountValue = parseFloat(partialAmount);
     const selectedMonto =
         paymentType === "full"
             ? precioActual
-            : parseFloat(partialAmount) || 0;
+            : Number.isFinite(partialAmountValue)
+                ? partialAmountValue
+                : 0;
+    const isPartialAmountValid =
+        paymentType !== "partial" ||
+        (Number.isFinite(partialAmountValue) &&
+            partialAmountValue >= montoMinimoActual &&
+            partialAmountValue < precioActual);
+    const canContinuePayment = !mpLoading && isPartialAmountValid;
 
     function handleClose() {
         setStep("detail");
@@ -299,14 +308,11 @@ export default function ClaseDetailDialog({
     }
 
     async function handleContinuarPago() {
-        if (paymentType === "partial") {
-            const monto = parseFloat(partialAmount);
-            if (isNaN(monto) || monto < montoMinimoActual || monto >= precioActual) {
-                setAmountError(
-                    `El monto debe ser entre ${formatPrice(montoMinimoActual)} (${porcentajeSena}%) y ${formatPrice(precioActual-1)} (100%)`
-                );
-                return;
-            }
+        if (!isPartialAmountValid) {
+            setAmountError(
+                `El monto debe ser entre ${formatPrice(montoMinimoActual)} (${porcentajeSena}%) y ${formatPrice(precioActual-1)} (100%)`
+            );
+            return;
         }
         setAmountError("");
         if (!clase) return;
@@ -709,8 +715,8 @@ export default function ClaseDetailDialog({
                                 <button
                                     type="button"
                                     onClick={handleContinuarPago}
-                                    disabled={mpLoading}
-                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                                    disabled={!canContinuePayment}
+                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                                 >
                                     {mpLoading ? (
                                         <>
