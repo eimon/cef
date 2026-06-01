@@ -1,6 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models.usuario import Usuario
+from models.asistencia import Asistencia
+from models.suscripciones import Suscripcion
 from schemas.usuario import UsuarioCreate, UsuarioUpdate, PublicSignupRequest
 from core.enums import UserRole
 from core.security import get_password_hash
@@ -62,6 +64,22 @@ class UserRepository:
             return None
         await self.db.delete(usuario)
         return usuario
+
+    async def has_active_enrollment(self, usuario_id: uuid.UUID) -> bool:
+        result = await self.db.execute(
+            select(Asistencia)
+            .where(Asistencia.usuario_id == usuario_id, Asistencia.cancelo == False)
+            .limit(1)
+        )
+        if result.scalars().first():
+            return True
+
+        result = await self.db.execute(
+            select(Suscripcion)
+            .where(Suscripcion.usuario_id == usuario_id, Suscripcion.activo == True)
+            .limit(1)
+        )
+        return result.scalars().first() is not None
 
     async def create(self, data: UsuarioCreate, hashed_password: str) -> Usuario:
         usuario = Usuario(
