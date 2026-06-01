@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
 import type { LucideIcon } from "lucide-react";
 
-type NavChild = { name: string; href: string };
+type NavChild = { name: string; href: string; adminOnly?: boolean };
 
 type NavItem = {
     name: string;
@@ -31,7 +31,7 @@ const navigation: NavItem[] = [
         clientOnly: false,
         staffOnly: true,
         children: [
-            { name: "Personal", href: "/users/personal" },
+            { name: "Personal", href: "/users/personal", adminOnly: true },
             { name: "Clientes", href: "/users/clientes" },
         ],
     },
@@ -107,6 +107,26 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
 
                         {visibleNavigation.map((item) => {
                             if (item.children) {
+                                // If the current user is a recepcionista, make the group act as a direct link
+                                if (userRole === "recepcion") {
+                                    const firstVisibleChild = item.children.find(c => !c.adminOnly);
+                                    const targetHref = firstVisibleChild?.href ?? item.children[0].href;
+                                    const isActive = item.children.some(c => pathname.startsWith(c.href));
+                                    return (
+                                        <Link
+                                            key={item.name}
+                                            href={targetHref!}
+                                            onClick={close}
+                                            className={`group w-full flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${isActive
+                                                ? "bg-cef-primary/10 text-cef-primary"
+                                                : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                            }`}
+                                        >
+                                            <item.icon className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${isActive ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                            {item.name}
+                                        </Link>
+                                    );
+                                }
                                 const isGroupActive = item.children.some(c => pathname.startsWith(c.href));
                                 const isGroupOpen = openGroup === item.name;
                                 return (
@@ -125,7 +145,9 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
                                         </button>
                                         {isGroupOpen && (
                                             <div className="mt-0.5 ml-9 space-y-0.5">
-                                                {item.children.map((child) => {
+                                                {item.children
+                                                    .filter(child => !child.adminOnly || userRole === "admin")
+                                                    .map((child) => {
                                                     const isChildActive = pathname.startsWith(child.href);
                                                     return (
                                                         <Link

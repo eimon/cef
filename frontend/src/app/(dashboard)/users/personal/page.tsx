@@ -1,11 +1,18 @@
 import UsersManagementPage from "@/components/UsersManagementPage";
 import { UserRole } from "@/types/api";
+import { getUserRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 const STAFF_ROLES = [UserRole.ADMIN, UserRole.RECEPCION];
 
 export const dynamic = "force-dynamic";
 
-export default function PersonalPage() {
+export default async function PersonalPage() {
+    const userRole = await getUserRole();
+    if (userRole !== "admin") {
+        redirect("/clases");
+    }
+
     return (
         <UsersManagementPage
             title="Personal"

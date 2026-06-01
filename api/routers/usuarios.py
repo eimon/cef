@@ -6,7 +6,7 @@ from uuid import UUID
 from schemas.usuario import UsuarioUpdate, UsuarioResponse
 from services.user_service import UserService
 from core.database import get_db
-from dependencies.auth import has_role
+from dependencies.auth import has_role, get_current_user
 from models.usuario import Usuario
 from core.roles import Role
 
@@ -21,18 +21,40 @@ async def list_users(
     nombre: str | None = Query(None, min_length=1),
     apellido: str | None = Query(None, min_length=1),
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(has_role(Role.ROLE_USER_LIST)),
+    current_user: Usuario = Depends(get_current_user),
 ):
-    return await UserService(db).list(skip, limit, dni, nombre, apellido)
+    # Require permission based on user role
+    if current_user.role.value == "admin":
+        # Admin requires ROLE_USER_LIST
+        if Role.ROLE_USER_LIST not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    else:
+        # Non-admin requires ROLE_CLIENT_LIST
+        if Role.ROLE_CLIENT_LIST not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    
+    return await UserService(db).list(skip, limit, dni, nombre, apellido, current_user)
 
 
 @router.get("/{usuario_id}", response_model=UsuarioResponse)
 async def get_user(
     usuario_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(has_role(Role.ROLE_USER_LIST)),
+    current_user: Usuario = Depends(get_current_user),
 ):
-    return await UserService(db).get(usuario_id)
+    # Same permission logic as list
+    if current_user.role.value == "admin":
+        if Role.ROLE_USER_LIST not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    else:
+        if Role.ROLE_CLIENT_LIST not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    
+    return await UserService(db).get(usuario_id, current_user)
 
 
 @router.put("/{usuario_id}", response_model=UsuarioResponse)
@@ -40,15 +62,35 @@ async def update_user(
     usuario_id: UUID,
     data: UsuarioUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(has_role(Role.ROLE_USER_UPDATE)),
+    current_user: Usuario = Depends(get_current_user),
 ):
-    return await UserService(db).update(usuario_id, data)
+    # Require permission based on user role
+    if current_user.role.value == "admin":
+        if Role.ROLE_USER_UPDATE not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    else:
+        if Role.ROLE_CLIENT_UPDATE not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    
+    return await UserService(db).update(usuario_id, data, current_user)
 
 
 @router.delete("/{usuario_id}", status_code=204)
 async def delete_user(
     usuario_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(has_role(Role.ROLE_USER_DELETE)),
+    current_user: Usuario = Depends(get_current_user),
 ):
-    await UserService(db).delete(usuario_id, current_user.id)
+    # Require permission based on user role
+    if current_user.role.value == "admin":
+        if Role.ROLE_USER_DELETE not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    else:
+        if Role.ROLE_CLIENT_DELETE not in current_user.permissions:
+            from exceptions.general import ForbiddenException
+            raise ForbiddenException("No autorizado para esta acción")
+    
+    await UserService(db).delete(usuario_id, current_user.id, current_user)

@@ -13,6 +13,8 @@ export default async function DashboardHome() {
 
     const firstName = user?.nombre || "";
 
+    const usersHref = user?.role === UserRole.RECEPCION ? "/users/clientes" : "/users/personal";
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
@@ -32,7 +34,7 @@ export default async function DashboardHome() {
 
             {/* Simple Dashboard Content */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Link href="/users/personal" className="glass rounded-2xl p-6 hover:shadow-md hover:border-slate-300 transition-all group">
+                <Link href={usersHref} className="glass rounded-2xl p-6 hover:shadow-md hover:border-slate-300 transition-all group">
                     <div className="w-12 h-12 rounded-xl bg-cef-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                         <Users className="text-cef-primary" size={24} />
                     </div>
