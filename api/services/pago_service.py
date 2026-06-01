@@ -123,7 +123,7 @@ class PagoService:
         payment = payment_response["response"]
         status = payment.get("status")
 
-        if status != "approved":
+        if status not in ("approved", "pending"):
             return {"status": status}
 
         existing = await self.db.execute(
@@ -265,7 +265,7 @@ class PagoService:
             raise NotFoundException("Pago no encontrado en MercadoPago")
 
         payment = payment_response["response"]
-        if payment.get("status") != "approved":
+        if payment.get("status") not in ("approved", "pending"):
             return {"status": payment.get("status")}
 
         existing = await self.db.execute(
@@ -364,7 +364,7 @@ class PagoService:
             raise NotFoundException("Pago no encontrado en MercadoPago")
 
         payment = payment_response["response"]
-        if payment.get("status") != "approved":
+        if payment.get("status") not in ("approved", "pending"):
             return {"status": payment.get("status")}
 
         existing = await self.db.execute(

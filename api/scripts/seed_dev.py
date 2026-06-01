@@ -43,6 +43,7 @@ async def _seed_admin(session) -> None:
     session.add(Usuario(
         email="admin@cef.ar",
         telefono="1100000001",
+        dni="11111111",
         hashed_password=get_password_hash("admin"),
         nombre="Administrador",
         role=UserRole.ADMIN,

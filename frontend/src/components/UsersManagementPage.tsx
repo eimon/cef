@@ -14,6 +14,8 @@ interface UsersManagementPageProps {
     emptyMessage: string;
     filteredEmptyMessage: string;
     showDniFilter?: boolean;
+    showAddButton?: boolean;
+    currentUserId?: string;
 }
 
 export default function UsersManagementPage({
@@ -24,6 +26,8 @@ export default function UsersManagementPage({
     emptyMessage,
     filteredEmptyMessage,
     showDniFilter = true,
+    showAddButton = true,
+    currentUserId,
 }: UsersManagementPageProps) {
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +92,7 @@ export default function UsersManagementPage({
                     <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
                     <p className="text-sm text-slate-400 mt-1">{subtitle}</p>
                 </div>
-                {allowedRoles.length > 0 && (
+                {showAddButton && allowedRoles.length > 0 && (
                     <AddUserDialog roleOptions={visibleRoles} onSuccess={() => refresh(filters)} />
                 )}
             </div>
@@ -155,6 +159,7 @@ export default function UsersManagementPage({
                     allowedRoles={allowedRoles}
                     emptyMessage={hasActiveFilter ? filteredEmptyMessage : emptyMessage}
                     onSuccess={() => refresh(filters)}
+                    currentUserId={currentUserId}
                 />
             )}
         </div>

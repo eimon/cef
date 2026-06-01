@@ -6,9 +6,13 @@ from exceptions.general import BadRequestException
 logger = logging.getLogger(__name__)
 
 
+def _https_url(base: str) -> str:
+    return base.rstrip("/").replace("http://", "https://", 1)
+
+
 class EmailService:
     async def send_verification_email(self, to_email: str, token: str) -> None:
-        verification_url = f"{settings.FRONTEND_PUBLIC_URL.rstrip('/')}/auth/verify-email?token={token}"
+        verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/verify-email?token={token}"
 
         if not settings.RESEND_API_KEY:
             logger.warning("RESEND_API_KEY no configurada. Link de verificacion: %s", verification_url)
@@ -48,7 +52,7 @@ class EmailService:
             raise BadRequestException("No pudimos enviar el email de confirmacion") from exc
 
     async def send_email_change_verification(self, to_email: str, token: str) -> None:
-        verification_url = f"{settings.FRONTEND_PUBLIC_URL.rstrip('/')}/auth/confirm-email?token={token}"
+        verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/confirm-email?token={token}"
 
         if not settings.RESEND_API_KEY:
             logger.warning("RESEND_API_KEY no configurada. Link de confirmación: %s", verification_url)
@@ -119,7 +123,7 @@ class EmailService:
                 logger.exception("Error enviando notificación de cambio de clase a %s", email)
 
     async def send_password_reset(self, to_email: str, token: str) -> None:
-        verification_url = f"{settings.FRONTEND_PUBLIC_URL.rstrip('/')}/auth/reset-password?token={token}"
+        verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/reset-password?token={token}"
 
         if not settings.RESEND_API_KEY:
             logger.warning("RESEND_API_KEY no configurada. Link de reseteo: %s", verification_url)
