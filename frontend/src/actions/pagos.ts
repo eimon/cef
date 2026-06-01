@@ -65,7 +65,7 @@ export async function crearPreferenciaDeudaMP(asistenciaId: string): Promise<Pre
         });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
-            return { error: error.detail || "Error al iniciar el pago de deuda" };
+            return { error: error.detail || "Error al iniciar el pago pendiente" };
         }
         return res.json();
     } catch {
@@ -81,7 +81,7 @@ export async function confirmarDeudaMP(paymentId: string): Promise<ConfirmarPago
         });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
-            return { error: error.detail || "Error al confirmar el pago de deuda" };
+            return { error: error.detail || "Error al confirmar el pago pendiente" };
         }
         return res.json();
     } catch {
