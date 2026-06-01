@@ -16,6 +16,7 @@ class MiClaseIndividualResponse(BaseModel):
     sala_nombre: Optional[str] = None
     monto_pagado: Optional[float] = None
     estado_pago: Optional[EstadoPago] = None
+    precio_clase: Optional[float] = None
     asistio: bool
     cancelo: bool
 

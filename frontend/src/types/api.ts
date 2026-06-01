@@ -165,6 +165,7 @@ export interface MiClaseIndividual {
     sala_nombre: string | null;
     monto_pagado: number | null;
     estado_pago: EstadoPago | null;
+    precio_clase: number | null;
     asistio: boolean;
     cancelo: boolean;
 }
@@ -243,4 +244,6 @@ export interface ClaseSemana {
     fecha_en_semana: string;
     cupo_disponible: number;
     instancia: InstanciaSemana | null;
+    inscrito: boolean;
+    suscrito: boolean;
 }

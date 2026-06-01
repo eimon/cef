@@ -1,7 +1,7 @@
 from models.usuario import Usuario
 from schemas.usuario import UsuarioUpdate
 from repositories.user_repository import UserRepository
-from exceptions.general import NotFoundException, BadRequestException
+from exceptions.general import NotFoundException, BadRequestException, ConflictException
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
@@ -39,6 +39,10 @@ class UserService:
     async def delete(self, usuario_id: uuid.UUID, current_usuario_id: uuid.UUID) -> Usuario:
         if usuario_id == current_usuario_id:
             raise BadRequestException("No podés eliminar tu propio usuario")
+
+        if await self.repo.has_active_enrollment(usuario_id):
+            raise ConflictException("No se puede eliminar el usuario porque está inscripto a una clase")
+
         usuario = await self.repo.delete(usuario_id)
         if not usuario:
             raise NotFoundException("Usuario no encontrado")

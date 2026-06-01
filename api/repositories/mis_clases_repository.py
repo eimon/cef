@@ -2,13 +2,14 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
+from models.precio_disciplina import PrecioDisciplina
 from models.suscripciones import Suscripcion
 from core.enums import TipoInscripcion
 
@@ -20,7 +21,30 @@ class MisClasesRepository:
     async def get_individuales(self, usuario_id: uuid.UUID) -> list:
         from models.profesor import Profesor
         from models.sala import Sala
-        from sqlalchemy import func
+
+        monto_pagado_sq = (
+            select(func.coalesce(func.sum(Pago.monto), 0))
+            .where(
+                Pago.usuario_id == usuario_id,
+                Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                Pago.activo == True,
+            )
+            .correlate(Asistencia)
+            .scalar_subquery()
+        )
+
+        estado_pago_sq = (
+            select(Pago.estado)
+            .where(
+                Pago.usuario_id == usuario_id,
+                Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                Pago.activo == True,
+            )
+            .correlate(Asistencia)
+            .order_by(Pago.created_at.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
 
         stmt = (
             select(
@@ -34,21 +58,15 @@ class MisClasesRepository:
                 ClaseInstancia.fecha,
                 (Profesor.nombre + " " + Profesor.apellido).label("profesor_nombre"),
                 Sala.nombre.label("sala_nombre"),
-                Pago.monto.label("monto_pagado"),
-                Pago.estado.label("estado_pago"),
+                monto_pagado_sq.label("monto_pagado"),
+                estado_pago_sq.label("estado_pago"),
+                PrecioDisciplina.precio_individual.label("precio_clase"),
             )
             .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
             .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
             .outerjoin(Profesor, ClaseTemplate.profesor_id == Profesor.id)
             .outerjoin(Sala, ClaseTemplate.sala_id == Sala.id)
-            .outerjoin(
-                Pago,
-                and_(
-                    Pago.usuario_id == usuario_id,
-                    Pago.clase_instancia_id == Asistencia.clase_instancia_id,
-                    Pago.activo == True,
-                ),
-            )
+            .outerjoin(PrecioDisciplina, PrecioDisciplina.disciplina == ClaseTemplate.disciplina)
             .where(
                 Asistencia.usuario_id == usuario_id,
                 Asistencia.tipo == TipoInscripcion.INDIVIDUAL,

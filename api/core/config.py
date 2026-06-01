@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 24
 
+    # MercadoPago
+    MP_ACCESS_TOKEN: Optional[str] = None
+    MP_PUBLIC_KEY: Optional[str] = None
+    MP_NOTIFICATION_URL: Optional[str] = None
+
     class Config:
         case_sensitive = True
 

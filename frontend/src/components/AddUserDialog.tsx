@@ -26,7 +26,7 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
     const [isOpen, setIsOpen] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const handledSuccessRef = useRef(false);
+    const submitRef = useRef(false);
     const { showSuccess } = useToast();
     const initialState: UserFormState = { error: "", success: false };
 
@@ -41,8 +41,8 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
     }, []);
 
     useEffect(() => {
-        if (!state.success || !isOpen || handledSuccessRef.current) return;
-        handledSuccessRef.current = true;
+        if (!state.success || !isOpen || !submitRef.current) return;
+        submitRef.current = false;
         showSuccess("Usuario agregado correctamente");
         closeDialog();
         onSuccess?.();
@@ -73,7 +73,7 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
 
                         <form
                             action={formAction}
-                            onSubmit={() => { handledSuccessRef.current = false; }}
+                            onSubmit={() => { submitRef.current = true; }}
                             className="p-6 space-y-4"
                         >
                             {state?.error && (

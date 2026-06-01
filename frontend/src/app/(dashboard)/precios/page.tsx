@@ -36,7 +36,7 @@ export default function PreciosPage() {
 
     const tabs: { id: Tab; label: string }[] = [
         { id: "precios", label: "Configuración de precios" },
-        { id: "sena", label: "Actualizar el monto mínimo de seña" },
+        { id: "sena", label: "Actualizar el porcentaje mínimo de seña" },
     ];
 
     return (

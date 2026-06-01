@@ -81,7 +81,7 @@ function UserCardMenu({
 export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
     const { confirm } = useConfirm();
     const { refresh } = useRouter();
 
@@ -93,6 +93,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
         setIsDeleting(null);
 
         if (result.error) { showError(result.error); return; }
+        showSuccess("Usuario eliminado correctamente");
         onSuccess?.();
         refresh();
     };

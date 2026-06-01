@@ -142,7 +142,12 @@ export async function deleteUser(userId: string): Promise<{ success?: boolean; e
 
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
-            return { error: errorData.detail || "Failed to delete user" };
+            return {
+                error:
+                    errorData.detail ||
+                    errorData.message ||
+                    "Failed to delete user",
+            };
         }
     } catch (error) {
         console.error("Delete User Error:", error);

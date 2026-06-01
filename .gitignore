@@ -42,6 +42,9 @@ postgres_data/
 CLAUDE.md
 .claude
 
+# SSL certificates (generated locally with mkcert — each dev generates their own)
+frontend/certs/*.pem
+
 # Node.js
 node_modules/
 npm-debug.log*

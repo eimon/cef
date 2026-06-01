@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar } from "lucide-react";
+import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2, CheckCircle2 } from "lucide-react";
 import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
-import { checkElegibilidadIndividual, inscribirseIndividual } from "@/actions/inscripciones";
-import { checkElegibilidadSuscripcion, suscribirse } from "@/actions/suscripciones";
+import { checkElegibilidadIndividual } from "@/actions/inscripciones";
+import { checkElegibilidadSuscripcion } from "@/actions/suscripciones";
 import { getAsistenciasClase } from "@/actions/asistencias";
-import MockPaymentModal from "@/components/MockPaymentModal";
+import { crearPreferenciaMP, crearPreferenciaSuscripcionMP } from "@/actions/pagos";
 
 const DIA_LABELS: Record<string, string> = {
     lunes: "Lunes",
@@ -53,6 +53,12 @@ function hasClaseEmpezado(fechaStr: string, horaInicioStr: string): boolean {
     return new Date(y, m - 1, d, h, min) <= new Date();
 }
 
+function isMoreThan24hAway(fechaStr: string, horaInicioStr: string): boolean {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    const [h, min] = horaInicioStr.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min).getTime() - Date.now() > 24 * 60 * 60 * 1000;
+}
+
 function hasClaseTerminado(fechaStr: string, horaFinStr: string): boolean {
     const [y, m, d] = fechaStr.split("-").map(Number);
     const [h, min] = horaFinStr.split(":").map(Number);
@@ -65,16 +71,19 @@ interface PaymentAmountStepProps {
     inputId: string;
     precioActual: number;
     montoMinimoActual: number;
+    porcentajeSena: number;
     paymentType: "full" | "partial";
     partialAmount: string;
     amountError: string;
     onTypeChange: (type: "full" | "partial") => void;
     onAmountChange: (value: string) => void;
+    allowPartial?: boolean;
 }
 
 function PaymentAmountStep({
-    inputId, precioActual, montoMinimoActual, paymentType,
+    inputId, precioActual, montoMinimoActual, porcentajeSena, paymentType,
     partialAmount, amountError, onTypeChange, onAmountChange,
+    allowPartial = true,
 }: PaymentAmountStepProps) {
     return (
         <div className="space-y-3">
@@ -96,25 +105,27 @@ function PaymentAmountStep({
                 </div>
             </button>
 
-            <button
-                type="button"
-                onClick={() => onTypeChange("partial")}
-                className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
-                    paymentType === "partial"
-                        ? "border-cef-primary bg-cef-primary/5"
-                        : "border-slate-200 hover:border-slate-300"
-                }`}
-            >
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                            Mínimo {formatPrice(montoMinimoActual + 1)} (más del 50%)
-                        </p>
+            {allowPartial ? (
+                <button
+                    type="button"
+                    onClick={() => onTypeChange("partial")}
+                    className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                        paymentType === "partial"
+                            ? "border-cef-primary bg-cef-primary/5"
+                            : "border-slate-200 hover:border-slate-300"
+                    }`}
+                >
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-800">Pago parcial</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Mínimo {formatPrice(montoMinimoActual)} ({porcentajeSena}% o más)
+                            </p>
+                        </div>
+                        <p className="text-xs text-slate-400">A definir</p>
                     </div>
-                    <p className="text-xs text-slate-400">A definir</p>
-                </div>
-            </button>
+                </button>
+            ) : null}
 
             {paymentType === "partial" && (
                 <div>
@@ -126,12 +137,12 @@ function PaymentAmountStep({
                         <input
                             id={inputId}
                             type="number"
-                            min={montoMinimoActual + 1}
-                            max={precioActual}
+                            min={montoMinimoActual}
+                            max={precioActual - 1}
                             step="1"
                             value={partialAmount}
                             onChange={(e) => onAmountChange(e.target.value)}
-                            placeholder={`${Math.ceil(montoMinimoActual) + 1} – ${precioActual}`}
+                            placeholder={`${montoMinimoActual} – ${precioActual - 1}`}
                             className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-cef-primary/30 focus:border-cef-primary/50"
                         />
                     </div>
@@ -193,20 +204,24 @@ export default function ClaseDetailDialog({
     isOpen,
     onClose,
     userRole,
+    senaMinima = "50",
 }: {
     clase: ClaseSemana | null;
     isOpen: boolean;
     onClose: () => void;
     userRole: string | null;
+    senaMinima?: string;
 }) {
+    const porcentajeSena = parseFloat(senaMinima) || 50;
     const [step, setStep] = useState<Step>("detail");
     const [paymentType, setPaymentType] = useState<"full" | "partial">("full");
     const [partialAmount, setPartialAmount] = useState("");
-    const [showPayment, setShowPayment] = useState(false);
     const [amountError, setAmountError] = useState("");
 
     const [checkLoading, setCheckLoading] = useState(false);
     const [checkError, setCheckError] = useState("");
+    const [mpLoading, setMpLoading] = useState(false);
+    const [mpError, setMpError] = useState("");
 
     const [suscripcionData, setSuscripcionData] = useState<SuscripcionCheckResponse | null>(null);
     const [suscripcionCheckLoading, setSuscripcionCheckLoading] = useState(false);
@@ -226,8 +241,8 @@ export default function ClaseDetailDialog({
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
         : clase.precio_individual;
     const montoMinimoActual = step === "amount-suscripcion"
-        ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion / 2)
-        : clase.precio_individual / 2;
+        ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion * porcentajeSena / 100)
+        : clase.precio_individual * porcentajeSena / 100;
     const selectedMonto =
         paymentType === "full"
             ? precioActual
@@ -239,7 +254,8 @@ export default function ClaseDetailDialog({
         setPartialAmount("");
         setAmountError("");
         setCheckError("");
-        setShowPayment(false);
+        setMpLoading(false);
+        setMpError("");
         setSuscripcionData(null);
         setSuscripcionCheckLoading(false);
         setSuscripcionCheckError("");
@@ -259,6 +275,8 @@ export default function ClaseDetailDialog({
             setCheckError(result.error);
             return;
         }
+        setPaymentType("full");
+        setPartialAmount("");
         setStep("amount");
     }
 
@@ -278,31 +296,33 @@ export default function ClaseDetailDialog({
         setStep("amount-suscripcion");
     }
 
-    function handleContinuarPago() {
+    async function handleContinuarPago() {
         if (paymentType === "partial") {
             const monto = parseFloat(partialAmount);
-            if (isNaN(monto) || monto <= montoMinimoActual || monto > precioActual) {
+            if (isNaN(monto) || monto < montoMinimoActual || monto >= precioActual) {
                 setAmountError(
-                    `El monto parcial debe ser mayor al 50% (${formatPrice(montoMinimoActual)}) y menor o igual al precio completo`
+                    `El monto debe ser entre ${formatPrice(montoMinimoActual)} (${porcentajeSena}%) y ${formatPrice(precioActual-1)} (100%)`
                 );
                 return;
             }
         }
         setAmountError("");
-        setShowPayment(true);
-    }
+        if (!clase) return;
+        setMpLoading(true);
+        setMpError("");
 
-    async function handlePay() {
-        if (!clase) return { error: "Clase no disponible" };
-        if (step === "amount-suscripcion") {
-            return await suscribirse(clase.id, selectedMonto);
+        const result = step === "amount-suscripcion"
+            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto)
+            : await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
+
+        if (result.error) {
+            setMpLoading(false);
+            setMpError(result.error);
+            return;
         }
-        return await inscribirseIndividual(clase.id, clase.fecha_en_semana, selectedMonto);
-    }
-
-    function handlePaymentClose() {
-        setShowPayment(false);
-        handleClose();
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
     }
 
     async function handleVerAsistencias() {
@@ -429,7 +449,16 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Pago único por clase</p>
                                         </div>
-                                        {canEnroll ? (
+                                        {clase.inscrito ? (
+                                            <div className="w-full py-2.5 px-3 rounded-lg bg-cef-success/10 border border-cef-success/20 text-xs font-semibold text-cef-success flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 size={14} />
+                                                Inscripto
+                                            </div>
+                                        ) : clase.suscrito ? (
+                                            <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
+                                                Ya tenés suscripción
+                                            </button>
+                                        ) : canEnroll ? (
                                             <div className="space-y-2">
                                                 <button
                                                     type="button"
@@ -483,32 +512,43 @@ export default function ClaseDetailDialog({
                                             </p>
                                             <p className="text-[11px] text-slate-400 mt-0.5">Acceso mensual garantizado</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <button
-                                                type="button"
-                                                onClick={handleSuscribirse}
-                                                disabled={suscripcionCheckLoading}
-                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
-                                            >
-                                                {suscripcionCheckLoading ? (
-                                                    <>
-                                                        <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                        Verificando…
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span>Suscribirme</span>
-                                                        <ChevronRight size={14} />
-                                                    </>
-                                                )}
+                                        {clase.suscrito ? (
+                                            <div className="w-full py-2.5 px-3 rounded-lg bg-cef-success/10 border border-cef-success/20 text-xs font-semibold text-cef-success flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 size={14} />
+                                                Suscripto
+                                            </div>
+                                        ) : clase.inscrito ? (
+                                            <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
+                                                Ya tenés inscripción
                                             </button>
-                                            {suscripcionCheckError && (
-                                                <div className="flex items-start gap-1.5">
-                                                    <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
-                                                    <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
-                                                </div>
-                                            )}
-                                        </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSuscribirse}
+                                                    disabled={suscripcionCheckLoading}
+                                                    className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                >
+                                                    {suscripcionCheckLoading ? (
+                                                        <>
+                                                            <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            Verificando…
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span>Suscribirme</span>
+                                                            <ChevronRight size={14} />
+                                                        </>
+                                                    )}
+                                                </button>
+                                                {suscripcionCheckError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{suscripcionCheckError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -555,11 +595,13 @@ export default function ClaseDetailDialog({
                                 inputId="individual-amount"
                                 precioActual={precioActual}
                                 montoMinimoActual={montoMinimoActual}
+                                porcentajeSena={porcentajeSena}
                                 paymentType={paymentType}
                                 partialAmount={partialAmount}
                                 amountError={amountError}
                                 onTypeChange={setPaymentType}
                                 onAmountChange={(v) => { setPartialAmount(v); setAmountError(""); }}
+                                allowPartial={isMoreThan24hAway(clase.fecha_en_semana, clase.hora_inicio)}
                             />
                         </div>
                     )}
@@ -593,11 +635,13 @@ export default function ClaseDetailDialog({
                                 inputId="suscripcion-amount"
                                 precioActual={precioActual}
                                 montoMinimoActual={montoMinimoActual}
+                                porcentajeSena={porcentajeSena}
                                 paymentType={paymentType}
                                 partialAmount={partialAmount}
                                 amountError={amountError}
                                 onTypeChange={setPaymentType}
                                 onAmountChange={(v) => { setPartialAmount(v); setAmountError(""); }}
+                                allowPartial={false}
                             />
                         </div>
                     )}
@@ -629,9 +673,17 @@ export default function ClaseDetailDialog({
                             </button>
                         ) : (
                             <>
+                                <div className="flex-1">
+                                    {mpError && (
+                                        <p className="text-xs text-cef-danger flex items-center gap-1.5">
+                                            <AlertCircle size={13} className="flex-shrink-0" />
+                                            {mpError}
+                                        </p>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => { setStep("detail"); setAmountError(""); }}
+                                    onClick={() => { setStep("detail"); setAmountError(""); setMpError(""); }}
                                     className="px-4 py-2 text-sm font-medium text-slate-500 rounded-lg hover:text-slate-700 hover:bg-slate-100 transition-colors"
                                 >
                                     Volver
@@ -639,10 +691,25 @@ export default function ClaseDetailDialog({
                                 <button
                                     type="button"
                                     onClick={handleContinuarPago}
-                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 transition-colors flex items-center gap-1.5"
+                                    disabled={mpLoading}
+                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5"
                                 >
-                                    Continuar
-                                    <ChevronRight size={15} />
+                                    {mpLoading ? (
+                                        <>
+                                            <Loader2 size={14} className="animate-spin" />
+                                            Redirigiendo...
+                                        </>
+                                    ) : step === "amount" ? (
+                                        <>
+                                            Pagar con MercadoPago
+                                            <ChevronRight size={15} />
+                                        </>
+                                    ) : (
+                                        <>
+                                            Continuar
+                                            <ChevronRight size={15} />
+                                        </>
+                                    )}
                                 </button>
                             </>
                         )}
@@ -650,13 +717,6 @@ export default function ClaseDetailDialog({
                 </div>
             </div>
 
-            {/* Mock Payment Modal (above everything) */}
-            <MockPaymentModal
-                isOpen={showPayment}
-                monto={selectedMonto}
-                onClose={handlePaymentClose}
-                onPay={handlePay}
-            />
         </>,
         document.body
     );

@@ -129,6 +129,7 @@ class InscripcionRepository:
         usuario_id: uuid.UUID,
         instancia: ClaseInstancia,
         monto: Decimal,
+        mp_payment_id: str = "mock",
     ) -> tuple[Asistencia, Pago]:
         from datetime import datetime, timezone
 
@@ -151,8 +152,8 @@ class InscripcionRepository:
             monto=monto,
             fecha_pago=datetime.now(timezone.utc),
             estado=EstadoPago.PAGADO,
-            mp_payment_id="mock",
-            descripcion="Pago individual mock",
+            mp_payment_id=mp_payment_id,
+            descripcion="Pago individual" if mp_payment_id != "mock" else "Pago individual mock",
             activo=True,
         )
         self.db.add(pago)

@@ -11,7 +11,16 @@ from exceptions.general import BadRequestException, ConflictException, NotFoundE
 from models.usuario import Usuario
 from repositories.suscripcion_repository import SuscripcionRepository
 from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.suscripcion import SuscripcionCreate, SuscripcionCheckResponse, SuscripcionResponse
+
+
+async def _get_porcentaje_sena(db) -> float:
+    config = await ConfiguracionRepository(db).get_by_clave("sena_minima")
+    try:
+        return float(config.valor) if config else 50.0
+    except (ValueError, TypeError):
+        return 50.0
 
 
 _DIA_TO_WEEKDAY = {
@@ -78,7 +87,7 @@ class SuscripcionService:
             fecha_fin,
             clase_template_id,
         ):
-            raise ConflictException("Ya tenés una suscripción activa en el mismo día y horario")
+            raise ConflictException("Ya tenés otra inscripción en el mismo horario para esta fecha")
 
         conflicto_fecha = await self.repo.get_conflicto_individual(
             current_user.id, fechas_clases, template.hora_inicio, template.hora_fin
@@ -107,17 +116,18 @@ class SuscripcionService:
         if not precio_disciplina:
             raise BadRequestException("No hay precio configurado para esta disciplina")
         precio = float(precio_disciplina.precio_suscripcion)
+        porcentaje = await _get_porcentaje_sena(self.db)
         return SuscripcionCheckResponse(
             elegible=True,
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             fechas_clases=fechas_clases,
             precio_total=precio,
-            monto_minimo=round(precio / 2, 2),
+            monto_minimo=round(precio * porcentaje / 100, 2),
         )
 
     async def suscribirse(
-        self, current_user: Usuario, data: SuscripcionCreate
+        self, current_user: Usuario, data: SuscripcionCreate, mp_payment_id: str = "mock"
     ) -> SuscripcionResponse:
         clase_template_id = uuid.UUID(str(data.clase_template_id))
         template, fecha_inicio, fecha_fin, fechas_clases = await self._validar_elegibilidad(
@@ -128,11 +138,12 @@ class SuscripcionService:
         if not precio_disciplina:
             raise BadRequestException("No hay precio configurado para esta disciplina")
         precio = Decimal(str(precio_disciplina.precio_suscripcion))
-        monto_minimo = precio / 2
+        porcentaje = await _get_porcentaje_sena(self.db)
+        monto_minimo = precio * Decimal(str(porcentaje)) / 100
 
         if data.monto < monto_minimo:
             raise BadRequestException(
-                f"El monto mínimo es el 50% del precio: ${float(monto_minimo):.2f}"
+                f"El monto mínimo es el {int(porcentaje)}% del precio: ${float(monto_minimo):.2f}"
             )
         if data.monto > precio:
             raise BadRequestException(
@@ -162,6 +173,7 @@ class SuscripcionService:
             usuario_id=current_user.id,
             suscripcion_id=suscripcion.id,
             monto=data.monto,
+            mp_payment_id=mp_payment_id,
         )
 
         return SuscripcionResponse(
