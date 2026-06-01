@@ -268,7 +268,7 @@ async def _seed_suscripcion_pasada(
     fecha_fin = fecha_inicio + timedelta(days=27)
 
     clase = ClaseTemplate(
-        nombre="Yoga mensual",
+        nombre="Yoga",
         descripcion="Suscripcion historica de prueba",
         profesor_id=profesor.id,
         sala_id=sala.id,
