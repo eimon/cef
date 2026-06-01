@@ -46,9 +46,24 @@ def _device_hint(request: Request) -> str | None:
 async def register(
     user_in: UsuarioCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
+    current_user: Usuario = Depends(get_current_user),
 ):
     """Register a new user."""
+    from core.roles import Role
+    from exceptions.general import ForbiddenException
+    
+    # Check permissions based on user role
+    if current_user.role.value == "admin":
+        # Admin requires ROLE_USER_CREATE
+        if Role.ROLE_USER_CREATE not in current_user.permissions:
+            raise ForbiddenException("No autorizado para esta acción")
+    else:
+        # Non-admin requires ROLE_CLIENT_CREATE and can only create clients
+        if Role.ROLE_CLIENT_CREATE not in current_user.permissions:
+            raise ForbiddenException("No autorizado para esta acción")
+        if user_in.role.value != "cliente":
+            raise ForbiddenException("Solo puede crear usuarios con rol cliente")
+    
     return await AuthService(db).register_user(user_in)
 
 

@@ -128,11 +128,13 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                     {user.activo ? "Activo" : "Inactivo"}
                                 </span>
                             </div>
-                            <UserCardMenu
-                                isDeleting={isDeleting === user.id}
-                                onEdit={() => setEditingUser(user)}
-                                onDelete={() => handleDelete(user)}
-                            />
+                            {allowedRoles.includes(user.role as UserRole) && (
+                                <UserCardMenu
+                                    isDeleting={isDeleting === user.id}
+                                    onEdit={() => setEditingUser(user)}
+                                    onDelete={() => handleDelete(user)}
+                                />
+                            )}
                         </div>
 
                         {/* Row 2: email + telefono */}
@@ -213,23 +215,27 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                        <div className="flex items-center justify-end space-x-1">
-                                            <button
-                                                onClick={() => setEditingUser(user)}
-                                                className="p-1.5 text-cef-primary/70 hover:bg-cef-primary/10 hover:text-cef-primary rounded-lg transition-colors"
-                                                title="Editar"
-                                            >
-                                                <Pencil size={15} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(user)}
-                                                disabled={isDeleting === user.id}
-                                                className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        </div>
+                                        {allowedRoles.includes(user.role as UserRole) ? (
+                                            <div className="flex items-center justify-end space-x-1">
+                                                <button
+                                                    onClick={() => setEditingUser(user)}
+                                                    className="p-1.5 text-cef-primary/70 hover:bg-cef-primary/10 hover:text-cef-primary rounded-lg transition-colors"
+                                                    title="Editar"
+                                                >
+                                                    <Pencil size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(user)}
+                                                    disabled={isDeleting === user.id}
+                                                    className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">Solo lectura</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

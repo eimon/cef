@@ -82,7 +82,9 @@ export default function UsersManagementPage({
                     <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
                     <p className="text-sm text-slate-400 mt-1">{subtitle}</p>
                 </div>
-                <AddUserDialog roleOptions={visibleRoles} onSuccess={() => refresh(filters)} />
+                {allowedRoles.length > 0 && (
+                    <AddUserDialog roleOptions={visibleRoles} onSuccess={() => refresh(filters)} />
+                )}
             </div>
 
             <form onSubmit={handleSearch} className="grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
