@@ -4,12 +4,15 @@ Seeder minimo para demo/control de flujo.
 Deja la base con:
   - 1 usuario admin       admin@cef.ar     / admin
   - 1 usuario cliente     cliente@cef.ar   / cliente123
+  - 1 ficha medica basica para el cliente
   - 1 profesor
   - 1 sala
   - 1 clase individual historica inscripta para el cliente
+  - 1 suscripcion historica para el cliente
 
 Limpia los datos de clases/profesores/salas/usuarios de demo anteriores para
-mantener el escenario chico y predecible.
+mantener el escenario chico y predecible. Las clases historicas quedan inactivas
+para que no aparezcan como clases disponibles en el calendario.
 """
 
 import asyncio
@@ -111,6 +114,47 @@ async def _upsert_cliente(session) -> Usuario:
     return cliente
 
 
+async def _seed_ficha_medica(session, cliente: Usuario) -> None:
+    session.add(FichaMedica(
+        usuario_id=cliente.id,
+        fecha=date.today(),
+        cuerpo_ficha="""{
+  "contacto_emergencia": {
+    "nombre": "Contacto de prueba",
+    "relacion": "Familiar",
+    "telefono": "1100000099"
+  },
+  "antecedentes_medicos": {
+    "afecciones": ["Ninguna"],
+    "especifique_otros": ""
+  },
+  "informacion_adicional_salud": {
+    "fuma_o_ha_fumado": "No",
+    "consume_alcohol": "No",
+    "mareos_falta_aire_o_dolor_pecho": "No",
+    "horas_sueno_promedio": "8",
+    "dificultad_para_dormir": "No",
+    "dieta_especial_o_suplementacion": "No"
+  },
+  "historial_cirugias": [],
+  "alergias_y_medicacion": {
+    "alergias": "",
+    "medicacion_actual": ""
+  },
+  "actividad_fisica_y_objetivos": {
+    "realiza_actividad_fisica_actualmente": "Si",
+    "frecuencia": "2 veces por semana",
+    "objetivo_principal": ["Bienestar general"]
+  },
+  "consentimiento_y_declaracion_jurada": {
+    "aceptado": true,
+    "texto": "Ficha medica de prueba para seed minimo"
+  }
+}""",
+    ))
+    await session.flush()
+
+
 async def _seed_precio_yoga(session) -> None:
     session.add(PrecioDisciplina(
         disciplina=Disciplina.YOGA,
@@ -149,6 +193,16 @@ def _previous_monday() -> date:
     today = date.today()
     current_monday = today - timedelta(days=today.weekday())
     return current_monday - timedelta(days=7)
+
+
+def _dates_for_weekday(start: date, end: date, weekday: int) -> list[date]:
+    first = start + timedelta(days=(weekday - start.weekday()) % 7)
+    dates = []
+    current = first
+    while current <= end:
+        dates.append(current)
+        current += timedelta(days=7)
+    return dates
 
 
 async def _seed_clase_individual(
@@ -204,16 +258,84 @@ async def _seed_clase_individual(
     await session.flush()
 
 
+async def _seed_suscripcion_pasada(
+    session,
+    cliente: Usuario,
+    profesor: Profesor,
+    sala: Sala,
+) -> None:
+    fecha_inicio = _previous_monday() - timedelta(days=28)
+    fecha_fin = fecha_inicio + timedelta(days=27)
+
+    clase = ClaseTemplate(
+        nombre="Yoga mensual",
+        descripcion="Suscripcion historica de prueba",
+        profesor_id=profesor.id,
+        sala_id=sala.id,
+        disciplina=Disciplina.YOGA,
+        dia_semana=DiaSemana.MARTES,
+        hora_inicio=time(18, 0),
+        hora_fin=time(19, 0),
+        capacidad_maxima=1,
+        activo=False,
+    )
+    session.add(clase)
+    await session.flush()
+
+    suscripcion = Suscripcion(
+        usuario_id=cliente.id,
+        clase_template_id=clase.id,
+        monto=Decimal("4800.00"),
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        activo=False,
+    )
+    session.add(suscripcion)
+    await session.flush()
+
+    for fecha_clase in _dates_for_weekday(fecha_inicio, fecha_fin, 1):
+        instancia = ClaseInstancia(
+            clase_template_id=clase.id,
+            fecha=fecha_clase,
+            cupo=0,
+            activo=True,
+        )
+        session.add(instancia)
+        await session.flush()
+
+        session.add(Asistencia(
+            usuario_id=cliente.id,
+            clase_instancia_id=instancia.id,
+            tipo=TipoInscripcion.SUSCRIPCION,
+            asistio=True,
+            cancelo=False,
+        ))
+
+    session.add(Pago(
+        usuario_id=cliente.id,
+        suscripcion_id=suscripcion.id,
+        monto=Decimal("4800.00"),
+        fecha_pago=datetime.now(timezone.utc),
+        estado=EstadoPago.PAGADO,
+        mp_payment_id="seed-minimal-suscripcion",
+        descripcion="Pago suscripcion historica seed minimo",
+        activo=True,
+    ))
+    await session.flush()
+
+
 async def seed_minimal() -> None:
     print("Iniciando seed minimo...")
     async with AsyncSessionLocal() as session:
         await _reset_demo_data(session)
         await _upsert_admin(session)
         cliente = await _upsert_cliente(session)
+        await _seed_ficha_medica(session, cliente)
         await _seed_precio_yoga(session)
         profesor = await _seed_profesor(session)
         sala = await _seed_sala(session)
         await _seed_clase_individual(session, cliente, profesor, sala)
+        await _seed_suscripcion_pasada(session, cliente, profesor, sala)
         await session.commit()
     print("Seed minimo listo.")
 

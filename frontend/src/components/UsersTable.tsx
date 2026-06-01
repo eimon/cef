@@ -28,6 +28,10 @@ const roleLabels: Record<string, string> = {
     [UserRole.CLIENTE]: "Cliente",
 };
 
+function displayValue(value: string | null | undefined): string {
+    return value?.trim() ?? "";
+}
+
 function UserCardMenu({
     isDeleting,
     onEdit,
@@ -116,7 +120,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center flex-wrap gap-1.5 min-w-0">
                                 <span className="text-sm font-semibold text-slate-700">
-                                    {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
+                                    {[displayValue(user.nombre), displayValue(user.apellido)].filter(Boolean).join(" ") || "—"}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
                                     {roleLabels[user.role] ?? user.role}
@@ -167,6 +171,9 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                     Nombre
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Apellido
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Email
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -190,7 +197,10 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                             {users.map((user) => (
                                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
-                                        {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
+                                        {displayValue(user.nombre) || "—"}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                        {displayValue(user.apellido)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.email}

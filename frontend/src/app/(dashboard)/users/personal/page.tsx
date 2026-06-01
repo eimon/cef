@@ -21,6 +21,7 @@ export default async function PersonalPage() {
             allowedRoles={STAFF_ROLES}
             emptyMessage="No hay administradores ni recepcionistas."
             filteredEmptyMessage="No se encontró personal con los filtros ingresados"
+            showDniFilter={false}
         />
     );
 }

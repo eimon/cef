@@ -13,16 +13,20 @@ Crea (idempotente):
 import asyncio
 import os
 import sys
-from datetime import date, time
+from datetime import date, datetime, time, timezone
+from decimal import Decimal
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.future import select
 
 from core.database import AsyncSessionLocal
-from core.enums import DiaSemana, Disciplina, UserRole
+from core.enums import DiaSemana, Disciplina, EstadoPago, TipoInscripcion, UserRole
 from core.security import get_password_hash
+from models.asistencia import Asistencia
+from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
+from models.pagos import Pago
 from models.precio_disciplina import PrecioDisciplina
 from models.profesor import Profesor
 from models.sala import Sala
@@ -158,12 +162,42 @@ async def _seed_precios(session) -> None:
 
 
 async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -> None:
+    async def upsert_clase(data: dict, profesor: Profesor, sala: Sala) -> ClaseTemplate:
+        clase = (await session.execute(
+            select(ClaseTemplate).where(
+                ClaseTemplate.nombre == data["nombre"],
+                ClaseTemplate.dia_semana == data["dia_semana"],
+                ClaseTemplate.hora_inicio == data["hora_inicio"],
+            )
+        )).scalars().first()
+
+        if clase is None:
+            clase = ClaseTemplate(
+                profesor_id=profesor.id,
+                sala_id=sala.id,
+                **data,
+            )
+            session.add(clase)
+            print(f"  [ok]   clase '{data['nombre']}'")
+        else:
+            clase.profesor_id = profesor.id
+            clase.sala_id = sala.id
+            clase.descripcion = data["descripcion"]
+            clase.disciplina = data["disciplina"]
+            clase.hora_fin = data["hora_fin"]
+            clase.capacidad_maxima = data["capacidad_maxima"]
+            clase.activo = True
+            print(f"  [update] clase '{data['nombre']}'")
+
+        await session.flush()
+        return clase
+
     clases = [
         {
             "nombre": "Yoga",
             "descripcion": "Clase de yoga para todos los niveles",
             "disciplina": Disciplina.YOGA,
-            "dia_semana": DiaSemana.LUNES,
+            "dia_semana": DiaSemana.MARTES,
             "hora_inicio": time(9, 0),
             "hora_fin": time(10, 0),
             "capacidad_maxima": 15,
@@ -188,21 +222,112 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
         },
     ]
     for i, data in enumerate(clases):
-        existe = (await session.execute(
-            select(ClaseTemplate).where(
-                ClaseTemplate.nombre == data["nombre"],
-                ClaseTemplate.dia_semana == data["dia_semana"],
-            )
-        )).scalars().first()
-        if existe:
-            print(f"  [skip] clase '{data['nombre']}'")
-            continue
-        session.add(ClaseTemplate(
-            profesor_id=profesores[i].id,
-            sala_id=salas[i].id,
-            **data,
+        await upsert_clase(data, profesores[i], salas[i])
+
+    pilates_lunes = await upsert_clase(
+        {
+            "nombre": "Pilates",
+            "descripcion": "Pilates con cupo reducido para probar lista de espera",
+            "disciplina": Disciplina.PILATES,
+            "dia_semana": DiaSemana.MARTES,
+            "hora_inicio": time(9, 0),
+            "hora_fin": time(10, 0),
+            "capacidad_maxima": 1,
+        },
+        profesores[1],
+        salas[1],
+    )
+
+    await upsert_clase(
+        {
+            "nombre": "Funcional",
+            "descripcion": "Clase de prueba de los viernes",
+            "disciplina": Disciplina.FUNCIONAL,
+            "dia_semana": DiaSemana.VIERNES,
+            "hora_inicio": time(10, 0),
+            "hora_fin": time(11, 0),
+            "capacidad_maxima": 10,
+        },
+        profesores[0],
+        salas[0],
+    )
+
+    await _seed_pilates_lunes_inscripto(session, pilates_lunes)
+
+
+async def _seed_pilates_lunes_inscripto(session, clase: ClaseTemplate) -> None:
+    usuario = (await session.execute(
+        select(Usuario).where(Usuario.email == "cliente2@cef.ar")
+    )).scalars().first()
+    if not usuario:
+        print("  [skip] inscripcion pilates lunes: falta cliente2@cef.ar")
+        return
+
+    fecha_clase = date(2026, 6, 8)
+    instancia = (await session.execute(
+        select(ClaseInstancia).where(
+            ClaseInstancia.clase_template_id == clase.id,
+            ClaseInstancia.fecha == fecha_clase,
+        )
+    )).scalars().first()
+
+    if instancia is None:
+        instancia = ClaseInstancia(
+            clase_template_id=clase.id,
+            fecha=fecha_clase,
+            cupo=0,
+            activo=True,
+        )
+        session.add(instancia)
+        await session.flush()
+        print("  [ok]   instancia Pilates 2026-06-08")
+    else:
+        instancia.cupo = 0
+        instancia.activo = True
+        instancia.cancelada = False
+        instancia.motivo_cancelacion = None
+        print("  [update] instancia Pilates 2026-06-08")
+
+    asistencia = (await session.execute(
+        select(Asistencia).where(
+            Asistencia.usuario_id == usuario.id,
+            Asistencia.clase_instancia_id == instancia.id,
+        )
+    )).scalars().first()
+    if asistencia is None:
+        session.add(Asistencia(
+            usuario_id=usuario.id,
+            clase_instancia_id=instancia.id,
+            tipo=TipoInscripcion.INDIVIDUAL,
+            asistio=False,
+            cancelo=False,
         ))
-        print(f"  [ok]   clase '{data['nombre']}'")
+        print("  [ok]   inscripcion Pilates 2026-06-08")
+    else:
+        asistencia.tipo = TipoInscripcion.INDIVIDUAL
+        asistencia.asistio = False
+        asistencia.cancelo = False
+        print("  [update] inscripcion Pilates 2026-06-08")
+
+    pago = (await session.execute(
+        select(Pago).where(
+            Pago.usuario_id == usuario.id,
+            Pago.clase_instancia_id == instancia.id,
+            Pago.mp_payment_id == "seed-dev-pilates-lunes-2026-06-08",
+        )
+    )).scalars().first()
+    if pago is None:
+        session.add(Pago(
+            usuario_id=usuario.id,
+            clase_instancia_id=instancia.id,
+            monto=Decimal("1500.00"),
+            fecha_pago=datetime.now(timezone.utc),
+            estado=EstadoPago.PAGADO,
+            mp_payment_id="seed-dev-pilates-lunes-2026-06-08",
+            descripcion="Pago individual seed Pilates lunes 2026-06-08",
+            activo=True,
+        ))
+        print("  [ok]   pago Pilates 2026-06-08")
 
 
 async def seed_dev() -> None:
