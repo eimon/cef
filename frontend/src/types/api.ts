@@ -243,6 +243,7 @@ export interface ClaseSemana {
     sala_nombre: string | null;
     fecha_en_semana: string;
     cupo_disponible: number;
+    cupo_suscripcion_disponible: boolean;
     instancia: InstanciaSemana | null;
     inscrito: boolean;
     suscrito: boolean;

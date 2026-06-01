@@ -236,6 +236,8 @@ export default function ClaseDetailDialog({
     const canEnroll =
         !clase.instancia?.cancelada &&
         !hasClaseEmpezado(clase.fecha_en_semana, clase.hora_inicio);
+    const canEnrollIndividual = canEnroll && clase.cupo_disponible > 0;
+    const canSubscribe = clase.cupo_suscripcion_disponible;
 
     const precioActual = step === "amount-suscripcion"
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
@@ -458,7 +460,7 @@ export default function ClaseDetailDialog({
                                             <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
                                                 Ya tenés suscripción
                                             </button>
-                                        ) : canEnroll ? (
+                                        ) : canEnrollIndividual ? (
                                             <div className="space-y-2">
                                                 <button
                                                     type="button"
@@ -485,6 +487,14 @@ export default function ClaseDetailDialog({
                                                     </div>
                                                 )}
                                             </div>
+                                        ) : canEnroll ? (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-center leading-tight"
+                                            >
+                                                Entrar a lista de espera para esta clase
+                                            </button>
                                         ) : (
                                             <button
                                                 type="button"
@@ -520,6 +530,14 @@ export default function ClaseDetailDialog({
                                         ) : clase.inscrito ? (
                                             <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
                                                 Ya tenés inscripción
+                                            </button>
+                                        ) : !canSubscribe ? (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-center leading-tight"
+                                            >
+                                                Entrar a lista de espera para una mensualidad en esta clase
                                             </button>
                                         ) : (
                                             <div className="space-y-2">
