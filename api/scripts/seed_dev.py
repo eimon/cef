@@ -566,7 +566,7 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
             "dia_semana": DiaSemana.MARTES,
             "hora_inicio": time(15, 0),
             "hora_fin": time(16, 0),
-            "capacidad_maxima": 12,
+            "capacidad_maxima": 1,
         },
         profesores[1],
         salas[1],
