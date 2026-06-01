@@ -37,7 +37,9 @@ export async function getUsers(filters?: GetUsersParams): Promise<User[]> {
     try {
         const params = filters
             ? Object.fromEntries(
-                  Object.entries(filters).filter(([, value]) => typeof value === "string" && value.trim() !== "")
+                  Object.entries(filters)
+                      .map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+                      .filter(([, value]) => typeof value === "string" && value !== "")
               )
             : undefined;
 

@@ -1,10 +1,28 @@
+import unicodedata
+import uuid
+
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models.usuario import Usuario
 from schemas.usuario import UsuarioCreate, UsuarioUpdate, PublicSignupRequest
 from core.enums import UserRole
 from core.security import get_password_hash
-import uuid
+
+
+def _normalize_text_search(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value)
+        if not unicodedata.combining(char)
+    )
 
 
 class UserRepository:
@@ -33,12 +51,16 @@ class UserRepository:
     ) -> list[Usuario]:
         query = select(Usuario).where(Usuario.activo == True)
 
+        dni = dni.strip() if dni else None
+        nombre = _normalize_text_search(nombre)
+        apellido = _normalize_text_search(apellido)
+
         if dni:
             query = query.where(Usuario.dni.ilike(f"%{dni}%"))
         if nombre:
-            query = query.where(Usuario.nombre.ilike(f"%{nombre}%"))
+            query = query.where(func.unaccent(Usuario.nombre).ilike(f"%{nombre}%"))
         if apellido:
-            query = query.where(Usuario.apellido.ilike(f"%{apellido}%"))
+            query = query.where(func.unaccent(Usuario.apellido).ilike(f"%{apellido}%"))
 
         result = await self.db.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())

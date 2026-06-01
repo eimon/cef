@@ -32,8 +32,6 @@ export default async function ClasesPage({
     const isStaff = userRole === "admin" || userRole === "recepcion";
     if (!isStaff && monday < currentMonday) redirect("/clases");
     const clases = await getClasesSemana(monday);
-    const isPastWeek = monday < currentMonday;
-    const clasesVisibles = isPastWeek && isStaff ? clases.filter((c) => c.instancia !== null) : clases;
 
     return (
         <div className="space-y-6">
@@ -48,7 +46,7 @@ export default async function ClasesPage({
                 </div>
             </div>
 
-            <ClasesGrid clases={clasesVisibles} userRole={userRole} />
+            <ClasesGrid clases={clases} userRole={userRole} />
         </div>
     );
 }

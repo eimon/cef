@@ -1,9 +1,9 @@
 """
-Seeder de desarrollo — datos base para trabajar en paralelo.
+Seeder de desarrollo - datos base para trabajar en paralelo.
 
 Crea (idempotente):
   - 1 usuario admin       admin@cef.ar     / admin
-  - 1 usuario cliente     cliente@cef.ar   / cliente123
+  - 3 usuarios cliente
   - 3 profesores
   - 3 salas
   - 3 precios por disciplina
@@ -11,21 +11,22 @@ Crea (idempotente):
 """
 
 import asyncio
-import sys
 import os
-from datetime import time, date, timedelta
+import sys
+from datetime import date, time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.future import select
+
 from core.database import AsyncSessionLocal
-from core.enums import UserRole, DiaSemana, Disciplina
+from core.enums import DiaSemana, Disciplina, UserRole
 from core.security import get_password_hash
-from models.usuario import Usuario
-from models.profesor import Profesor
-from models.sala import Sala
 from models.clase_template import ClaseTemplate
 from models.precio_disciplina import PrecioDisciplina
+from models.profesor import Profesor
+from models.sala import Sala
+from models.usuario import Usuario
 
 
 async def _seed_admin(session) -> None:
@@ -46,23 +47,54 @@ async def _seed_admin(session) -> None:
 
 
 async def _seed_cliente(session) -> None:
-    existe = (await session.execute(
-        select(Usuario).where(Usuario.email == "cliente@cef.ar")
-    )).scalars().first()
-    if existe:
-        print("  [skip] cliente")
-        return
-    session.add(Usuario(
-        email="cliente@cef.ar",
-        telefono="1100000002",
-        hashed_password=get_password_hash("cliente123"),
-        nombre="María",
-        apellido="García",
-        fecha_nacimiento=date(1992, 5, 20),
-        dni="30123456",
-        role=UserRole.CLIENTE,
-    ))
-    print("  [ok]   cliente")
+    clientes = [
+        {
+            "email": "cliente@cef.ar",
+            "telefono": "1100000002",
+            "password": "cliente123",
+            "nombre": "María",
+            "apellido": "García",
+            "fecha_nacimiento": date(1992, 5, 20),
+            "dni": "30123456",
+        },
+        {
+            "email": "cliente2@cef.ar",
+            "telefono": "1100000006",
+            "password": "cliente123",
+            "nombre": "Lucía",
+            "apellido": "Fernández",
+            "fecha_nacimiento": date(1994, 8, 12),
+            "dni": "32123456",
+        },
+        {
+            "email": "cliente3@cef.ar",
+            "telefono": "1100000007",
+            "password": "cliente123",
+            "nombre": "Joaquín",
+            "apellido": "López",
+            "fecha_nacimiento": date(1989, 11, 3),
+            "dni": "28123456",
+        },
+    ]
+
+    for i, data in enumerate(clientes, 1):
+        existe = (await session.execute(
+            select(Usuario).where(Usuario.email == data["email"])
+        )).scalars().first()
+        if existe:
+            print(f"  [skip] cliente {i}")
+            continue
+        session.add(Usuario(
+            email=data["email"],
+            telefono=data["telefono"],
+            hashed_password=get_password_hash(data["password"]),
+            nombre=data["nombre"],
+            apellido=data["apellido"],
+            fecha_nacimiento=data["fecha_nacimiento"],
+            dni=data["dni"],
+            role=UserRole.CLIENTE,
+        ))
+        print(f"  [ok]   cliente {i}")
 
 
 async def _seed_profesores(session) -> list[Profesor]:
@@ -72,17 +104,17 @@ async def _seed_profesores(session) -> list[Profesor]:
         {"nombre": "Luis", "apellido": "Martínez", "email": "profesor3@cef.ar", "telefono": "1100000005", "dni": "25987656"},
     ]
     profesores = []
-    for i, d in enumerate(datos, 1):
+    for i, data in enumerate(datos, 1):
         existe = (await session.execute(
-            select(Profesor).where(Profesor.email == d["email"])
+            select(Profesor).where(Profesor.email == data["email"])
         )).scalars().first()
         if existe:
             print(f"  [skip] profesor {i}")
             profesores.append(existe)
         else:
-            p = Profesor(**d)
-            session.add(p)
-            profesores.append(p)
+            profesor = Profesor(**data)
+            session.add(profesor)
+            profesores.append(profesor)
             print(f"  [ok]   profesor {i}")
     await session.flush()
     return profesores
@@ -99,9 +131,9 @@ async def _seed_salas(session) -> list[Sala]:
             print(f"  [skip] {nombre}")
             salas.append(existe)
         else:
-            s = Sala(nombre=nombre, capacidad=20)
-            session.add(s)
-            salas.append(s)
+            sala = Sala(nombre=nombre, capacidad=20)
+            session.add(sala)
+            salas.append(sala)
             print(f"  [ok]   {nombre}")
     await session.flush()
     return salas
@@ -113,15 +145,15 @@ async def _seed_precios(session) -> None:
         {"disciplina": Disciplina.PILATES, "precio_individual": 1500, "precio_suscripcion": 1200},
         {"disciplina": Disciplina.FUNCIONAL, "precio_individual": 1800, "precio_suscripcion": 1400},
     ]
-    for d in precios:
+    for data in precios:
         existe = (await session.execute(
-            select(PrecioDisciplina).where(PrecioDisciplina.disciplina == d["disciplina"])
+            select(PrecioDisciplina).where(PrecioDisciplina.disciplina == data["disciplina"])
         )).scalars().first()
         if existe:
-            print(f"  [skip] precio {d['disciplina'].value}")
+            print(f"  [skip] precio {data['disciplina'].value}")
         else:
-            session.add(PrecioDisciplina(**d))
-            print(f"  [ok]   precio {d['disciplina'].value}")
+            session.add(PrecioDisciplina(**data))
+            print(f"  [ok]   precio {data['disciplina'].value}")
     await session.flush()
 
 

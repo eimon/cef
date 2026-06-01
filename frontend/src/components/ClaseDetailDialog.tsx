@@ -214,6 +214,7 @@ export default function ClaseDetailDialog({
 
     const [asistencias, setAsistencias] = useState<AsistenciaRecepcion[]>([]);
     const [asistenciasLoading, setAsistenciasLoading] = useState(false);
+    const [asistenciasError, setAsistenciasError] = useState("");
 
     if (!isOpen || !clase) return null;
 
@@ -244,6 +245,7 @@ export default function ClaseDetailDialog({
         setSuscripcionCheckError("");
         setAsistencias([]);
         setAsistenciasLoading(false);
+        setAsistenciasError("");
         onClose();
     }
 
@@ -306,9 +308,14 @@ export default function ClaseDetailDialog({
     async function handleVerAsistencias() {
         if (!clase) return;
         setAsistenciasLoading(true);
-        const data = await getAsistenciasClase(clase.instancia!.id);
+        setAsistenciasError("");
+        const result = await getAsistenciasClase(clase.instancia!.id);
         setAsistenciasLoading(false);
-        setAsistencias(data);
+        if (result.error) {
+            setAsistenciasError(result.error);
+            return;
+        }
+        setAsistencias(result.data);
         setStep("asistencias");
     }
 
@@ -520,10 +527,19 @@ export default function ClaseDetailDialog({
                                         ) : (
                                             <>
                                                 <ClipboardList size={16} />
-                                                <span>Ver asistencias</span>
+                                                <span>
+                                                    {clase.instancia
+                                                        ? "Ver asistencias"
+                                                        : "Sin asistencias para esta fecha"}
+                                                </span>
                                             </>
                                         )}
                                     </button>
+                                    {asistenciasError && (
+                                        <p className="mt-2 text-xs text-cef-danger text-center">
+                                            {asistenciasError}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>
