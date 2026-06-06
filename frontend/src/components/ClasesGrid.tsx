@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, CalendarDays, Pencil, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Clock, CalendarDays, Pencil, Trash2, ChevronDown, Check } from "lucide-react";
 import { ClaseSemana, DiaSemana, Disciplina } from "@/types/api";
 import ClaseDetailDialog from "@/components/ClaseDetailDialog";
 import EditClaseDialog from "@/components/EditClaseDialog";
@@ -62,6 +62,70 @@ function formatFechaCorta(fechaStr: string): string {
     return `${parseInt(dia)}/${parseInt(mes)}`;
 }
 
+function DisciplinaDropdown({
+    disciplinas,
+    value,
+    onChange,
+}: {
+    disciplinas: Disciplina[];
+    value: Disciplina | null;
+    onChange: (d: Disciplina | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const label = value ? (DISCIPLINA_LABELS[value] ?? value) : "Todas las disciplinas";
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    value
+                        ? "bg-cef-primary/10 text-cef-primary border-cef-primary/30"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+            >
+                {label}
+                <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+
+            {open && (
+                <div className="absolute left-0 top-full mt-1.5 z-20 w-44 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    {[null, ...disciplinas].map((d) => {
+                        const optLabel = d ? (DISCIPLINA_LABELS[d] ?? d) : "Todas las disciplinas";
+                        const isSelected = value === d;
+                        return (
+                            <button
+                                key={d ?? "__all__"}
+                                type="button"
+                                onClick={() => { onChange(d); setOpen(false); }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-colors ${
+                                    isSelected
+                                        ? "bg-cef-primary/10 text-cef-primary"
+                                        : "text-slate-600 hover:bg-slate-50"
+                                }`}
+                            >
+                                {optLabel}
+                                {isSelected && <Check size={12} />}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function ClasesGrid({ clases, userRole, senaMinima }: { clases: ClaseSemana[]; userRole: string | null; senaMinima?: string }) {
     const [selectedClase, setSelectedClase] = useState<ClaseSemana | null>(null);
     const [claseToEdit, setClaseToEdit] = useState<ClaseSemana | null>(null);
@@ -93,33 +157,11 @@ export default function ClasesGrid({ clases, userRole, senaMinima }: { clases: C
             <div className="flex flex-wrap gap-x-6 gap-y-2">
                 {/* Disciplina */}
                 {disciplinas.length > 1 && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                            type="button"
-                            onClick={() => setFiltroDisciplina(null)}
-                            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                                filtroDisciplina === null
-                                    ? "bg-cef-primary/10 text-cef-primary border border-cef-primary/30"
-                                    : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700 hover:bg-slate-200"
-                            }`}
-                        >
-                            Todas
-                        </button>
-                        {disciplinas.map((d) => (
-                            <button
-                                key={d}
-                                type="button"
-                                onClick={() => setFiltroDisciplina(filtroDisciplina === d ? null : d)}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                                    filtroDisciplina === d
-                                        ? "bg-cef-primary/10 text-cef-primary border border-cef-primary/30"
-                                        : "bg-slate-100 text-slate-500 border border-slate-200 hover:text-slate-700 hover:bg-slate-200"
-                                }`}
-                            >
-                                {DISCIPLINA_LABELS[d]}
-                            </button>
-                        ))}
-                    </div>
+                    <DisciplinaDropdown
+                        disciplinas={disciplinas}
+                        value={filtroDisciplina}
+                        onChange={setFiltroDisciplina}
+                    />
                 )}
 
                 {/* Día */}
