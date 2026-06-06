@@ -24,6 +24,18 @@ function getCurrentSunday(): string {
     return `${y}-${m}-${d}`;
 }
 
+function getMaxWeekStart(): string {
+    const today = new Date();
+    // Último día del mes próximo
+    const lastDayNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+    // Retroceder hasta el domingo anterior o igual
+    lastDayNextMonth.setDate(lastDayNextMonth.getDate() - lastDayNextMonth.getDay());
+    const y = lastDayNextMonth.getFullYear();
+    const m = String(lastDayNextMonth.getMonth() + 1).padStart(2, "0");
+    const d = String(lastDayNextMonth.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
 function formatWeekRange(sundayStr: string): string {
     const [y, m, d] = sundayStr.split("-").map(Number);
     const sunday = new Date(y, m - 1, d);
@@ -46,8 +58,10 @@ export default function WeekNavigation({ weekStart, canNavigatePast = false }: {
     const router = useRouter();
     const pathname = usePathname();
     const currentWeekStart = getCurrentSunday();
+    const maxWeekStart = getMaxWeekStart();
     const isCurrentWeek = weekStart === currentWeekStart;
     const isPreviousDisabled = isCurrentWeek && !canNavigatePast;
+    const isNextDisabled = weekStart >= maxWeekStart;
 
     const navigate = (dateStr: string) => {
         router.push(`${pathname}?fecha=${dateStr}`);
@@ -79,7 +93,8 @@ export default function WeekNavigation({ weekStart, canNavigatePast = false }: {
             <button
                 type="button"
                 onClick={() => navigate(addDays(weekStart, 7))}
-                className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
+                disabled={isNextDisabled}
+                className="p-2 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-500 hover:text-slate-800 hover:bg-slate-100 disabled:hover:text-slate-500 disabled:hover:bg-transparent"
                 aria-label="Semana siguiente"
             >
                 <ChevronRight size={18} />
