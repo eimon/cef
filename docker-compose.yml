@@ -29,6 +29,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    entrypoint: ["sh", "/app/entrypoint.sh"]
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   frontend:
@@ -49,6 +50,7 @@ services:
       - INTERNAL_API_URL=http://cef_api:8000
       - JWT_SECRET_KEY=${SECRET_KEY:-supersecretkey}
       - ALGORITHM=${ALGORITHM:-HS256}
+      - NODE_EXTRA_CA_CERTS=/app/certs/rootCA.pem
       - TZ=America/Argentina/Buenos_Aires
     command: npm run dev:https
     depends_on:

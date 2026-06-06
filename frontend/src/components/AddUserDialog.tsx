@@ -26,23 +26,28 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
     const [isOpen, setIsOpen] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const handledSuccessRef = useRef(false);
+    const [dni, setDni] = useState("");
+    const availableRoles = roleOptions?.length ? roleOptions : Object.values(UserRole);
+    const [selectedRole, setSelectedRole] = useState<UserRole>(availableRoles[0] ?? UserRole.CLIENTE);
+    const submitRef = useRef(false);
     const { showSuccess } = useToast();
     const initialState: UserFormState = { error: "", success: false };
 
     const [state, formAction, isPending] = useActionState(createUser, initialState);
-    const canSubmit = isValidEmail(email) && password.trim().length > 0;
-    const availableRoles = roleOptions?.length ? roleOptions : Object.values(UserRole);
+    const requiresDni = selectedRole !== UserRole.CLIENTE;
+    const canSubmit = isValidEmail(email) && password.trim().length > 0 && (!requiresDni || dni.trim().length > 0);
 
     const closeDialog = useCallback(() => {
         setIsOpen(false);
         setEmail("");
         setPassword("");
-    }, []);
+        setDni("");
+        setSelectedRole(availableRoles[0] ?? UserRole.CLIENTE);
+    }, [availableRoles]);
 
     useEffect(() => {
-        if (!state.success || !isOpen || handledSuccessRef.current) return;
-        handledSuccessRef.current = true;
+        if (!state.success || !isOpen || !submitRef.current) return;
+        submitRef.current = false;
         showSuccess("Usuario agregado correctamente");
         closeDialog();
         onSuccess?.();
@@ -73,7 +78,7 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
 
                         <form
                             action={formAction}
-                            onSubmit={() => { handledSuccessRef.current = false; }}
+                            onSubmit={() => { submitRef.current = true; }}
                             className="p-6 space-y-4"
                         >
                             {state?.error && (
@@ -111,13 +116,35 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
 
                             <div>
                                 <label className={labelCls}>Rol</label>
-                                <select name="role" className={inputCls}>
+                                <select
+                                    name="role"
+                                    className={inputCls}
+                                    value={selectedRole}
+                                    onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                                >
                                     {availableRoles.map((role) => (
                                         <option key={role} value={role}>
                                             {roleLabels[role] ?? role}
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+
+                            <div>
+                                <label className={labelCls}>
+                                    DNI {requiresDni
+                                        ? null
+                                        : <span className="text-slate-300 normal-case tracking-normal">(opcional)</span>
+                                    }
+                                </label>
+                                <input
+                                    name="dni"
+                                    type="text"
+                                    required={requiresDni}
+                                    value={dni}
+                                    onChange={(e) => setDni(e.target.value)}
+                                    className={inputCls}
+                                />
                             </div>
 
                             <div>

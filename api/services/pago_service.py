@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -9,6 +9,7 @@ from sqlalchemy.future import select
 
 from core.config import settings
 from core.enums import EstadoPago
+from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
 from models.pagos import Pago
@@ -28,6 +29,11 @@ async def _get_porcentaje_sena(db) -> float:
         return float(config.valor) if config else 50.0
     except (ValueError, TypeError):
         return 50.0
+
+
+def _deuda_saldable(fecha: date, hora_inicio) -> bool:
+    clase_inicio = datetime.combine(fecha, hora_inicio, tzinfo=LOCAL_TZ)
+    return clase_inicio - datetime.now(LOCAL_TZ) > timedelta(hours=24)
 
 
 class PagoService:
@@ -123,7 +129,7 @@ class PagoService:
         payment = payment_response["response"]
         status = payment.get("status")
 
-        if status != "approved":
+        if status not in ("approved", "pending"):
             return {"status": status}
 
         existing = await self.db.execute(
@@ -213,6 +219,9 @@ class PagoService:
 
         asistencia, instancia, template = row
 
+        if not _deuda_saldable(instancia.fecha, template.hora_inicio):
+            raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
+
         total_pagado = Decimal(str(
             (await self.db.execute(
                 select(func.coalesce(func.sum(Pago.monto), 0))
@@ -265,7 +274,7 @@ class PagoService:
             raise NotFoundException("Pago no encontrado en MercadoPago")
 
         payment = payment_response["response"]
-        if payment.get("status") != "approved":
+        if payment.get("status") not in ("approved", "pending"):
             return {"status": payment.get("status")}
 
         existing = await self.db.execute(
@@ -298,6 +307,21 @@ class PagoService:
         )).scalars().first()
         if not asistencia:
             raise NotFoundException("Asistencia no encontrada")
+
+        from models.clase_instancia import ClaseInstancia
+        from models.clase_template import ClaseTemplate
+
+        row = (await self.db.execute(
+            select(ClaseInstancia, ClaseTemplate)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .where(ClaseInstancia.id == asistencia.clase_instancia_id)
+        )).first()
+        if not row:
+            raise NotFoundException("Clase no encontrada")
+
+        instancia, template = row
+        if not _deuda_saldable(instancia.fecha, template.hora_inicio):
+            raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
 
         pago = Pago(
             usuario_id=current_user.id,
@@ -364,7 +388,7 @@ class PagoService:
             raise NotFoundException("Pago no encontrado en MercadoPago")
 
         payment = payment_response["response"]
-        if payment.get("status") != "approved":
+        if payment.get("status") not in ("approved", "pending"):
             return {"status": payment.get("status")}
 
         existing = await self.db.execute(

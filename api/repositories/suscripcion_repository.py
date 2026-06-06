@@ -121,6 +121,15 @@ class SuscripcionRepository:
         )
         return result.scalars().first()
 
+    async def count_active_asistencias(self, instancia_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).where(
+                Asistencia.clase_instancia_id == instancia_id,
+                Asistencia.cancelo == False,
+            )
+        )
+        return result.scalar() or 0
+
     async def create_instancia(
         self, clase_template_id: uuid.UUID, fecha: date, cupo: int
     ) -> ClaseInstancia:

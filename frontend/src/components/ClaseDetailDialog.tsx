@@ -229,12 +229,15 @@ export default function ClaseDetailDialog({
 
     const [asistencias, setAsistencias] = useState<AsistenciaRecepcion[]>([]);
     const [asistenciasLoading, setAsistenciasLoading] = useState(false);
+    const [asistenciasError, setAsistenciasError] = useState("");
 
     if (!isOpen || !clase) return null;
 
     const canEnroll =
         !clase.instancia?.cancelada &&
         !hasClaseEmpezado(clase.fecha_en_semana, clase.hora_inicio);
+    const canEnrollIndividual = canEnroll && clase.cupo_disponible > 0;
+    const canSubscribe = clase.cupo_suscripcion_disponible;
 
     const precioActual = step === "amount-suscripcion"
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
@@ -242,10 +245,19 @@ export default function ClaseDetailDialog({
     const montoMinimoActual = step === "amount-suscripcion"
         ? (suscripcionData?.monto_minimo ?? clase.precio_suscripcion * porcentajeSena / 100)
         : clase.precio_individual * porcentajeSena / 100;
+    const partialAmountValue = parseFloat(partialAmount);
     const selectedMonto =
         paymentType === "full"
             ? precioActual
-            : parseFloat(partialAmount) || 0;
+            : Number.isFinite(partialAmountValue)
+                ? partialAmountValue
+                : 0;
+    const isPartialAmountValid =
+        paymentType !== "partial" ||
+        (Number.isFinite(partialAmountValue) &&
+            partialAmountValue >= montoMinimoActual &&
+            partialAmountValue < precioActual);
+    const canContinuePayment = !mpLoading && isPartialAmountValid;
 
     function handleClose() {
         setStep("detail");
@@ -260,6 +272,7 @@ export default function ClaseDetailDialog({
         setSuscripcionCheckError("");
         setAsistencias([]);
         setAsistenciasLoading(false);
+        setAsistenciasError("");
         onClose();
     }
 
@@ -295,14 +308,11 @@ export default function ClaseDetailDialog({
     }
 
     async function handleContinuarPago() {
-        if (paymentType === "partial") {
-            const monto = parseFloat(partialAmount);
-            if (isNaN(monto) || monto < montoMinimoActual || monto >= precioActual) {
-                setAmountError(
-                    `El monto debe ser entre ${formatPrice(montoMinimoActual)} (${porcentajeSena}%) y ${formatPrice(precioActual-1)} (100%)`
-                );
-                return;
-            }
+        if (!isPartialAmountValid) {
+            setAmountError(
+                `El monto debe ser entre ${formatPrice(montoMinimoActual)} (${porcentajeSena}%) y ${formatPrice(precioActual-1)} (100%)`
+            );
+            return;
         }
         setAmountError("");
         if (!clase) return;
@@ -326,9 +336,14 @@ export default function ClaseDetailDialog({
     async function handleVerAsistencias() {
         if (!clase) return;
         setAsistenciasLoading(true);
-        const data = await getAsistenciasClase(clase.instancia!.id);
+        setAsistenciasError("");
+        const result = await getAsistenciasClase(clase.instancia!.id);
         setAsistenciasLoading(false);
-        setAsistencias(data);
+        if (result.error) {
+            setAsistenciasError(result.error);
+            return;
+        }
+        setAsistencias(result.data);
         setStep("asistencias");
     }
 
@@ -451,7 +466,7 @@ export default function ClaseDetailDialog({
                                             <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
                                                 Ya tenés suscripción
                                             </button>
-                                        ) : canEnroll ? (
+                                        ) : canEnrollIndividual ? (
                                             <div className="space-y-2">
                                                 <button
                                                     type="button"
@@ -478,6 +493,14 @@ export default function ClaseDetailDialog({
                                                     </div>
                                                 )}
                                             </div>
+                                        ) : canEnroll ? (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-center leading-tight"
+                                            >
+                                                Entrar a lista de espera para esta clase
+                                            </button>
                                         ) : (
                                             <button
                                                 type="button"
@@ -513,6 +536,14 @@ export default function ClaseDetailDialog({
                                         ) : clase.inscrito ? (
                                             <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
                                                 Ya tenés inscripción
+                                            </button>
+                                        ) : !canSubscribe ? (
+                                            <button
+                                                type="button"
+                                                disabled
+                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-center leading-tight"
+                                            >
+                                                Entrar a lista de espera para una mensualidad en esta clase
                                             </button>
                                         ) : (
                                             <div className="space-y-2">
@@ -560,10 +591,19 @@ export default function ClaseDetailDialog({
                                         ) : (
                                             <>
                                                 <ClipboardList size={16} />
-                                                <span>Ver asistencias</span>
+                                                <span>
+                                                    {clase.instancia
+                                                        ? "Ver asistencias"
+                                                        : "Sin asistencias para esta fecha"}
+                                                </span>
                                             </>
                                         )}
                                     </button>
+                                    {asistenciasError && (
+                                        <p className="mt-2 text-xs text-cef-danger text-center">
+                                            {asistenciasError}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -675,8 +715,8 @@ export default function ClaseDetailDialog({
                                 <button
                                     type="button"
                                     onClick={handleContinuarPago}
-                                    disabled={mpLoading}
-                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                                    disabled={!canContinuePayment}
+                                    className="px-5 py-2 text-sm font-semibold bg-cef-primary text-white rounded-lg hover:bg-cef-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                                 >
                                     {mpLoading ? (
                                         <>

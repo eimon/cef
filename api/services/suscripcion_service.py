@@ -98,7 +98,11 @@ class SuscripcionService:
             )
 
         for fecha in fechas_clases:
-            count = await self.repo.count_suscripciones_en_fecha(clase_template_id, fecha)
+            instancia = await self.repo.get_instancia(clase_template_id, fecha)
+            if instancia:
+                count = await self.repo.count_active_asistencias(instancia.id)
+            else:
+                count = await self.repo.count_suscripciones_en_fecha(clase_template_id, fecha)
             if count >= template.capacidad_maxima:
                 raise BadRequestException(
                     f"No hay cupo disponible para suscripciones el {fecha.strftime('%d/%m/%Y')}"

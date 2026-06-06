@@ -19,7 +19,7 @@ export default async function PagoRetornoPage({
     const paymentId = rawPaymentId && rawPaymentId !== "null" ? rawPaymentId : undefined;
     const tipo = params.tipo;
 
-    if (status === "approved" && paymentId) {
+    if ((status === "approved" || status === "pending") && paymentId) {
         const result =
             tipo === "deuda"        ? await confirmarDeudaMP(paymentId) :
             tipo === "suscripcion"  ? await confirmarSuscripcionMP(paymentId) :
@@ -46,7 +46,7 @@ export default async function PagoRetornoPage({
                     esSuscripcion
                         ? "Tu suscripción fue activada. Ya podés verla en Mis Clases."
                         : tipo === "deuda"
-                        ? "Tu deuda fue saldada. Ya podés verlo en Mis Clases."
+                        ? "Tu pago fue completado. Ya podés verlo en Mis Clases."
                         : "Tu inscripción fue confirmada. Ya podés ver tu clase en Mis Clases."
                 }
                 linkHref="/mis-clases"

@@ -75,6 +75,15 @@ class InscripcionRepository:
         )
         return result.scalar() or 0
 
+    async def count_active_asistencias(self, instancia_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).where(
+                Asistencia.clase_instancia_id == instancia_id,
+                Asistencia.cancelo == False,
+            )
+        )
+        return result.scalar() or 0
+
     async def has_existing_enrollment(self, usuario_id: uuid.UUID, instancia_id: uuid.UUID) -> bool:
         result = await self.db.execute(
             select(Asistencia).where(

@@ -14,6 +14,7 @@ interface UsersTableProps {
     allowedRoles: UserRole[];
     emptyMessage?: string;
     onSuccess?: () => void;
+    currentUserId?: string;
 }
 
 const roleBadgeClass: Record<string, string> = {
@@ -28,12 +29,18 @@ const roleLabels: Record<string, string> = {
     [UserRole.CLIENTE]: "Cliente",
 };
 
+function displayValue(value: string | null | undefined): string {
+    return value?.trim() ?? "";
+}
+
 function UserCardMenu({
     isDeleting,
+    editDisabled,
     onEdit,
     onDelete,
 }: {
     isDeleting: boolean;
+    editDisabled?: boolean;
     onEdit: () => void;
     onDelete: () => void;
 }) {
@@ -70,7 +77,7 @@ function UserCardMenu({
 
             {open && (
                 <div className="absolute right-0 top-8 z-30 w-40 glass-modal rounded-xl overflow-hidden py-1">
-                    {item("Editar", onEdit, "text-cef-primary")}
+                    {item("Editar", onEdit, "text-cef-primary", editDisabled)}
                     {item("Eliminar", onDelete, "text-cef-danger", isDeleting)}
                 </div>
             )}
@@ -78,10 +85,10 @@ function UserCardMenu({
     );
 }
 
-export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess }: UsersTableProps) {
+export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess, currentUserId }: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
     const { confirm } = useConfirm();
     const { refresh } = useRouter();
 
@@ -93,6 +100,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
         setIsDeleting(null);
 
         if (result.error) { showError(result.error); return; }
+        showSuccess("Usuario eliminado correctamente");
         onSuccess?.();
         refresh();
     };
@@ -115,7 +123,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center flex-wrap gap-1.5 min-w-0">
                                 <span className="text-sm font-semibold text-slate-700">
-                                    {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
+                                    {[displayValue(user.nombre), displayValue(user.apellido)].filter(Boolean).join(" ") || "—"}
                                 </span>
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
                                     {roleLabels[user.role] ?? user.role}
@@ -127,11 +135,14 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                     {user.activo ? "Activo" : "Inactivo"}
                                 </span>
                             </div>
-                            <UserCardMenu
-                                isDeleting={isDeleting === user.id}
-                                onEdit={() => setEditingUser(user)}
-                                onDelete={() => handleDelete(user)}
-                            />
+                            {allowedRoles.includes(user.role as UserRole) && (
+                                <UserCardMenu
+                                    isDeleting={isDeleting === user.id}
+                                    editDisabled={currentUserId === user.id}
+                                    onEdit={() => setEditingUser(user)}
+                                    onDelete={() => handleDelete(user)}
+                                />
+                            )}
                         </div>
 
                         {/* Row 2: email + telefono */}
@@ -164,6 +175,9 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                     Nombre
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Apellido
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Email
                                 </th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
@@ -187,7 +201,10 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                             {users.map((user) => (
                                 <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
-                                        {[user.nombre, user.apellido].filter(Boolean).join(" ") || "—"}
+                                        {displayValue(user.nombre) || "—"}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                        {displayValue(user.apellido)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.email}
@@ -212,23 +229,28 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                        <div className="flex items-center justify-end space-x-1">
-                                            <button
-                                                onClick={() => setEditingUser(user)}
-                                                className="p-1.5 text-cef-primary/70 hover:bg-cef-primary/10 hover:text-cef-primary rounded-lg transition-colors"
-                                                title="Editar"
-                                            >
-                                                <Pencil size={15} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(user)}
-                                                disabled={isDeleting === user.id}
-                                                className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        </div>
+                                        {allowedRoles.includes(user.role as UserRole) ? (
+                                            <div className="flex items-center justify-end space-x-1">
+                                                <button
+                                                    onClick={() => setEditingUser(user)}
+                                                    disabled={currentUserId === user.id}
+                                                    className="p-1.5 text-cef-primary/70 hover:bg-cef-primary/10 hover:text-cef-primary rounded-lg transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                                                    title="Editar"
+                                                >
+                                                    <Pencil size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(user)}
+                                                    disabled={isDeleting === user.id}
+                                                    className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">Solo lectura</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

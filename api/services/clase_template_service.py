@@ -1,7 +1,9 @@
-from datetime import date, timedelta
+import calendar
+from datetime import date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 import uuid
 
 from repositories.clase_template_repository import ClaseTemplateRepository
@@ -17,6 +19,7 @@ from models.clase_template import ClaseTemplate
 from models.precio_disciplina import PrecioDisciplina
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
+from core.timezone import LOCAL_TZ
 
 _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
     0: DiaSemana.LUNES,
@@ -37,6 +40,39 @@ _DIA_OFFSET: dict[DiaSemana, int] = {
     DiaSemana.VIERNES: 5,
     DiaSemana.SABADO: 6,
 }
+
+_DIA_TO_WEEKDAY: dict[DiaSemana, int] = {
+    DiaSemana.LUNES: 0,
+    DiaSemana.MARTES: 1,
+    DiaSemana.MIERCOLES: 2,
+    DiaSemana.JUEVES: 3,
+    DiaSemana.VIERNES: 4,
+    DiaSemana.SABADO: 5,
+    DiaSemana.DOMINGO: 6,
+}
+
+
+def _proxima_fecha(dia_semana: DiaSemana) -> date:
+    hoy = datetime.now(LOCAL_TZ).date()
+    dias = ((_DIA_TO_WEEKDAY[dia_semana] - hoy.weekday()) % 7) or 7
+    return hoy + timedelta(days=dias)
+
+
+def _calcular_fecha_fin(fecha_inicio: date) -> date:
+    month = fecha_inicio.month + 1
+    year = fecha_inicio.year + (month - 1) // 12
+    month = (month - 1) % 12 + 1
+    day = min(fecha_inicio.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day) - timedelta(days=1)
+
+
+def _calcular_fechas_clases(fecha_inicio: date, fecha_fin: date) -> list[date]:
+    fechas = []
+    current = fecha_inicio
+    while current <= fecha_fin:
+        fechas.append(current)
+        current += timedelta(days=7)
+    return fechas
 
 
 class ClaseTemplateService:
@@ -156,10 +192,21 @@ class ClaseTemplateService:
         fechas = [week_start + timedelta(days=i) for i in range(7)]
 
         templates = await self.repo.get_all()
-        instancias = await ClaseInstanciaRepository(self.db).get_by_fechas(fechas)
+        subscription_dates_by_template: dict[uuid.UUID, list[date]] = {}
+        subscription_dates: set[date] = set()
+        for template in templates:
+            fecha_inicio = _proxima_fecha(template.dia_semana)
+            fecha_fin = _calcular_fecha_fin(fecha_inicio)
+            fechas_suscripcion = _calcular_fechas_clases(fecha_inicio, fecha_fin)
+            subscription_dates_by_template[template.id] = fechas_suscripcion
+            subscription_dates.update(fechas_suscripcion)
+
+        all_relevant_dates = sorted(set(fechas) | subscription_dates)
+        instancias = await ClaseInstanciaRepository(self.db).get_by_fechas(all_relevant_dates)
         precios = await self._load_precios()
 
         instancia_map = {(i.clase_template_id, i.fecha): i for i in instancias}
+        week_instancias = [i for i in instancias if i.fecha in fechas]
 
         template_ids = [t.id for t in templates]
         subs_result = await self.db.execute(
@@ -170,21 +217,47 @@ class ClaseTemplateService:
         )
         subs = subs_result.scalars().all()
 
-        def count_subs(template_id: uuid.UUID) -> int:
-            return sum(1 for s in subs if s.clase_template_id == template_id)
+        instancia_ids = [i.id for i in instancias]
+        asistencia_counts: dict[uuid.UUID, int] = {}
+        if instancia_ids:
+            asistencia_result = await self.db.execute(
+                select(Asistencia.clase_instancia_id, func.count()).where(
+                    Asistencia.clase_instancia_id.in_(instancia_ids),
+                    Asistencia.cancelo == False,
+                ).group_by(Asistencia.clase_instancia_id)
+            )
+            asistencia_counts = {row[0]: row[1] for row in asistencia_result.all()}
+
+        def count_subs(template_id: uuid.UUID, target_date: date) -> int:
+            return sum(
+                1
+                for s in subs
+                if s.clase_template_id == template_id
+                and s.fecha_inicio <= target_date <= s.fecha_fin
+            )
+
+        def cupo_disponible_for(template, target_date: date) -> int:
+            instancia = instancia_map.get((template.id, target_date))
+            if instancia:
+                return max(0, template.capacidad_maxima - asistencia_counts.get(instancia.id, 0))
+            return max(0, template.capacidad_maxima - count_subs(template.id, target_date))
+
+        def cupo_suscripcion_disponible(template) -> bool:
+            fechas_suscripcion = subscription_dates_by_template.get(template.id, [])
+            return all(cupo_disponible_for(template, f) > 0 for f in fechas_suscripcion)
 
         # Enrollment status for current user
         inscrito_instancia_ids: set = set()
         user_subs: list = []
         if current_user:
-            instancia_ids = [i.id for i in instancias]
-            if instancia_ids:
+            week_instancia_ids = [i.id for i in week_instancias]
+            if week_instancia_ids:
                 asistencias_result = await self.db.execute(
                     select(Asistencia.clase_instancia_id).where(
                         Asistencia.usuario_id == current_user.id,
                         Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
                         Asistencia.cancelo == False,
-                        Asistencia.clase_instancia_id.in_(instancia_ids),
+                        Asistencia.clase_instancia_id.in_(week_instancia_ids),
                     )
                 )
                 inscrito_instancia_ids = {r[0] for r in asistencias_result.all()}
@@ -206,11 +279,7 @@ class ClaseTemplateService:
             offset = _DIA_OFFSET[template.dia_semana]
             fecha_clase = week_start + timedelta(days=offset)
             instancia = instancia_map.get((template.id, fecha_clase))
-
-            if instancia:
-                cupo_disponible = instancia.cupo
-            else:
-                cupo_disponible = template.capacidad_maxima - count_subs(template.id)
+            cupo_disponible = cupo_disponible_for(template, fecha_clase)
 
             pi, ps = precios.get(template.disciplina, (0.0, 0.0))
 
@@ -241,11 +310,12 @@ class ClaseTemplateService:
                 sala_nombre=template.sala.nombre if template.sala else None,
                 fecha_en_semana=fecha_clase,
                 cupo_disponible=cupo_disponible,
+                cupo_suscripcion_disponible=cupo_suscripcion_disponible(template),
                 instancia=InstanciaSemanaResponse(
                     id=instancia.id,
                     fecha=instancia.fecha,
                     cancelada=instancia.cancelada,
-                    cupo=instancia.cupo,
+                    cupo=cupo_disponible,
                 ) if instancia else None,
                 inscrito=inscrito,
                 suscrito=suscrito,

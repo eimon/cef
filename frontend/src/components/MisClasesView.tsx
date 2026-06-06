@@ -103,9 +103,9 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
         item.precio_clase != null && item.monto_pagado != null
             ? item.precio_clase - item.monto_pagado
             : 0;
-    const tieneDeuda = item.tipo === "individual" && !item.cancelada && montoRestante > 0;
+    const tienePagoPendiente = item.tipo === "individual" && !item.cancelada && montoRestante > 0;
 
-    async function handleSaldar() {
+    async function handleCompletarPago() {
         if (!item.asistencia_id) return;
         setPaying(true);
         setPayError("");
@@ -156,8 +156,8 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                         : <span className="text-[10px] font-semibold uppercase text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200 flex-shrink-0">No asistí</span>
                 )}
 
-                {/* Monto — solo cuando hay deuda pendiente */}
-                {tieneDeuda && item.monto_pagado != null && item.precio_clase != null && (
+                {/* Monto pendiente */}
+                {tienePagoPendiente && item.monto_pagado != null && item.precio_clase != null && (
                     <span className="text-xs text-slate-500 flex-shrink-0 flex items-center gap-1">
                         <DollarSign size={11} className="text-slate-400" />
                         {formatPrice(item.monto_pagado)}
@@ -165,19 +165,19 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                     </span>
                 )}
 
-                {/* Saldar deuda */}
-                {tieneDeuda && (
+                {/* Completar pago */}
+                {tienePagoPendiente && (
                     payError
                         ? <span className="text-[10px] text-cef-danger flex items-center gap-1 flex-shrink-0">
                             <AlertCircle size={10} />{payError}
                           </span>
                         : <button
                             type="button"
-                            onClick={handleSaldar}
+                            onClick={handleCompletarPago}
                             disabled={paying}
                             className="flex-shrink-0 py-1 px-2.5 rounded-lg bg-cef-warning/10 hover:bg-cef-warning/20 text-cef-warning border border-cef-warning/20 text-[11px] font-semibold flex items-center gap-1 transition-colors disabled:opacity-60"
                           >
-                            {paying ? <Loader2 size={11} className="animate-spin" /> : `Saldar ${formatPrice(montoRestante)}`}
+                            {paying ? <Loader2 size={11} className="animate-spin" /> : "Completar pago"}
                           </button>
                 )}
             </div>

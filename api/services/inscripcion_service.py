@@ -41,7 +41,8 @@ class InscripcionService:
             if await self.repo.has_existing_enrollment(current_user.id, instancia.id):
                 raise ConflictException("Ya estás inscripto en esta clase")
 
-            if instancia.cupo <= 0:
+            active_asistencias = await self.repo.count_active_asistencias(instancia.id)
+            if active_asistencias >= template.capacidad_maxima:
                 raise BadRequestException("No hay cupo disponible para inscripción individual en esta clase")
         else:
             cupo_reservado = await self.repo.count_active_suscripciones(clase_template_id, fecha)

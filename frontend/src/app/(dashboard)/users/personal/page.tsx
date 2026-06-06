@@ -1,11 +1,18 @@
 import UsersManagementPage from "@/components/UsersManagementPage";
 import { UserRole } from "@/types/api";
+import { getUserId, getUserRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 const STAFF_ROLES = [UserRole.ADMIN, UserRole.RECEPCION];
 
 export const dynamic = "force-dynamic";
 
-export default function PersonalPage() {
+export default async function PersonalPage() {
+    const [userRole, currentUserId] = await Promise.all([getUserRole(), getUserId()]);
+    if (userRole !== "admin") {
+        redirect("/clases");
+    }
+
     return (
         <UsersManagementPage
             title="Personal"
@@ -14,6 +21,8 @@ export default function PersonalPage() {
             allowedRoles={STAFF_ROLES}
             emptyMessage="No hay administradores ni recepcionistas."
             filteredEmptyMessage="No se encontró personal con los filtros ingresados"
+
+            currentUserId={currentUserId ?? undefined}
         />
     );
 }
