@@ -110,9 +110,23 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
         });
     }, [isOpen, clase]);
 
+    const selectedSala = ui.salas.find((s) => s.id === ui.salaId) ?? null;
+    const salaCapacidad = selectedSala?.capacidad ?? null;
+
     const setField = (key: "disciplina" | "capacidadMaxima" | "salaId" | "profesorId") =>
-        (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-            dispatch({ type: "SET_FIELD", key, value: event.target.value });
+        (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+            const value = event.target.value;
+            if (key === "salaId") {
+                const sala = ui.salas.find((s) => s.id === value);
+                const cap = sala?.capacidad ?? null;
+                dispatch({ type: "SET_FIELD", key, value });
+                if (cap !== null && Number(ui.capacidadMaxima) > cap) {
+                    dispatch({ type: "SET_FIELD", key: "capacidadMaxima", value: String(cap) });
+                }
+                return;
+            }
+            dispatch({ type: "SET_FIELD", key, value });
+        };
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -132,11 +146,13 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
         refresh();
     };
 
+    const capacidadNum = Number(ui.capacidadMaxima);
     const canSubmit =
         ui.disciplina.trim().length > 0 &&
         ui.diaSemana.trim().length > 0 &&
         ui.horaInicio.trim().length > 0 &&
-        Number(ui.capacidadMaxima) > 0 &&
+        capacidadNum > 0 &&
+        (salaCapacidad === null || capacidadNum <= salaCapacidad) &&
         ui.salaId.trim().length > 0 &&
         ui.profesorId.trim().length > 0;
 
@@ -230,11 +246,16 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                     name="capacidad_maxima"
                                     type="number"
                                     min={1}
+                                    max={salaCapacidad ?? undefined}
                                     required
                                     value={ui.capacidadMaxima}
                                     onChange={setField("capacidadMaxima")}
                                     className={inputCls}
+                                    placeholder={salaCapacidad ? `Máx. ${salaCapacidad}` : undefined}
                                 />
+                                {salaCapacidad !== null && (
+                                    <p className="mt-1 text-xs text-slate-400">Capacidad de la sala: {salaCapacidad}</p>
+                                )}
                             </div>
 
                             <div>

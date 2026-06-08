@@ -1,12 +1,24 @@
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, UUID4, Field
 from typing import Optional
 from datetime import datetime
 
 
-class SalaResponse(BaseModel):
+class SalaBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=200)
+    capacidad: int = Field(..., ge=1)
+
+
+class SalaCreate(SalaBase):
+    pass
+
+
+class SalaUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=1, max_length=200)
+    capacidad: Optional[int] = Field(None, ge=1)
+
+
+class SalaResponse(SalaBase):
     id: UUID4
-    nombre: str
-    capacidad: Optional[int] = None
     activo: bool
     created_at: datetime
     updated_at: Optional[datetime] = None

@@ -94,18 +94,34 @@ export default function AddClaseDialog() {
         });
     }, [ui.isOpen]);
 
+    const selectedSala = ui.salas.find((s) => s.id === ui.fields.sala_id) ?? null;
+    const salaCapacidad = selectedSala?.capacidad ?? null;
+
     const set = (key: keyof ClaseFields) =>
-        (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-            dispatch({ type: "SET_FIELD", key, value: event.target.value });
+        (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+            let value = event.target.value;
+            if (key === "sala_id") {
+                const sala = ui.salas.find((s) => s.id === value);
+                const cap = sala?.capacidad ?? null;
+                dispatch({ type: "SET_FIELD", key, value });
+                if (cap !== null && Number(ui.fields.capacidad_maxima) > cap) {
+                    dispatch({ type: "SET_FIELD", key: "capacidad_maxima", value: String(cap) });
+                }
+                return;
+            }
+            dispatch({ type: "SET_FIELD", key, value });
+        };
 
     const horaFin = ui.fields.hora_inicio ? sumarUnaHora(ui.fields.hora_inicio) : "--:--";
+    const capacidadNum = Number(ui.fields.capacidad_maxima);
     const canSubmit =
         ui.fields.disciplina.trim().length > 0 &&
         ui.diaSemana.trim().length > 0 &&
         ui.fields.hora_inicio.trim().length > 0 &&
         ui.fields.sala_id.trim().length > 0 &&
         ui.fields.profesor_id.trim().length > 0 &&
-        Number(ui.fields.capacidad_maxima) > 0;
+        capacidadNum > 0 &&
+        (salaCapacidad === null || capacidadNum <= salaCapacidad);
 
     return (
         <>
@@ -137,6 +153,7 @@ export default function AddClaseDialog() {
                                     ui={ui}
                                     canSubmit={canSubmit}
                                     horaFin={horaFin}
+                                    salaCapacidad={salaCapacidad}
                                     set={set}
                                     dispatch={dispatch}
                                 />
@@ -153,12 +170,14 @@ function AddClaseForm({
     ui,
     canSubmit,
     horaFin,
+    salaCapacidad,
     set,
     dispatch,
 }: {
     ui: State;
     canSubmit: boolean;
     horaFin: string;
+    salaCapacidad: number | null;
     set: (key: keyof ClaseFields) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
     dispatch: Dispatch<Action>;
 }) {
@@ -254,12 +273,16 @@ function AddClaseForm({
                     name="capacidad_maxima"
                     type="number"
                     min={1}
+                    max={salaCapacidad ?? undefined}
                     required
                     value={ui.fields.capacidad_maxima}
                     onChange={set("capacidad_maxima")}
                     className={inputCls}
-                    placeholder="Ej: 15"
+                    placeholder={salaCapacidad ? `Máx. ${salaCapacidad}` : "Ej: 15"}
                 />
+                {salaCapacidad !== null && (
+                    <p className="mt-1 text-xs text-slate-400">Capacidad de la sala: {salaCapacidad}</p>
+                )}
             </div>
 
             <div>

@@ -79,7 +79,7 @@ export interface MedicalRecordProfile {
 export interface Sala {
     id: string;
     nombre: string;
-    capacidad: number | null;
+    capacidad: number;
     activo: boolean;
     created_at: string;
     updated_at: string | null;
