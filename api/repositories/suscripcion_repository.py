@@ -58,6 +58,15 @@ class SuscripcionRepository:
         )
         return result.scalar() or 0
 
+    async def count_active_suscripciones(self, clase_template_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).where(
+                Suscripcion.clase_template_id == clase_template_id,
+                Suscripcion.activo == True,
+            )
+        )
+        return result.scalar() or 0
+
     async def has_conflicto_suscripcion(
         self,
         usuario_id: uuid.UUID,
