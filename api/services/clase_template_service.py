@@ -228,19 +228,14 @@ class ClaseTemplateService:
             )
             asistencia_counts = {row[0]: row[1] for row in asistencia_result.all()}
 
-        def count_subs(template_id: uuid.UUID, target_date: date) -> int:
-            return sum(
-                1
-                for s in subs
-                if s.clase_template_id == template_id
-                and s.fecha_inicio <= target_date <= s.fecha_fin
-            )
+        def count_all_subs(template_id: uuid.UUID) -> int:
+            return sum(1 for s in subs if s.clase_template_id == template_id)
 
         def cupo_disponible_for(template, target_date: date) -> int:
             instancia = instancia_map.get((template.id, target_date))
             if instancia:
                 return max(0, template.capacidad_maxima - asistencia_counts.get(instancia.id, 0))
-            return max(0, template.capacidad_maxima - count_subs(template.id, target_date))
+            return max(0, template.capacidad_maxima - count_all_subs(template.id))
 
         def cupo_suscripcion_disponible(template) -> bool:
             fechas_suscripcion = subscription_dates_by_template.get(template.id, [])

@@ -97,12 +97,15 @@ class SuscripcionService:
                 f"Tenés una inscripción individual en el mismo horario el {conflicto_fecha.strftime('%d/%m/%Y')}"
             )
 
+        total_subs: int | None = None
         for fecha in fechas_clases:
             instancia = await self.repo.get_instancia(clase_template_id, fecha)
             if instancia:
                 count = await self.repo.count_active_asistencias(instancia.id)
             else:
-                count = await self.repo.count_suscripciones_en_fecha(clase_template_id, fecha)
+                if total_subs is None:
+                    total_subs = await self.repo.count_active_suscripciones(clase_template_id)
+                count = total_subs
             if count >= template.capacidad_maxima:
                 raise BadRequestException(
                     f"No hay cupo disponible para suscripciones el {fecha.strftime('%d/%m/%Y')}"
@@ -162,13 +165,15 @@ class SuscripcionService:
             fecha_fin=fecha_fin,
         )
 
+        total_subs_after: int | None = None
         for fecha in fechas_clases:
             instancia = await self.repo.get_instancia(clase_template_id, fecha)
             if instancia:
                 instancia.cupo = max(0, instancia.cupo - 1)
             else:
-                count = await self.repo.count_suscripciones_en_fecha(clase_template_id, fecha)
-                cupo = max(0, template.capacidad_maxima - count)
+                if total_subs_after is None:
+                    total_subs_after = await self.repo.count_active_suscripciones(clase_template_id)
+                cupo = max(0, template.capacidad_maxima - total_subs_after)
                 instancia = await self.repo.create_instancia(clase_template_id, fecha, cupo)
 
             await self.repo.create_asistencia(current_user.id, instancia.id)
