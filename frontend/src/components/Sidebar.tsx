@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown } from "lucide-react";
+import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown, Building2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
@@ -36,6 +36,7 @@ const navigation: NavItem[] = [
         ],
     },
     { name: "Profesores", href: "/profesores", icon: GraduationCap, adminOnly: false, clientOnly: false, staffOnly: true },
+    { name: "Salas",      href: "/salas",      icon: Building2,   adminOnly: true,  clientOnly: false, staffOnly: false },
     { name: "Precios",    href: "/precios",    icon: DollarSign, adminOnly: true,  clientOnly: false, staffOnly: false },
 ];
 

@@ -13,7 +13,7 @@ class Sala(Base):
     nombre = Column(String(200), nullable=False)
     # sede: reservado para soporte multi-sede futuro
     sede = Column(String(200), nullable=True)
-    capacidad = Column(Integer, nullable=True)
+    capacidad = Column(Integer, nullable=False)
     activo = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

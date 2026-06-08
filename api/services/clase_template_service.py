@@ -9,9 +9,10 @@ import uuid
 from repositories.clase_template_repository import ClaseTemplateRepository
 from repositories.clase_instancia_repository import ClaseInstanciaRepository
 from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.sala_repository import SalaRepository
 from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
-from exceptions.general import NotFoundException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
+from exceptions.general import NotFoundException, BadRequestException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
 from core.enums import DiaSemana, Disciplina, TipoInscripcion
 from models.asistencia import Asistencia
@@ -109,7 +110,16 @@ class ClaseTemplateService:
             updated_at=clase.updated_at,
         )
 
+    async def _validar_capacidad_sala(self, sala_id, capacidad_maxima: int) -> None:
+        sala = await SalaRepository(self.db).get_by_id(sala_id)
+        if sala and sala.capacidad is not None and capacidad_maxima > sala.capacidad:
+            raise BadRequestException(
+                f"El cupo de la clase ({capacidad_maxima}) no puede superar la capacidad de la sala ({sala.capacidad})"
+            )
+
     async def create(self, data: ClaseTemplateCreate) -> ClaseTemplateResponse:
+        await self._validar_capacidad_sala(data.sala_id, data.capacidad_maxima)
+
         if await self.repo.get_conflicting_sala(data.sala_id, data.dia_semana, data.hora_inicio, data.hora_fin):
             raise SalaOcupadaException()
 
@@ -144,6 +154,8 @@ class ClaseTemplateService:
         clase = await self.repo.get_by_id(clase_id)
         if not clase:
             raise NotFoundException("Clase no encontrada")
+
+        await self._validar_capacidad_sala(data.sala_id, data.capacidad_maxima)
 
         if await self.repo.get_conflicting_sala(data.sala_id, data.dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
             raise SalaOcupadaException()
