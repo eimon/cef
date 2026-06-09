@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useActionState, ChangeEvent } from "react";
 import { createProfesor, ProfesorFormState } from "@/actions/profesores";
+import { getDisciplinas } from "@/actions/disciplinas";
+import { DisciplinaItem } from "@/types/api";
 import { Plus, X, Loader2 } from "lucide-react";
 import { useToast } from "@/context/ToastContext";
 import { isEmptyOrValidEmail } from "@/lib/validation";
+import DisciplinasMultiSelect from "@/components/DisciplinasMultiSelect";
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
@@ -20,6 +23,8 @@ interface AddProfesorDialogProps {
 export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [fields, setFields] = useState(emptyFields);
+    const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([]);
+    const [selectedDisciplinas, setSelectedDisciplinas] = useState<string[]>([]);
     const { showSuccess } = useToast();
     const initialState: ProfesorFormState = {};
     const [state, formAction, isPending] = useActionState(createProfesor, initialState);
@@ -32,13 +37,21 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
         fields.nombre.trim().length > 0 &&
         fields.apellido.trim().length > 0 &&
         fields.genero.trim().length > 0 &&
+        selectedDisciplinas.length > 0 &&
         isEmptyOrValidEmail(fields.email);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        getDisciplinas().then(setDisciplinas);
+        setSelectedDisciplinas([]);
+    }, [isOpen]);
 
     useEffect(() => {
         if (state.success && isOpen) {
             showSuccess("Profesor agregado correctamente");
             setIsOpen(false);
             setFields(emptyFields);
+            setSelectedDisciplinas([]);
             onSuccess();
         }
     }, [state.success, isOpen, showSuccess, onSuccess]);
@@ -46,6 +59,7 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
     const handleClose = () => {
         setIsOpen(false);
         setFields(emptyFields);
+        setSelectedDisciplinas([]);
     };
 
     return (
@@ -60,15 +74,15 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
 
             {isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                    <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                    <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
                             <h3 className="text-base font-semibold text-slate-800">Añadir Nuevo Profesor</h3>
                             <button onClick={handleClose} className="text-slate-400 hover:text-slate-600 transition-colors">
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <form action={formAction} className="p-6 space-y-4">
+                        <form action={formAction} className="p-6 space-y-4 overflow-y-auto">
                             {state?.error && (
                                 <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
                                     {state.error}
@@ -112,6 +126,15 @@ export default function AddProfesorDialog({ onSuccess }: AddProfesorDialogProps)
                                     Teléfono <span className="text-slate-300 normal-case tracking-normal">(opcional)</span>
                                 </label>
                                 <input name="telefono" type="tel" value={fields.telefono} onChange={set("telefono")} className={inputCls} />
+                            </div>
+
+                            <div>
+                                <label className={labelCls}>Disciplinas</label>
+                                <DisciplinasMultiSelect
+                                    disciplinas={disciplinas}
+                                    selected={selectedDisciplinas}
+                                    onChange={setSelectedDisciplinas}
+                                />
                             </div>
 
                             <div className="pt-2 flex justify-end space-x-3">

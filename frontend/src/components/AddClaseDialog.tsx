@@ -101,7 +101,7 @@ export default function AddClaseDialog() {
 
     const set = (key: keyof ClaseFields) =>
         (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-            let value = event.target.value;
+            const value = event.target.value;
             if (key === "sala_id") {
                 const sala = ui.salas.find((s) => s.id === value);
                 const cap = sala?.capacidad ?? null;
@@ -111,8 +111,15 @@ export default function AddClaseDialog() {
                 }
                 return;
             }
+            if (key === "disciplina") {
+                dispatch({ type: "SET_FIELD", key: "profesor_id", value: "" });
+            }
             dispatch({ type: "SET_FIELD", key, value });
         };
+
+    const profesoresFiltrados = ui.fields.disciplina
+        ? ui.profesores.filter((p) => (p.disciplinas ?? []).includes(ui.fields.disciplina))
+        : [];
 
     const horaFin = ui.fields.hora_inicio ? sumarUnaHora(ui.fields.hora_inicio) : "--:--";
     const capacidadNum = Number(ui.fields.capacidad_maxima);
@@ -156,6 +163,7 @@ export default function AddClaseDialog() {
                                     canSubmit={canSubmit}
                                     horaFin={horaFin}
                                     salaCapacidad={salaCapacidad}
+                                    profesoresFiltrados={profesoresFiltrados}
                                     set={set}
                                     dispatch={dispatch}
                                 />
@@ -173,6 +181,7 @@ function AddClaseForm({
     canSubmit,
     horaFin,
     salaCapacidad,
+    profesoresFiltrados,
     set,
     dispatch,
 }: {
@@ -180,6 +189,7 @@ function AddClaseForm({
     canSubmit: boolean;
     horaFin: string;
     salaCapacidad: number | null;
+    profesoresFiltrados: Profesor[];
     set: (key: keyof ClaseFields) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
     dispatch: Dispatch<Action>;
 }) {
@@ -299,9 +309,23 @@ function AddClaseForm({
 
             <div>
                 <label htmlFor="add-profesor" className={labelCls}>Profesor</label>
-                <select id="add-profesor" name="profesor_id" required value={ui.fields.profesor_id} onChange={set("profesor_id")} className={inputCls}>
-                    <option value="">Seleccionar…</option>
-                    {ui.profesores.map((profesor) => (
+                <select
+                    id="add-profesor"
+                    name="profesor_id"
+                    required
+                    value={ui.fields.profesor_id}
+                    onChange={set("profesor_id")}
+                    disabled={!ui.fields.disciplina}
+                    className={`${inputCls} ${!ui.fields.disciplina ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                    <option value="">
+                        {!ui.fields.disciplina
+                            ? "Primero seleccioná una disciplina"
+                            : profesoresFiltrados.length === 0
+                            ? "No hay profesores para esta disciplina"
+                            : "Seleccionar…"}
+                    </option>
+                    {profesoresFiltrados.map((profesor) => (
                         <option key={profesor.id} value={profesor.id}>{profesor.nombre} {profesor.apellido}</option>
                     ))}
                 </select>

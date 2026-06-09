@@ -1,6 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from models.profesor import Profesor
+from models.disciplina import Disciplina
 from schemas.profesor import ProfesorCreate, ProfesorUpdate
 import uuid
 
@@ -10,11 +12,19 @@ class ProfesorRepository:
         self.db = db
 
     async def get_by_id(self, profesor_id: uuid.UUID) -> Profesor | None:
-        result = await self.db.execute(select(Profesor).where(Profesor.id == profesor_id))
+        result = await self.db.execute(
+            select(Profesor)
+            .options(selectinload(Profesor.disciplinas))
+            .where(Profesor.id == profesor_id)
+        )
         return result.scalars().first()
 
     async def get_by_dni(self, dni: str) -> Profesor | None:
-        result = await self.db.execute(select(Profesor).where(Profesor.dni == dni))
+        result = await self.db.execute(
+            select(Profesor)
+            .options(selectinload(Profesor.disciplinas))
+            .where(Profesor.dni == dni)
+        )
         return result.scalars().first()
 
     async def get_all(
@@ -25,7 +35,11 @@ class ProfesorRepository:
         nombre: str | None = None,
         apellido: str | None = None,
     ) -> list[Profesor]:
-        query = select(Profesor).where(Profesor.activo == True)
+        query = (
+            select(Profesor)
+            .options(selectinload(Profesor.disciplinas))
+            .where(Profesor.activo == True)
+        )
         if dni:
             query = query.where(Profesor.dni.ilike(f"%{dni}%"))
         if nombre:
@@ -36,10 +50,29 @@ class ProfesorRepository:
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
+    async def _get_disciplinas_by_nombres(self, nombres: list[str]) -> list[Disciplina]:
+        if not nombres:
+            return []
+        result = await self.db.execute(
+            select(Disciplina).where(
+                Disciplina.nombre.in_(nombres),
+                Disciplina.activo == True,
+            )
+        )
+        return list(result.scalars().all())
+
     async def create(self, data: ProfesorCreate) -> Profesor:
-        profesor = Profesor(**data.model_dump())
+        disciplinas_nombres = data.disciplinas
+        create_data = data.model_dump(exclude={"disciplinas"})
+        profesor = Profesor(**create_data)
         self.db.add(profesor)
         await self.db.flush()
+
+        if disciplinas_nombres:
+            disciplinas = await self._get_disciplinas_by_nombres(disciplinas_nombres)
+            profesor.disciplinas = disciplinas
+            await self.db.flush()
+
         await self.db.refresh(profesor)
         return profesor
 
@@ -47,8 +80,14 @@ class ProfesorRepository:
         profesor = await self.get_by_id(profesor_id)
         if not profesor:
             return None
-        for key, value in data.model_dump(exclude_unset=True).items():
+
+        for key, value in data.model_dump(exclude_unset=True, exclude={"disciplinas"}).items():
             setattr(profesor, key, value)
+
+        if "disciplinas" in data.model_fields_set:
+            disciplinas = await self._get_disciplinas_by_nombres(data.disciplinas or [])
+            profesor.disciplinas = disciplinas
+
         await self.db.flush()
         await self.db.refresh(profesor)
         return profesor
@@ -63,7 +102,11 @@ class ProfesorRepository:
         return profesor
 
     async def reactivate(self, profesor_id: uuid.UUID) -> Profesor | None:
-        result = await self.db.execute(select(Profesor).where(Profesor.id == profesor_id))
+        result = await self.db.execute(
+            select(Profesor)
+            .options(selectinload(Profesor.disciplinas))
+            .where(Profesor.id == profesor_id)
+        )
         profesor = result.scalars().first()
         if not profesor:
             return None

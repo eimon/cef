@@ -26,6 +26,7 @@ export interface Profesor {
     email: string | null;
     telefono: string | null;
     activo: boolean;
+    disciplinas: string[];
     created_at: string;
     updated_at: string | null;
 }

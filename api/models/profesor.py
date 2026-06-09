@@ -1,9 +1,16 @@
 import uuid
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import Column, String, Boolean, DateTime, Table, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from core.database import Base
+
+profesor_disciplinas = Table(
+    "profesor_disciplinas",
+    Base.metadata,
+    Column("profesor_id", UUID(as_uuid=True), ForeignKey("profesores.id", ondelete="CASCADE"), primary_key=True),
+    Column("disciplina_id", UUID(as_uuid=True), ForeignKey("disciplinas.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Profesor(Base):
@@ -21,3 +28,4 @@ class Profesor(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     clase_templates = relationship("ClaseTemplate", back_populates="profesor")
+    disciplinas = relationship("Disciplina", secondary="profesor_disciplinas", lazy="selectin")

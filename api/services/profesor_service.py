@@ -64,6 +64,25 @@ class ProfesorService:
             existing = await self.repo.get_by_dni(data.dni)
             if existing and existing.id != profesor_id:
                 raise ConflictException("El DNI ingresado ya se encuentra registrado en otro profesor")
+
+        if "disciplinas" in data.model_fields_set and data.disciplinas is not None:
+            current = {d.nombre for d in profesor.disciplinas}
+            removed = current - set(data.disciplinas)
+            if removed:
+                result = await self.db.execute(
+                    select(ClaseTemplate).where(
+                        ClaseTemplate.profesor_id == profesor_id,
+                        ClaseTemplate.activo == True,
+                        ClaseTemplate.disciplina.in_(removed),
+                    )
+                )
+                conflicting = list(result.scalars().all())
+                if conflicting:
+                    nombres = ", ".join(sorted({c.disciplina for c in conflicting}))
+                    raise BadRequestException(
+                        f"No es posible quitar la disciplina porque el profesor tiene clases activas asignadas: {nombres}"
+                    )
+
         updated = await self.repo.update(profesor_id, data)
         if not updated:
             raise NotFoundException("Profesor no encontrado")
