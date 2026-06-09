@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from core.enums import Disciplina
 from core.roles import Role
 from dependencies.auth import get_current_user, has_role
 from models.usuario import Usuario
@@ -24,7 +23,7 @@ async def list_precios(
 
 @router.put("/disciplinas/{disciplina}", response_model=PrecioDisciplinaResponse)
 async def update_precio_disciplina(
-    disciplina: Disciplina,
+    disciplina: str,
     data: PrecioDisciplinaUpdate,
     db: AsyncSession = Depends(get_db),
     _=Depends(has_role(Role.ROLE_PRECIO_UPDATE)),

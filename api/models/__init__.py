@@ -12,7 +12,7 @@ from models.sala import Sala
 from models.email_change_token import EmailChangeToken
 from models.password_reset_token import PasswordResetToken
 from models.configuracion import Configuracion
-from models.precio_disciplina import PrecioDisciplina
+from models.disciplina import Disciplina
 
 __all__ = [
     "Usuario",
@@ -29,5 +29,5 @@ __all__ = [
     "FichaMedica",
     "Sala",
     "Configuracion",
-    "PrecioDisciplina",
+    "Disciplina",
 ]

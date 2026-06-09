@@ -2,13 +2,13 @@ from pydantic import BaseModel, UUID4
 from typing import Optional
 from datetime import date, time
 
-from core.enums import Disciplina, EstadoPago, DiaSemana
+from core.enums import EstadoPago, DiaSemana
 
 
 class MiClaseIndividualResponse(BaseModel):
     asistencia_id: UUID4
     clase_nombre: str
-    disciplina: Disciplina
+    disciplina: str
     fecha: date
     hora_inicio: time
     hora_fin: time
@@ -37,7 +37,7 @@ class MiSuscripcionResponse(BaseModel):
     id: UUID4
     clase_template_id: UUID4
     clase_nombre: str
-    disciplina: Disciplina
+    disciplina: str
     dia_semana: DiaSemana
     hora_inicio: time
     hora_fin: time

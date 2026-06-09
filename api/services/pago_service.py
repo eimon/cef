@@ -15,7 +15,7 @@ from models.asistencia import Asistencia
 from models.pagos import Pago
 from models.usuario import Usuario
 from repositories.inscripcion_repository import InscripcionRepository
-from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.inscripcion import InscripcionIndividualCreate
 from schemas.suscripcion import SuscripcionCreate
@@ -63,11 +63,11 @@ class PagoService:
         if not template:
             raise NotFoundException("Clase no encontrada")
 
-        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
-        if not precio_disciplina:
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not disciplina_obj:
             raise BadRequestException("No hay precio configurado para esta disciplina")
 
-        precio = float(precio_disciplina.precio_individual)
+        precio = float(disciplina_obj.precio_individual)
         porcentaje = await _get_porcentaje_sena(self.db)
         monto_minimo = precio * porcentaje / 100
 
@@ -233,7 +233,7 @@ class PagoService:
             )).scalar()
         ))
 
-        precio_disc = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        precio_disc = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
         if not precio_disc:
             raise BadRequestException("No hay precio configurado para esta disciplina")
 
@@ -351,7 +351,7 @@ class PagoService:
         if not template:
             raise NotFoundException("Clase no encontrada")
 
-        precio_disc = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
+        precio_disc = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
         if not precio_disc:
             raise BadRequestException("No hay precio configurado para esta disciplina")
 

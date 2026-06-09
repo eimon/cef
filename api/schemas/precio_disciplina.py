@@ -1,8 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from core.enums import Disciplina
-
 
 class PrecioDisciplinaUpdate(BaseModel):
     precio_individual: float = Field(..., gt=0, description="Debe ser mayor a cero")
@@ -10,7 +8,7 @@ class PrecioDisciplinaUpdate(BaseModel):
 
 
 class PrecioDisciplinaResponse(BaseModel):
-    disciplina: Disciplina
+    disciplina: str
     precio_individual: float
     precio_suscripcion: float
     updated_at: datetime

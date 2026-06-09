@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Clock, CalendarDays, Pencil, Trash2, ChevronDown, Check } from "lucide-react";
-import { ClaseSemana, DiaSemana, Disciplina } from "@/types/api";
+import { ClaseSemana, DiaSemana } from "@/types/api";
 import ClaseDetailDialog from "@/components/ClaseDetailDialog";
 import EditClaseDialog from "@/components/EditClaseDialog";
 import DeleteClaseDialog from "@/components/DeleteClaseDialog";
@@ -37,12 +37,6 @@ const DIA_ACCENT: Record<string, string> = {
     sabado: "bg-violet-400",
 };
 
-const DISCIPLINA_LABELS: Record<Disciplina, string> = {
-    [Disciplina.YOGA]: "Yoga",
-    [Disciplina.PILATES]: "Pilates",
-    [Disciplina.FUNCIONAL]: "Funcional",
-};
-
 const DIAS_ORDER: DiaSemana[] = [
     DiaSemana.DOMINGO,
     DiaSemana.LUNES,
@@ -67,9 +61,9 @@ function DisciplinaDropdown({
     value,
     onChange,
 }: {
-    disciplinas: Disciplina[];
-    value: Disciplina | null;
-    onChange: (d: Disciplina | null) => void;
+    disciplinas: string[];
+    value: string | null;
+    onChange: (d: string | null) => void;
 }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
@@ -82,7 +76,7 @@ function DisciplinaDropdown({
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    const label = value ? (DISCIPLINA_LABELS[value] ?? value) : "Todas las disciplinas";
+    const label = value ? value.charAt(0).toUpperCase() + value.slice(1) : "Todas las disciplinas";
 
     return (
         <div ref={ref} className="relative">
@@ -102,7 +96,7 @@ function DisciplinaDropdown({
             {open && (
                 <div className="absolute left-0 top-full mt-1.5 z-20 w-44 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
                     {[null, ...disciplinas].map((d) => {
-                        const optLabel = d ? (DISCIPLINA_LABELS[d] ?? d) : "Todas las disciplinas";
+                        const optLabel = d ? d.charAt(0).toUpperCase() + d.slice(1) : "Todas las disciplinas";
                         const isSelected = value === d;
                         return (
                             <button
@@ -130,11 +124,11 @@ export default function ClasesGrid({ clases, userRole, senaMinima }: { clases: C
     const [selectedClase, setSelectedClase] = useState<ClaseSemana | null>(null);
     const [claseToEdit, setClaseToEdit] = useState<ClaseSemana | null>(null);
     const [claseToDelete, setClaseToDelete] = useState<ClaseSemana | null>(null);
-    const [filtroDisciplina, setFiltroDisciplina] = useState<Disciplina | null>(null);
+    const [filtroDisciplina, setFiltroDisciplina] = useState<string | null>(null);
     const [filtroDia, setFiltroDia] = useState<DiaSemana | null>(null);
     const isStaff = userRole === "admin" || userRole === "recepcion";
 
-    const disciplinas = Array.from(new Set(clases.map((c) => c.disciplina))) as Disciplina[];
+    const disciplinas = Array.from(new Set(clases.map((c) => c.disciplina)));
     const diasConClases = DIAS_ORDER.filter(d => clases.some(c => c.dia_semana === d));
 
     const clasesFiltradas = clases.filter((c) => {

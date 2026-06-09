@@ -8,16 +8,15 @@ import uuid
 
 from repositories.clase_template_repository import ClaseTemplateRepository
 from repositories.clase_instancia_repository import ClaseInstanciaRepository
-from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.disciplina_repository import DisciplinaRepository
 from repositories.sala_repository import SalaRepository
 from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, ClaseTemplateResponse
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, BadRequestException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
-from core.enums import DiaSemana, Disciplina, TipoInscripcion
+from core.enums import DiaSemana, TipoInscripcion
 from models.asistencia import Asistencia
 from models.clase_template import ClaseTemplate
-from models.precio_disciplina import PrecioDisciplina
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
 from core.timezone import LOCAL_TZ
@@ -81,11 +80,11 @@ class ClaseTemplateService:
         self.db = db
         self.repo = ClaseTemplateRepository(db)
 
-    async def _load_precios(self) -> dict[Disciplina, tuple[float, float]]:
-        items = await PrecioDisciplinaRepository(self.db).get_all()
-        return {p.disciplina: (float(p.precio_individual), float(p.precio_suscripcion)) for p in items}
+    async def _load_precios(self) -> dict[str, tuple[float, float]]:
+        items = await DisciplinaRepository(self.db).get_all()
+        return {d.nombre: (float(d.precio_individual), float(d.precio_suscripcion)) for d in items}
 
-    def _to_response(self, clase, precios: dict[Disciplina, tuple[float, float]]) -> ClaseTemplateResponse:
+    def _to_response(self, clase, precios: dict[str, tuple[float, float]]) -> ClaseTemplateResponse:
         pi, ps = precios.get(clase.disciplina, (0.0, 0.0))
         return ClaseTemplateResponse(
             id=clase.id,
@@ -118,6 +117,10 @@ class ClaseTemplateService:
             )
 
     async def create(self, data: ClaseTemplateCreate) -> ClaseTemplateResponse:
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(data.disciplina)
+        if not disciplina_obj:
+            raise BadRequestException("Disciplina no encontrada")
+
         await self._validar_capacidad_sala(data.sala_id, data.capacidad_maxima)
 
         if await self.repo.get_conflicting_sala(data.sala_id, data.dia_semana, data.hora_inicio, data.hora_fin):
@@ -126,7 +129,7 @@ class ClaseTemplateService:
         if await self.repo.get_conflicting_profesor(data.profesor_id, data.dia_semana, data.hora_inicio, data.hora_fin):
             raise ProfesorOcupadoException()
 
-        nombre = data.disciplina.value.capitalize()
+        nombre = data.disciplina.capitalize()
         clase = ClaseTemplate(
             nombre=nombre,
             disciplina=data.disciplina,
@@ -172,7 +175,7 @@ class ClaseTemplateService:
             "hora_fin": data.hora_fin,
             "sala_id": data.sala_id,
             "profesor_id": data.profesor_id,
-            "nombre": data.disciplina.value.capitalize(),
+            "nombre": data.disciplina.capitalize(),
             "capacidad_maxima": data.capacidad_maxima,
         })
 
@@ -180,7 +183,7 @@ class ClaseTemplateService:
         hora_inicio_str = data.hora_inicio.strftime("%H:%M")
         hora_fin_str = data.hora_fin.strftime("%H:%M")
         await EmailService().send_clase_update_notification(
-            emails, data.disciplina.value.capitalize(), dia_label, hora_inicio_str, hora_fin_str
+            emails, data.disciplina.capitalize(), dia_label, hora_inicio_str, hora_fin_str
         )
 
         clase = await self.repo.get_by_id(clase_id)

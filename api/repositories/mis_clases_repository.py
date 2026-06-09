@@ -9,7 +9,7 @@ from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
-from models.precio_disciplina import PrecioDisciplina
+from models.disciplina import Disciplina as DisciplinaModel
 from models.suscripciones import Suscripcion
 from core.enums import TipoInscripcion
 
@@ -60,13 +60,13 @@ class MisClasesRepository:
                 Sala.nombre.label("sala_nombre"),
                 monto_pagado_sq.label("monto_pagado"),
                 estado_pago_sq.label("estado_pago"),
-                PrecioDisciplina.precio_individual.label("precio_clase"),
+                DisciplinaModel.precio_individual.label("precio_clase"),
             )
             .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
             .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
             .outerjoin(Profesor, ClaseTemplate.profesor_id == Profesor.id)
             .outerjoin(Sala, ClaseTemplate.sala_id == Sala.id)
-            .outerjoin(PrecioDisciplina, PrecioDisciplina.disciplina == ClaseTemplate.disciplina)
+            .outerjoin(DisciplinaModel, DisciplinaModel.nombre == ClaseTemplate.disciplina)
             .where(
                 Asistencia.usuario_id == usuario_id,
                 Asistencia.tipo == TipoInscripcion.INDIVIDUAL,

@@ -5,14 +5,14 @@ import { X, Loader2 } from "lucide-react";
 import { createClase } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
 import { getProfesores } from "@/actions/profesores";
-import { type Sala, type Profesor } from "@/types/api";
+import { getDisciplinas } from "@/actions/disciplinas";
+import { type Sala, type Profesor, type DisciplinaItem } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
 import { useRouter } from "next/navigation";
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
-const disciplinas = ["yoga", "pilates", "funcional"];
 const diasSemana = [
     { value: "lunes", label: "Lun" },
     { value: "martes", label: "Mar" },
@@ -40,6 +40,7 @@ type State = {
     isOpen: boolean;
     salas: Sala[];
     profesores: Profesor[];
+    disciplinas: DisciplinaItem[];
     isLoadingOptions: boolean;
     fields: ClaseFields;
     diaSemana: string;
@@ -48,7 +49,7 @@ type State = {
 type Action =
     | { type: "OPEN" }
     | { type: "CLOSE" }
-    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[] }
+    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[]; disciplinas: DisciplinaItem[] }
     | { type: "SET_FIELD"; key: keyof ClaseFields; value: string }
     | { type: "SET_DIA"; value: string };
 
@@ -64,6 +65,7 @@ const initialState: State = {
     isOpen: false,
     salas: [],
     profesores: [],
+    disciplinas: [],
     isLoadingOptions: false,
     fields: emptyFields,
     diaSemana: "",
@@ -76,7 +78,7 @@ function reducer(state: State, action: Action): State {
         case "CLOSE":
             return { ...initialState };
         case "SET_OPTIONS":
-            return { ...state, salas: action.salas, profesores: action.profesores, isLoadingOptions: false };
+            return { ...state, salas: action.salas, profesores: action.profesores, disciplinas: action.disciplinas, isLoadingOptions: false };
         case "SET_FIELD":
             return { ...state, fields: { ...state.fields, [action.key]: action.value } };
         case "SET_DIA":
@@ -89,8 +91,8 @@ export default function AddClaseDialog() {
 
     useEffect(() => {
         if (!ui.isOpen) return;
-        Promise.all([getSalas(), getProfesores()]).then(([salas, profesores]) => {
-            dispatch({ type: "SET_OPTIONS", salas, profesores });
+        Promise.all([getSalas(), getProfesores(), getDisciplinas()]).then(([salas, profesores, disciplinas]) => {
+            dispatch({ type: "SET_OPTIONS", salas, profesores, disciplinas });
         });
     }, [ui.isOpen]);
 
@@ -216,8 +218,8 @@ function AddClaseForm({
                 <label htmlFor="add-disciplina" className={labelCls}>Disciplina</label>
                 <select id="add-disciplina" name="disciplina" required value={ui.fields.disciplina} onChange={set("disciplina")} className={inputCls}>
                     <option value="">Seleccionar…</option>
-                    {disciplinas.map((disciplina) => (
-                        <option key={disciplina} value={disciplina}>{disciplina.charAt(0).toUpperCase() + disciplina.slice(1)}</option>
+                    {ui.disciplinas.map((d) => (
+                        <option key={d.id} value={d.nombre}>{d.nombre.charAt(0).toUpperCase() + d.nombre.slice(1)}</option>
                     ))}
                 </select>
             </div>

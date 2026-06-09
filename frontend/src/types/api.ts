@@ -91,10 +91,16 @@ export interface AuthResponse {
     token_type: string;
 }
 
-export enum Disciplina {
-    YOGA = "yoga",
-    PILATES = "pilates",
-    FUNCIONAL = "funcional",
+export type Disciplina = string;
+
+export interface DisciplinaItem {
+    id: string;
+    nombre: string;
+    precio_individual: number;
+    precio_suscripcion: number;
+    activo: boolean;
+    created_at: string;
+    updated_at: string | null;
 }
 
 export interface PrecioDisciplina {

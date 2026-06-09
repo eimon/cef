@@ -2,14 +2,8 @@
 
 import { useState } from "react";
 import { Pencil } from "lucide-react";
-import { PrecioDisciplina, Disciplina } from "@/types/api";
+import { PrecioDisciplina } from "@/types/api";
 import EditDisciplinaPrecioDialog from "@/components/EditDisciplinaPrecioDialog";
-
-const DISCIPLINA_LABELS: Record<Disciplina, string> = {
-    yoga: "Yoga",
-    pilates: "Pilates",
-    funcional: "Funcional",
-};
 
 function formatPrecio(value: number) {
     return new Intl.NumberFormat("es-AR").format(value);
@@ -40,7 +34,7 @@ export default function PreciosTable({ precios, onSuccess }: PreciosTableProps) 
                         <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
                                 <p className="text-sm font-semibold text-slate-700 mb-2">
-                                    {DISCIPLINA_LABELS[p.disciplina]}
+                                    {p.disciplina.charAt(0).toUpperCase() + p.disciplina.slice(1)}
                                 </p>
                                 <div className="flex gap-4 text-xs text-slate-500">
                                     <span>Mensualidad: <strong className="text-slate-700">${formatPrecio(p.precio_suscripcion)}</strong></span>
@@ -75,7 +69,7 @@ export default function PreciosTable({ precios, onSuccess }: PreciosTableProps) 
                             {precios.map((p) => (
                                 <tr key={p.disciplina} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
-                                        {DISCIPLINA_LABELS[p.disciplina]}
+                                        {p.disciplina.charAt(0).toUpperCase() + p.disciplina.slice(1)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">
                                         ${formatPrecio(p.precio_suscripcion)}

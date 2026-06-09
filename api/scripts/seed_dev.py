@@ -21,14 +21,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy.future import select
 
 from core.database import AsyncSessionLocal
-from core.enums import DiaSemana, Disciplina, EstadoPago, TipoInscripcion, UserRole
+from core.enums import DiaSemana, EstadoPago, TipoInscripcion, UserRole
 from core.security import get_password_hash
 from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.ficha_medica import FichaMedica
 from models.pagos import Pago
-from models.precio_disciplina import PrecioDisciplina
+from models.disciplina import Disciplina as DisciplinaModel
 from models.profesor import Profesor
 from models.sala import Sala
 from models.suscripciones import Suscripcion
@@ -152,19 +152,21 @@ async def _seed_salas(session) -> list[Sala]:
 
 async def _seed_precios(session) -> None:
     precios = [
-        {"disciplina": Disciplina.YOGA, "precio_individual": 1500, "precio_suscripcion": 1200},
-        {"disciplina": Disciplina.PILATES, "precio_individual": 1500, "precio_suscripcion": 1200},
-        {"disciplina": Disciplina.FUNCIONAL, "precio_individual": 1800, "precio_suscripcion": 1400},
+        {"nombre": "yoga", "precio_individual": 1500, "precio_suscripcion": 1200},
+        {"nombre": "pilates", "precio_individual": 1500, "precio_suscripcion": 1200},
+        {"nombre": "funcional", "precio_individual": 1800, "precio_suscripcion": 1400},
     ]
     for data in precios:
-        existe = (await session.execute(
-            select(PrecioDisciplina).where(PrecioDisciplina.disciplina == data["disciplina"])
+        disciplina = (await session.execute(
+            select(DisciplinaModel).where(DisciplinaModel.nombre == data["nombre"])
         )).scalars().first()
-        if existe:
-            print(f"  [skip] precio {data['disciplina'].value}")
+        if disciplina:
+            disciplina.precio_individual = data["precio_individual"]
+            disciplina.precio_suscripcion = data["precio_suscripcion"]
+            print(f"  [update] precio {data['nombre']}")
         else:
-            session.add(PrecioDisciplina(**data))
-            print(f"  [ok]   precio {data['disciplina'].value}")
+            session.add(DisciplinaModel(**data, activo=True))
+            print(f"  [ok]   precio {data['nombre']}")
     await session.flush()
 
 
@@ -255,7 +257,7 @@ async def _upsert_clase_historica(
             descripcion=descripcion,
             profesor_id=profesor.id,
             sala_id=sala.id,
-            disciplina=Disciplina.YOGA,
+            disciplina="yoga",
             dia_semana=dia_semana,
             hora_inicio=hora_inicio,
             hora_fin=hora_fin,
@@ -529,7 +531,7 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
         {
             "nombre": "Yoga",
             "descripcion": "Clase de yoga para todos los niveles",
-            "disciplina": Disciplina.YOGA,
+            "disciplina": "yoga",
             "dia_semana": DiaSemana.MARTES,
             "hora_inicio": time(9, 0),
             "hora_fin": time(10, 0),
@@ -538,7 +540,7 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
         {
             "nombre": "Funcional",
             "descripcion": "Entrenamiento funcional de alta intensidad",
-            "disciplina": Disciplina.FUNCIONAL,
+            "disciplina": "funcional",
             "dia_semana": DiaSemana.MIERCOLES,
             "hora_inicio": time(18, 0),
             "hora_fin": time(19, 0),
@@ -547,7 +549,7 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
         {
             "nombre": "Pilates",
             "descripcion": "Pilates mat para fortalecimiento y flexibilidad",
-            "disciplina": Disciplina.PILATES,
+            "disciplina": "pilates",
             "dia_semana": DiaSemana.VIERNES,
             "hora_inicio": time(10, 0),
             "hora_fin": time(11, 0),
@@ -563,7 +565,7 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
         {
             "nombre": "Pilates",
             "descripcion": "Pilates con Ana Pérez",
-            "disciplina": Disciplina.PILATES,
+            "disciplina": "pilates",
             "dia_semana": DiaSemana.MARTES,
             "hora_inicio": time(15, 0),
             "hora_fin": time(16, 0),
@@ -577,7 +579,7 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
         {
             "nombre": "Funcional",
             "descripcion": "Clase de prueba de los viernes",
-            "disciplina": Disciplina.FUNCIONAL,
+            "disciplina": "funcional",
             "dia_semana": DiaSemana.VIERNES,
             "hora_inicio": time(10, 0),
             "hora_fin": time(11, 0),
