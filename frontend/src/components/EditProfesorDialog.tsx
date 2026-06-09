@@ -2,11 +2,13 @@
 
 import { ChangeEvent, useEffect, useState } from "react";
 import { updateProfesor, ProfesorFormState } from "@/actions/profesores";
+import { getDisciplinas } from "@/actions/disciplinas";
 import { X, Loader2 } from "lucide-react";
 import { useActionState } from "react";
-import { Profesor } from "@/types/api";
+import { Profesor, DisciplinaItem } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
 import { isEmptyOrValidEmail } from "@/lib/validation";
+import DisciplinasMultiSelect from "@/components/DisciplinasMultiSelect";
 
 interface EditProfesorDialogProps {
     profesor: Profesor;
@@ -34,6 +36,8 @@ function getInitialFields(profesor: Profesor) {
 export default function EditProfesorDialog({ profesor, isOpen, onClose, onSuccess }: EditProfesorDialogProps) {
     const { showSuccess } = useToast();
     const [fields, setFields] = useState(() => getInitialFields(profesor));
+    const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([]);
+    const [selectedDisciplinas, setSelectedDisciplinas] = useState<string[]>(profesor.disciplinas ?? []);
     const initialState: ProfesorFormState = {};
     const updateProfesorWithId = updateProfesor.bind(null, profesor.id);
     const [state, formAction, isPending] = useActionState(updateProfesorWithId, initialState);
@@ -47,11 +51,14 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
         fields.nombre.trim().length > 0 &&
         fields.apellido.trim().length > 0 &&
         fields.genero.trim().length > 0 &&
+        selectedDisciplinas.length > 0 &&
         isEmptyOrValidEmail(fields.email);
 
     useEffect(() => {
         if (!isOpen) return;
         setFields(getInitialFields(profesor));
+        setSelectedDisciplinas(profesor.disciplinas ?? []);
+        getDisciplinas().then(setDisciplinas);
     }, [isOpen, profesor]);
 
     useEffect(() => {
@@ -66,15 +73,15 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <div className="glass-modal rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 flex-shrink-0">
                     <h3 className="text-base font-semibold text-slate-800">Editar Profesor</h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
                         <X size={18} />
                     </button>
                 </div>
 
-                <form action={formAction} className="p-6 space-y-4">
+                <form action={formAction} className="p-6 space-y-4 overflow-y-auto">
                     {state?.error && (
                         <div className="bg-cef-danger/10 border border-cef-danger/20 text-cef-danger p-3 rounded-lg text-sm">
                             {state.error}
@@ -150,6 +157,15 @@ export default function EditProfesorDialog({ profesor, isOpen, onClose, onSucces
                             value={fields.telefono}
                             onChange={set("telefono")}
                             className={inputCls}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={labelCls}>Disciplinas</label>
+                        <DisciplinasMultiSelect
+                            disciplinas={disciplinas}
+                            selected={selectedDisciplinas}
+                            onChange={setSelectedDisciplinas}
                         />
                     </div>
 

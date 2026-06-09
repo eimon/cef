@@ -12,6 +12,7 @@ const createProfesorSchema = z.object({
     genero: z.string().min(1, "El género es requerido"),
     email: z.string().email("Email inválido").optional(),
     telefono: z.string().optional(),
+    disciplinas: z.array(z.string()).min(1, "Debe seleccionar al menos una disciplina"),
 });
 
 const updateProfesorSchema = z.object({
@@ -21,6 +22,7 @@ const updateProfesorSchema = z.object({
     genero: z.string().min(1, "El género es requerido").optional(),
     email: z.string().email("Email inválido").optional(),
     telefono: z.string().optional(),
+    disciplinas: z.array(z.string()).min(1, "Debe seleccionar al menos una disciplina"),
 });
 
 export type ProfesorFormState = {
@@ -76,6 +78,7 @@ export async function createProfesor(
         genero: formData.get("genero"),
         email: emailRaw?.trim() || undefined,
         telefono: formData.get("telefono") || undefined,
+        disciplinas: formData.getAll("disciplinas") as string[],
     });
 
     if (!validatedFields.success) {
@@ -115,6 +118,7 @@ export async function updateProfesor(
         genero: formData.get("genero") || undefined,
         email: emailRaw?.trim() || undefined,
         telefono: formData.get("telefono") || undefined,
+        disciplinas: formData.getAll("disciplinas") as string[],
     });
 
     if (!validatedFields.success) {
