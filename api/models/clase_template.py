@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from core.database import Base
-from core.enums import DiaSemana, Disciplina
+from core.enums import DiaSemana
 
 
 class ClaseTemplate(Base):
@@ -16,7 +16,7 @@ class ClaseTemplate(Base):
     profesor_id = Column(UUID(as_uuid=True), ForeignKey("profesores.id", ondelete="SET NULL"), nullable=True, index=True)
     sala_id = Column(UUID(as_uuid=True), ForeignKey("salas.id", ondelete="SET NULL"), nullable=True, index=True)
     dia_semana = Column(Enum(DiaSemana, name="diasemana"), nullable=False)
-    disciplina = Column(Enum(Disciplina, name="disciplina"), nullable=False)
+    disciplina = Column(String(100), nullable=False)
     hora_inicio = Column(Time, nullable=False)
     hora_fin = Column(Time, nullable=False)
     capacidad_maxima = Column(Integer, nullable=False)

@@ -5,14 +5,14 @@ import { X, Loader2 } from "lucide-react";
 import { updateClase } from "@/actions/clases";
 import { getSalas } from "@/actions/salas";
 import { getProfesores } from "@/actions/profesores";
-import { ClaseSemana, Sala, Profesor } from "@/types/api";
+import { getDisciplinas } from "@/actions/disciplinas";
+import { ClaseSemana, Sala, Profesor, DisciplinaItem } from "@/types/api";
 import { useToast } from "@/context/ToastContext";
 import { useRouter } from "next/navigation";
 
 const inputCls = "w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm";
 const labelCls = "block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wider";
 
-const disciplinas = ["yoga", "pilates", "funcional"];
 const diasSemana = [
     { value: "lunes", label: "Lun" },
     { value: "martes", label: "Mar" },
@@ -34,6 +34,7 @@ function sumarUnaHora(hora: string): string {
 type State = {
     salas: Sala[];
     profesores: Profesor[];
+    disciplinas: DisciplinaItem[];
     isLoadingOptions: boolean;
     disciplina: string;
     horaInicio: string;
@@ -45,7 +46,7 @@ type State = {
 
 type Action =
     | { type: "OPEN"; clase: ClaseSemana }
-    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[] }
+    | { type: "SET_OPTIONS"; salas: Sala[]; profesores: Profesor[]; disciplinas: DisciplinaItem[] }
     | { type: "SET_FIELD"; key: "disciplina" | "capacidadMaxima" | "salaId" | "profesorId"; value: string }
     | { type: "SET_HORA"; value: string }
     | { type: "SET_DIA"; value: string };
@@ -64,7 +65,7 @@ function reducer(state: State, action: Action): State {
                 profesorId: action.clase.profesor_id ?? "",
             };
         case "SET_OPTIONS":
-            return { ...state, salas: action.salas, profesores: action.profesores, isLoadingOptions: false };
+            return { ...state, salas: action.salas, profesores: action.profesores, disciplinas: action.disciplinas, isLoadingOptions: false };
         case "SET_FIELD":
             return { ...state, [action.key]: action.value };
         case "SET_HORA":
@@ -89,6 +90,7 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
     const [ui, dispatch] = useReducer(reducer, {
         salas: [],
         profesores: [],
+        disciplinas: [],
         isLoadingOptions: false,
         disciplina: String(clase.disciplina || ""),
         horaInicio: clase.hora_inicio.slice(0, 5),
@@ -105,8 +107,8 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
             setError(null);
             dispatch({ type: "OPEN", clase });
         }
-        Promise.all([getSalas(), getProfesores()]).then(([salas, profesores]) => {
-            dispatch({ type: "SET_OPTIONS", salas, profesores });
+        Promise.all([getSalas(), getProfesores(), getDisciplinas()]).then(([salas, profesores, disciplinas]) => {
+            dispatch({ type: "SET_OPTIONS", salas, profesores, disciplinas });
         });
     }, [isOpen, clase]);
 
@@ -189,9 +191,10 @@ export default function EditClaseDialog({ clase, isOpen, onClose }: EditClaseDia
                                     onChange={setField("disciplina")}
                                     className={inputCls}
                                 >
-                                    {disciplinas.map((disciplina) => (
-                                        <option key={disciplina} value={disciplina}>
-                                            {disciplina.charAt(0).toUpperCase() + disciplina.slice(1)}
+                                    <option value="">Seleccionar…</option>
+                                    {ui.disciplinas.map((d) => (
+                                        <option key={d.id} value={d.nombre}>
+                                            {d.nombre.charAt(0).toUpperCase() + d.nombre.slice(1)}
                                         </option>
                                     ))}
                                 </select>

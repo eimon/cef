@@ -10,7 +10,7 @@ from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
 from repositories.suscripcion_repository import SuscripcionRepository
-from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.suscripcion import SuscripcionCreate, SuscripcionCheckResponse, SuscripcionResponse
 
@@ -119,10 +119,10 @@ class SuscripcionService:
         template, fecha_inicio, fecha_fin, fechas_clases = await self._validar_elegibilidad(
             current_user, clase_template_id
         )
-        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
-        if not precio_disciplina:
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not disciplina_obj:
             raise BadRequestException("No hay precio configurado para esta disciplina")
-        precio = float(precio_disciplina.precio_suscripcion)
+        precio = float(disciplina_obj.precio_suscripcion)
         porcentaje = await _get_porcentaje_sena(self.db)
         return SuscripcionCheckResponse(
             elegible=True,
@@ -141,10 +141,10 @@ class SuscripcionService:
             current_user, clase_template_id
         )
 
-        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
-        if not precio_disciplina:
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not disciplina_obj:
             raise BadRequestException("No hay precio configurado para esta disciplina")
-        precio = Decimal(str(precio_disciplina.precio_suscripcion))
+        precio = Decimal(str(disciplina_obj.precio_suscripcion))
         porcentaje = await _get_porcentaje_sena(self.db)
         monto_minimo = precio * Decimal(str(porcentaje)) / 100
 

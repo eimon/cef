@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.timezone import LOCAL_TZ
 from repositories.inscripcion_repository import InscripcionRepository
-from repositories.precio_disciplina_repository import PrecioDisciplinaRepository
+from repositories.disciplina_repository import DisciplinaRepository
 from schemas.inscripcion import InscripcionIndividualCreate, InscripcionResponse
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
@@ -84,10 +84,10 @@ class InscripcionService:
 
         instancia, template = await self._validar_elegibilidad(current_user, clase_template_id, fecha)
 
-        precio_disciplina = await PrecioDisciplinaRepository(self.db).get_by_disciplina(template.disciplina)
-        if not precio_disciplina:
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not disciplina_obj:
             raise BadRequestException("No hay precio configurado para esta disciplina")
-        precio = Decimal(str(precio_disciplina.precio_individual))
+        precio = Decimal(str(disciplina_obj.precio_individual))
         monto_minimo = precio / 2
 
         if data.monto < monto_minimo:

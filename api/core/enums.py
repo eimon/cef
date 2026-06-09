@@ -28,7 +28,3 @@ class DiaSemana(str, enum.Enum):
     DOMINGO = "domingo"
 
 
-class Disciplina(str, enum.Enum):
-    YOGA = "yoga"
-    PILATES = "pilates"
-    FUNCIONAL = "funcional"

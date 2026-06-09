@@ -2,7 +2,7 @@ from pydantic import BaseModel, UUID4
 from typing import Optional
 from datetime import date, time
 
-from core.enums import DiaSemana, Disciplina
+from core.enums import DiaSemana
 
 
 class InstanciaSemanaResponse(BaseModel):
@@ -25,7 +25,7 @@ class ClaseSemanaResponse(BaseModel):
     capacidad_maxima: int
     precio_individual: float
     precio_suscripcion: float
-    disciplina: Disciplina
+    disciplina: str
     profesor_id: Optional[UUID4] = None
     sala_id: Optional[UUID4] = None
     profesor_nombre: Optional[str] = None

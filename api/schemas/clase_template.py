@@ -2,14 +2,14 @@ from pydantic import BaseModel, UUID4, Field
 from typing import Optional
 from datetime import datetime, time
 
-from core.enums import DiaSemana, Disciplina
+from core.enums import DiaSemana
 
 
 class ClaseTemplateBase(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=200)
     descripcion: Optional[str] = Field(None, max_length=500)
     dia_semana: DiaSemana
-    disciplina: Disciplina
+    disciplina: str
     hora_inicio: time
     hora_fin: time
     capacidad_maxima: int = Field(..., ge=1)
@@ -18,7 +18,7 @@ class ClaseTemplateBase(BaseModel):
 
 
 class ClaseTemplateCreate(BaseModel):
-    disciplina: Disciplina
+    disciplina: str
     dia_semana: DiaSemana
     hora_inicio: time
     hora_fin: time
@@ -28,7 +28,7 @@ class ClaseTemplateCreate(BaseModel):
 
 
 class ClaseTemplateUpdate(BaseModel):
-    disciplina: Disciplina
+    disciplina: str
     dia_semana: DiaSemana
     hora_inicio: time
     hora_fin: time
