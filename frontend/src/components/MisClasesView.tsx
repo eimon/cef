@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, CalendarDays, DollarSign, AlertCircle, Loader2 } from "lucide-react";
+import { Clock, CalendarDays, AlertCircle, Loader2, X, Info, CreditCard } from "lucide-react";
 import { MiClaseIndividual, MiSuscripcion, Disciplina } from "@/types/api";
 import { crearPreferenciaDeudaMP } from "@/actions/pagos";
 
@@ -92,51 +92,176 @@ function isUpcoming(fecha: string, horaInicio: string): boolean {
     return new Date(y, m - 1, d, h, min) > new Date();
 }
 
+function getClassStart(fecha: string, horaInicio: string): Date {
+    const [y, m, d] = fecha.split("-").map(Number);
+    const [h, min] = horaInicio.split(":").map(Number);
+    return new Date(y, m - 1, d, h, min);
+}
+
+function canCompleteDebt(fecha: string, horaInicio: string): boolean {
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    return getClassStart(fecha, horaInicio).getTime() - Date.now() > oneDayMs;
+}
+
+function getBlockedDebtMessage(item: MisClasesItem): string {
+    if (!isUpcoming(item.fecha, item.hora_inicio)) {
+        return "La clase ya paso. La deuda no se puede completar desde la app.";
+    }
+    return "Ya no se puede completar el pago desde la app porque faltan menos de 24 horas para la clase.";
+}
+
+function DebtDialog({
+    item,
+    montoRestante,
+    onClose,
+}: {
+    item: MisClasesItem;
+    montoRestante: number;
+    onClose: () => void;
+}) {
+    const [paying, setPaying] = useState(false);
+    const [payError, setPayError] = useState("");
+    const canPay = Boolean(item.asistencia_id) && canCompleteDebt(item.fecha, item.hora_inicio);
+
+    async function handleCompletarPago() {
+        if (!item.asistencia_id || !canPay) return;
+        setPaying(true);
+        setPayError("");
+        const result = await crearPreferenciaDeudaMP(item.asistencia_id);
+        if (result.error) {
+            setPaying(false);
+            setPayError(result.error);
+            return;
+        }
+        if (result.init_point) window.location.href = result.init_point;
+    }
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+            <div className="glass-modal w-full max-w-md rounded-2xl p-5 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-cef-warning/20 bg-cef-warning/10 text-cef-warning">
+                            <Info size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Deuda pendiente</h3>
+                            <p className="mt-1 text-sm text-slate-500">{item.clase_nombre}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                    <div className="rounded-xl border border-slate-200 bg-white/60 p-4">
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase text-slate-400">Abonado</p>
+                                <p className="mt-1 text-sm font-bold text-slate-800">{formatPrice(item.monto_pagado ?? 0)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase text-slate-400">Total</p>
+                                <p className="mt-1 text-sm font-bold text-slate-800">{formatPrice(item.precio_clase ?? 0)}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase text-slate-400">Deuda</p>
+                                <p className="mt-1 text-sm font-bold text-cef-warning">{formatPrice(montoRestante)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={`rounded-xl border p-3 text-sm ${
+                        canPay
+                            ? "border-cef-success/20 bg-cef-success/10 text-slate-700"
+                            : "border-cef-warning/20 bg-cef-warning/10 text-slate-700"
+                    }`}>
+                        {canPay
+                            ? "Podes completar el saldo pendiente. El sistema permite hacerlo hasta 24 horas antes del inicio de la clase."
+                            : getBlockedDebtMessage(item)}
+                    </div>
+
+                    {payError && (
+                        <p className="flex items-center gap-1.5 rounded-lg border border-cef-danger/20 bg-cef-danger/10 px-3 py-2 text-xs font-medium text-cef-danger">
+                            <AlertCircle size={14} />
+                            {payError}
+                        </p>
+                    )}
+                </div>
+
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
+                    >
+                        Cerrar
+                    </button>
+                    {canPay && (
+                        <button
+                            type="button"
+                            onClick={handleCompletarPago}
+                            disabled={paying}
+                            className="inline-flex items-center justify-center gap-2 rounded-lg bg-cef-warning px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cef-warning/90 disabled:opacity-60"
+                        >
+                            {paying ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
+                            Completar pago
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function MiClaseRow({ item }: { item: MisClasesItem }) {
-    const [paying, setPaying] = useState(false);
-    const [payError, setPayError] = useState("");
+    const [debtOpen, setDebtOpen] = useState(false);
 
     const upcoming = isUpcoming(item.fecha, item.hora_inicio);
     const montoRestante =
         item.precio_clase != null && item.monto_pagado != null
-            ? item.precio_clase - item.monto_pagado
+            ? Math.max(item.precio_clase - item.monto_pagado, 0)
             : 0;
-    const tienePagoPendiente = item.tipo === "individual" && !item.cancelada && montoRestante > 0;
-
-    async function handleCompletarPago() {
-        if (!item.asistencia_id) return;
-        setPaying(true);
-        setPayError("");
-        const result = await crearPreferenciaDeudaMP(item.asistencia_id);
-        if (result.error) { setPaying(false); setPayError(result.error); return; }
-        if (result.init_point) window.location.href = result.init_point;
-    }
+    const tieneDeudaParcial =
+        item.tipo === "individual" &&
+        !item.cancelada &&
+        item.monto_pagado != null &&
+        item.precio_clase != null &&
+        item.monto_pagado > 0 &&
+        item.monto_pagado < item.precio_clase;
 
     const accent = DISCIPLINA_ACCENT[item.disciplina] ?? "bg-slate-400";
 
     return (
-        <div className="glass rounded-xl hover:border-slate-300 hover:shadow-sm transition-all group flex items-stretch overflow-hidden">
+        <>
+        <div className="glass flex items-stretch overflow-hidden rounded-xl transition-all hover:border-slate-300 hover:shadow-sm">
             <div className={`w-1 flex-shrink-0 ${accent}`} />
-            <div className="flex-1 flex items-center gap-2.5 px-3 py-2.5 min-w-0 flex-wrap sm:flex-nowrap">
+            <div className="min-w-0 flex-1 px-3 py-3 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5 sm:py-2.5 lg:flex-nowrap">
 
                 {/* Name + teacher */}
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 leading-tight truncate">{item.clase_nombre}</p>
+                <div className="min-w-0 sm:flex-1">
+                    <p className="break-words text-sm font-semibold leading-tight text-slate-800">{item.clase_nombre}</p>
                     {item.profesor_nombre && (
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">{item.profesor_nombre}</p>
+                        <p className="mt-1 break-words text-[11px] text-slate-400">{item.profesor_nombre}</p>
                     )}
                 </div>
 
                 {/* Time */}
-                <span className="flex items-center gap-1 text-xs text-slate-500 flex-shrink-0">
+                <span className="mt-2 inline-flex flex-shrink-0 items-center gap-1 text-xs text-slate-500 sm:mt-0">
                     <Clock size={11} className="text-slate-400" />
                     {formatTime(item.hora_inicio)}–{formatTime(item.hora_fin)}
                 </span>
 
                 {/* Tipo */}
-                <span className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                <span className={`mt-2 inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:mt-0 ${
                     item.tipo === "individual"
                         ? "bg-slate-100 text-slate-500 border border-slate-200"
                         : "bg-cef-primary/10 text-cef-primary border border-cef-primary/20"
@@ -146,7 +271,7 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
 
                 {/* Estado */}
                 {item.cancelada && (
-                    <span className="text-[10px] font-semibold uppercase text-cef-danger bg-cef-danger/10 px-1.5 py-0.5 rounded-full border border-cef-danger/20 flex-shrink-0">
+                    <span className="mt-2 inline-flex flex-shrink-0 rounded-full border border-cef-danger/20 bg-cef-danger/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-cef-danger sm:mt-0">
                         Cancelada
                     </span>
                 )}
@@ -156,32 +281,27 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                         : <span className="text-[10px] font-semibold uppercase text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200 flex-shrink-0">No asistí</span>
                 )}
 
-                {/* Monto pendiente */}
-                {tienePagoPendiente && item.monto_pagado != null && item.precio_clase != null && (
-                    <span className="text-xs text-slate-500 flex-shrink-0 flex items-center gap-1">
-                        <DollarSign size={11} className="text-slate-400" />
-                        {formatPrice(item.monto_pagado)}
-                        <span className="text-cef-warning">/ {formatPrice(item.precio_clase)}</span>
-                    </span>
-                )}
-
-                {/* Completar pago */}
-                {tienePagoPendiente && (
-                    payError
-                        ? <span className="text-[10px] text-cef-danger flex items-center gap-1 flex-shrink-0">
-                            <AlertCircle size={10} />{payError}
-                          </span>
-                        : <button
-                            type="button"
-                            onClick={handleCompletarPago}
-                            disabled={paying}
-                            className="flex-shrink-0 py-1 px-2.5 rounded-lg bg-cef-warning/10 hover:bg-cef-warning/20 text-cef-warning border border-cef-warning/20 text-[11px] font-semibold flex items-center gap-1 transition-colors disabled:opacity-60"
-                          >
-                            {paying ? <Loader2 size={11} className="animate-spin" /> : "Completar pago"}
-                          </button>
+                {/* Deuda */}
+                {tieneDeudaParcial && (
+                    <button
+                        type="button"
+                        onClick={() => setDebtOpen(true)}
+                        className="mt-3 flex w-full flex-shrink-0 items-center justify-center gap-1 rounded-lg border border-cef-warning/20 bg-cef-warning/10 px-2.5 py-2 text-[11px] font-semibold text-cef-warning transition-colors hover:bg-cef-warning/20 sm:mt-0 sm:w-auto sm:py-1"
+                    >
+                        Ver deuda
+                    </button>
                 )}
             </div>
         </div>
+
+        {debtOpen && (
+            <DebtDialog
+                item={item}
+                montoRestante={montoRestante}
+                onClose={() => setDebtOpen(false)}
+            />
+        )}
+        </>
     );
 }
 
@@ -195,13 +315,13 @@ function PillTabs<T extends string>({
     onChange: (v: T) => void;
 }) {
     return (
-        <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+        <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
             {options.map(({ value, label }) => (
                 <button
                     key={value}
                     type="button"
                     onClick={() => onChange(value)}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`whitespace-nowrap rounded-lg px-4 py-1.5 text-xs font-semibold transition-all ${
                         active === value
                             ? "bg-white text-slate-800 shadow-sm"
                             : "text-slate-500 hover:text-slate-700"
@@ -286,15 +406,15 @@ export default function MisClasesView({
                 <div className="space-y-6">
                     {Array.from(grouped.entries()).map(([fecha, items]) => (
                         <div key={fecha} className="space-y-1.5">
-                            <div className="flex items-center gap-3 pb-1 border-b border-slate-200">
+                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-1 sm:gap-3">
                                 <div className="p-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-500">
                                     <CalendarDays size={15} />
                                 </div>
-                                <h2 className="text-sm font-bold text-slate-800 tracking-tight capitalize">
+                                <h2 className="min-w-0 flex-1 break-words text-sm font-bold capitalize tracking-tight text-slate-800">
                                     {formatFechaHeader(fecha)}
                                 </h2>
                                 <span className="text-xs text-slate-400 font-medium">{formatFechaCorta(fecha)}</span>
-                                <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                <span className="ml-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 sm:ml-auto">
                                     {items.length}
                                 </span>
                             </div>
