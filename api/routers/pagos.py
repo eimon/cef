@@ -7,9 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from dependencies.auth import get_current_user
 from models.usuario import Usuario
+from schemas.pago import MiPagoResponse
 from services.pago_service import PagoService
 
 router = APIRouter(prefix="/pagos", tags=["pagos"])
+
+
+@router.get("/mios", response_model=list[MiPagoResponse])
+async def get_mis_pagos(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).get_mis_pagos(current_user)
 
 
 @router.post("/mp/preferencia")

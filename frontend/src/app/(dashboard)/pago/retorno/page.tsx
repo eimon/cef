@@ -67,6 +67,25 @@ export default async function PagoRetornoPage({
         );
     }
 
+    if (paymentId) {
+        const result =
+            tipo === "deuda"        ? await confirmarDeudaMP(paymentId) :
+            tipo === "suscripcion"  ? await confirmarSuscripcionMP(paymentId) :
+                                     await confirmarPagoMP(paymentId);
+
+        if (result.error) {
+            return (
+                <RetornoLayout
+                    icon={<AlertCircle size={40} className="text-cef-warning" />}
+                    title="Error al registrar el pago"
+                    message={result.error}
+                    linkHref="/clases"
+                    linkLabel="Volver a clases"
+                />
+            );
+        }
+    }
+
     return (
         <RetornoLayout
             icon={<XCircle size={40} className="text-cef-danger" />}

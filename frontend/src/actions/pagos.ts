@@ -1,6 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
+import { MiPago } from "@/types/api";
 
 export type PreferenciaResult = {
     init_point?: string;
@@ -13,6 +14,16 @@ export type ConfirmarPagoResult = {
     already_processed?: boolean;
     error?: string;
 };
+
+export async function getMisPagos(): Promise<MiPago[]> {
+    try {
+        const res = await serverApi("/pagos/mios");
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
 
 export async function crearPreferenciaMP(
     claseTemplateId: string,
