@@ -681,16 +681,12 @@ export async function updateMedicalRecord(
 export async function logout() {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("refresh_token")?.value;
-    const accessToken = cookieStore.get("access_token")?.value;
 
-    if (refreshToken && accessToken) {
+    if (refreshToken) {
         try {
             await fetch(`${SERVER_API_URL}/auth/logout`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${accessToken}`,
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ refresh_token: refreshToken }),
             });
         } catch {

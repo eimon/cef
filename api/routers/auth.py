@@ -187,7 +187,6 @@ async def refresh(
 async def logout(
     body: LogoutRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
 ):
     """Revoke the provided refresh token. Idempotent."""
     await RefreshTokenService(db).revoke(body.refresh_token)
