@@ -25,20 +25,12 @@ function formatPaymentAmount(value: number) {
     return paymentFormatter.format(value);
 }
 
-function getPaymentConcept(payment: MiPago) {
-    if (payment.clase_nombre) return payment.clase_nombre;
-    if (payment.descripcion) return payment.descripcion;
-    return payment.tipo === "suscripcion" ? "Suscripcion" : "Pago";
+function formatDiscipline(value: string) {
+    return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function getPaymentSubtitle(payment: MiPago) {
-    const parts = [
-        payment.tipo === "suscripcion" ? "Suscripcion" : payment.tipo === "individual" ? "Clase individual" : "Movimiento",
-        payment.disciplina,
-        payment.mp_payment_id ? `MP ${payment.mp_payment_id}` : null,
-    ].filter(Boolean);
-
-    return parts.join(" - ");
+function getPaymentTypeLabel(payment: MiPago) {
+    return payment.tipo === "suscripcion" ? "Suscripcion" : "Individual";
 }
 
 function PaymentStatusBadge() {
@@ -54,16 +46,17 @@ function PaymentRow({ payment }: { payment: MiPago }) {
     return (
         <div className="glass rounded-xl px-4 py-3 transition-all hover:border-slate-300 hover:shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-start gap-3">
-                    <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500">
+                <div className="flex min-h-9 min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500">
                         <CreditCard size={18} />
                     </div>
                     <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-800">{getPaymentConcept(payment)}</p>
-                        <p className="mt-0.5 truncate text-xs text-slate-400">{getPaymentSubtitle(payment)}</p>
-                        {payment.descripcion && payment.clase_nombre && (
-                            <p className="mt-1 text-xs text-slate-500">{payment.descripcion}</p>
-                        )}
+                        <p className="break-words text-sm font-semibold leading-tight text-slate-800">
+                            {formatDiscipline(payment.disciplina)}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                            {getPaymentTypeLabel(payment)}
+                        </p>
                     </div>
                 </div>
 
