@@ -14,10 +14,12 @@ from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
 from models.pagos import Pago
 from models.usuario import Usuario
+from repositories.pago_repository import PagoRepository
 from repositories.inscripcion_repository import InscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.inscripcion import InscripcionIndividualCreate
+from schemas.pago import MiPagoResponse
 from schemas.suscripcion import SuscripcionCreate
 from services.inscripcion_service import InscripcionService
 from services.suscripcion_service import SuscripcionService
@@ -39,6 +41,7 @@ def _deuda_saldable(fecha: date, hora_inicio) -> bool:
 class PagoService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.repo = PagoRepository(db)
         self._sdk: mercadopago.SDK | None = None
 
     @property
@@ -48,6 +51,50 @@ class PagoService:
         if not self._sdk:
             self._sdk = mercadopago.SDK(settings.MP_ACCESS_TOKEN)
         return self._sdk
+
+    async def get_mis_pagos(self, current_user: Usuario) -> list[MiPagoResponse]:
+        pagos = await self.repo.list_by_usuario(current_user.id)
+        historial = []
+
+        for pago in pagos:
+            clase_template = None
+            tipo = "otro"
+
+            if pago.suscripcion and pago.suscripcion.clase_template:
+                clase_template = pago.suscripcion.clase_template
+                tipo = "suscripcion"
+            elif pago.clase_instancia and pago.clase_instancia.clase_template:
+                clase_template = pago.clase_instancia.clase_template
+                tipo = "individual"
+
+            historial.append(MiPagoResponse(
+                id=pago.id,
+                monto=float(pago.monto),
+                fecha_pago=pago.fecha_pago,
+                estado=pago.estado,
+                mp_payment_id=pago.mp_payment_id,
+                descripcion=pago.descripcion,
+                tipo=tipo,
+                clase_nombre=clase_template.nombre if clase_template else None,
+                disciplina=clase_template.disciplina if clase_template else None,
+            ))
+
+        return historial
+
+    async def _record_failed_mp_payment(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+        payment: dict,
+        descripcion: str,
+    ) -> None:
+        monto = Decimal(str(payment.get("transaction_amount") or 0))
+        await self.repo.create_failed_mp(
+            usuario_id=current_user.id,
+            payment_id=str(payment_id),
+            monto=monto,
+            descripcion=descripcion,
+        )
 
     async def crear_preferencia_mp(
         self,
@@ -130,6 +177,12 @@ class PagoService:
         status = payment.get("status")
 
         if status not in ("approved", "pending"):
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Pago individual no completado",
+            )
             return {"status": status}
 
         existing = await self.db.execute(
@@ -275,6 +328,12 @@ class PagoService:
 
         payment = payment_response["response"]
         if payment.get("status") not in ("approved", "pending"):
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Pago saldo pendiente no completado",
+            )
             return {"status": payment.get("status")}
 
         existing = await self.db.execute(
@@ -389,6 +448,12 @@ class PagoService:
 
         payment = payment_response["response"]
         if payment.get("status") not in ("approved", "pending"):
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Pago suscripcion no completado",
+            )
             return {"status": payment.get("status")}
 
         existing = await self.db.execute(

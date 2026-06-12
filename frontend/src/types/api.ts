@@ -161,6 +161,18 @@ export enum EstadoPago {
     ANULADO = "anulado",
 }
 
+export interface MiPago {
+    id: string;
+    monto: number;
+    fecha_pago: string;
+    estado: EstadoPago;
+    mp_payment_id: string | null;
+    descripcion: string | null;
+    tipo: string;
+    clase_nombre: string | null;
+    disciplina: Disciplina | null;
+}
+
 export interface MiClaseIndividual {
     asistencia_id: string;
     clase_nombre: string;

@@ -1,0 +1,21 @@
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, UUID4
+
+from core.enums import EstadoPago
+
+
+class MiPagoResponse(BaseModel):
+    id: UUID4
+    monto: float
+    fecha_pago: datetime
+    estado: EstadoPago
+    mp_payment_id: Optional[str] = None
+    descripcion: Optional[str] = None
+    tipo: str
+    clase_nombre: Optional[str] = None
+    disciplina: Optional[str] = None
+
+    class Config:
+        from_attributes = True
