@@ -54,7 +54,7 @@ function PaymentRow({ payment }: { payment: MiPago }) {
                         <p className="break-words text-sm font-semibold leading-tight text-slate-800">
                             {formatDiscipline(payment.disciplina)}
                         </p>
-                        <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        <p className="mt-0.5 text-xs font-medium text-slate-400">
                             {getPaymentTypeLabel(payment)}
                         </p>
                     </div>
