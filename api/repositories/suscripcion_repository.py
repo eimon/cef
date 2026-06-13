@@ -5,13 +5,14 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 
-from core.enums import DiaSemana, TipoInscripcion, EstadoPago
+from core.enums import DiaSemana, TipoInscripcion, EstadoPago, EstadoSuscripcion
 from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
-from models.suscripciones import Suscripcion
+from models.suscripciones import Suscripcion, SuscripcionReserva
 
 
 class SuscripcionRepository:
@@ -41,9 +42,62 @@ class SuscripcionRepository:
                 Suscripcion.fecha_inicio <= fecha_fin,
                 Suscripcion.fecha_fin >= fecha_inicio,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
             )
         )
         return result.scalars().first() is not None
+
+    async def get_suscripcion_by_id_for_user(
+        self, suscripcion_id: uuid.UUID, usuario_id: uuid.UUID
+    ) -> Suscripcion | None:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(
+                Suscripcion.id == suscripcion_id,
+                Suscripcion.usuario_id == usuario_id,
+                Suscripcion.activo == True,
+            )
+        )
+        return result.scalars().first()
+
+    async def get_suscripciones_for_renewal(self, usuario_id: uuid.UUID) -> list[Suscripcion]:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(
+                Suscripcion.usuario_id == usuario_id,
+                Suscripcion.activo == True,
+            )
+            .order_by(Suscripcion.clase_template_id, Suscripcion.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_suscripciones_for_template(self, clase_template_id: uuid.UUID) -> list[Suscripcion]:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(
+                Suscripcion.clase_template_id == clase_template_id,
+                Suscripcion.activo == True,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def get_latest_suscripcion_for_template(
+        self, usuario_id: uuid.UUID, clase_template_id: uuid.UUID
+    ) -> Suscripcion | None:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .where(
+                Suscripcion.usuario_id == usuario_id,
+                Suscripcion.clase_template_id == clase_template_id,
+                Suscripcion.activo == True,
+            )
+            .order_by(Suscripcion.created_at.desc())
+            .limit(1)
+        )
+        return result.scalars().first()
 
     async def count_suscripciones_en_fecha(
         self, clase_template_id: uuid.UUID, fecha: date
@@ -54,6 +108,7 @@ class SuscripcionRepository:
                 Suscripcion.fecha_inicio <= fecha,
                 Suscripcion.fecha_fin >= fecha,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
             )
         )
         return result.scalar() or 0
@@ -63,6 +118,22 @@ class SuscripcionRepository:
             select(func.count()).where(
                 Suscripcion.clase_template_id == clase_template_id,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
+            )
+        )
+        return result.scalar() or 0
+
+    async def count_active_reservas_en_fecha(
+        self, clase_template_id: uuid.UUID, fecha: date
+    ) -> int:
+        result = await self.db.execute(
+            select(func.count())
+            .select_from(SuscripcionReserva)
+            .join(ClaseInstancia, SuscripcionReserva.clase_instancia_id == ClaseInstancia.id)
+            .where(
+                ClaseInstancia.clase_template_id == clase_template_id,
+                ClaseInstancia.fecha == fecha,
+                SuscripcionReserva.activa == True,
             )
         )
         return result.scalar() or 0
@@ -83,6 +154,7 @@ class SuscripcionRepository:
             .where(
                 Suscripcion.usuario_id == usuario_id,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
                 Suscripcion.clase_template_id != exclude_template_id,
                 Suscripcion.fecha_inicio <= fecha_fin,
                 Suscripcion.fecha_fin >= fecha_inicio,
@@ -167,6 +239,58 @@ class SuscripcionRepository:
         await self.db.refresh(asistencia)
         return asistencia
 
+    async def create_reserva(
+        self, suscripcion_id: uuid.UUID, instancia_id: uuid.UUID
+    ) -> SuscripcionReserva:
+        reserva = SuscripcionReserva(
+            suscripcion_id=suscripcion_id,
+            clase_instancia_id=instancia_id,
+            activa=True,
+        )
+        self.db.add(reserva)
+        await self.db.flush()
+        await self.db.refresh(reserva)
+        return reserva
+
+    async def get_active_future_reservas(self, suscripcion_id: uuid.UUID, from_date: date) -> list[SuscripcionReserva]:
+        result = await self.db.execute(
+            select(SuscripcionReserva)
+            .options(selectinload(SuscripcionReserva.clase_instancia))
+            .join(ClaseInstancia, SuscripcionReserva.clase_instancia_id == ClaseInstancia.id)
+            .where(
+                SuscripcionReserva.suscripcion_id == suscripcion_id,
+                SuscripcionReserva.activa == True,
+                ClaseInstancia.fecha >= from_date,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def mark_subscription_state(
+        self, suscripcion: Suscripcion, estado: EstadoSuscripcion
+    ) -> Suscripcion:
+        suscripcion.estado = estado
+        await self.db.flush()
+        return suscripcion
+
+    async def release_future_reservas(self, suscripcion: Suscripcion, from_date: date) -> None:
+        reservas = await self.get_active_future_reservas(suscripcion.id, from_date)
+        for reserva in reservas:
+            reserva.activa = False
+            if reserva.clase_instancia:
+                reserva.clase_instancia.cupo += 1
+
+            asistencia = (await self.db.execute(
+                select(Asistencia).where(
+                    Asistencia.usuario_id == suscripcion.usuario_id,
+                    Asistencia.clase_instancia_id == reserva.clase_instancia_id,
+                    Asistencia.tipo == TipoInscripcion.SUSCRIPCION,
+                    Asistencia.cancelo == False,
+                )
+            )).scalars().first()
+            if asistencia:
+                asistencia.cancelo = True
+        await self.db.flush()
+
     async def create_suscripcion(
         self,
         usuario_id: uuid.UUID,
@@ -174,6 +298,7 @@ class SuscripcionRepository:
         monto: Decimal,
         fecha_inicio: date,
         fecha_fin: date,
+        fecha_pago: date,
     ) -> Suscripcion:
         suscripcion = Suscripcion(
             usuario_id=usuario_id,
@@ -181,6 +306,8 @@ class SuscripcionRepository:
             monto=monto,
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
+            fecha_pago=fecha_pago,
+            estado=EstadoSuscripcion.VIGENTE,
             activo=True,
         )
         self.db.add(suscripcion)

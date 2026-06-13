@@ -173,6 +173,21 @@ export interface MiPago {
     disciplina: Disciplina | null;
 }
 
+export interface RenovacionSuscripcionPendiente {
+    suscripcion_id: string;
+    clase_template_id: string;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    fecha_inicio: string;
+    fecha_fin: string;
+    renovacion_disponible_desde: string;
+    renovacion_disponible_hasta: string;
+    nueva_fecha_inicio: string;
+    nueva_fecha_fin: string;
+    cantidad_clases: number;
+    precio_total: number;
+}
+
 export interface MiClaseIndividual {
     asistencia_id: string;
     clase_nombre: string;
@@ -208,6 +223,7 @@ export interface MiSuscripcion {
     fecha_inicio: string;
     fecha_fin: string;
     monto: number;
+    estado: "vigente" | "renovable" | "vencida";
     activo: boolean;
     instancias: InstanciaEnSuscripcion[];
 }
@@ -228,6 +244,8 @@ export interface SuscripcionResponse {
     monto: number;
     fecha_inicio: string;
     fecha_fin: string;
+    fecha_pago: string;
+    estado: "vigente" | "renovable" | "vencida";
     fechas_clases: string[];
     activo: boolean;
 }

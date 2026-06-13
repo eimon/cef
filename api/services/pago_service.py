@@ -437,6 +437,45 @@ class PagoService:
             "preference_id": pref["id"],
         }
 
+    async def crear_preferencia_renovacion_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        suscripcion_id: UUID,
+    ) -> dict:
+        (
+            _suscripcion,
+            template,
+            _fecha_inicio,
+            _fecha_fin,
+            _fechas_clases,
+            precio,
+            _disponible_desde,
+            _disponible_hasta,
+        ) = await SuscripcionService(self.db)._validar_renovacion(current_user, suscripcion_id)
+
+        dia = template.dia_semana.value.capitalize()
+        pref_data = self._make_preference(
+            title=f"Renovación suscripción — {template.nombre} {dia}",
+            monto=round(float(precio), 2),
+            back_url_suffix="?tipo=renovacion-suscripcion",
+            metadata={
+                "suscripcion_id": str(suscripcion_id),
+                "usuario_id": str(current_user.id),
+                "tipo": "renovacion_suscripcion",
+            },
+            external_reference=f"renovacion_suscripcion|{suscripcion_id}|{current_user.id}",
+        )
+
+        response = self.sdk.preference().create(pref_data)
+        if response["status"] not in (200, 201):
+            raise BadRequestException("Error al conectar con MercadoPago")
+
+        pref = response["response"]
+        return {
+            "init_point": self._init_point_from_response(pref),
+            "preference_id": pref["id"],
+        }
+
     async def confirmar_suscripcion_mp(
         self,
         current_user: Usuario,
@@ -447,7 +486,10 @@ class PagoService:
             raise NotFoundException("Pago no encontrado en MercadoPago")
 
         payment = payment_response["response"]
-        if payment.get("status") not in ("approved", "pending"):
+        if payment.get("status") == "pending":
+            return {"status": "pending"}
+
+        if payment.get("status") != "approved":
             await self._record_failed_mp_payment(
                 current_user,
                 payment_id,
@@ -482,6 +524,60 @@ class PagoService:
         data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto)
         result = await SuscripcionService(self.db).suscribirse(
             current_user, data, mp_payment_id=str(payment_id)
+        )
+
+        return {"status": "approved", **result.model_dump()}
+
+    async def confirmar_renovacion_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+    ) -> dict:
+        payment_response = self.sdk.payment().get(payment_id)
+        if payment_response["status"] != 200:
+            raise NotFoundException("Pago no encontrado en MercadoPago")
+
+        payment = payment_response["response"]
+        if payment.get("status") == "pending":
+            return {"status": "pending"}
+
+        if payment.get("status") != "approved":
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Renovación suscripción no completada",
+            )
+            return {"status": payment.get("status")}
+
+        existing = await self.db.execute(
+            select(Pago).where(Pago.mp_payment_id == str(payment_id))
+        )
+        if existing.scalars().first():
+            return {"status": "approved", "already_processed": True}
+
+        metadata = payment.get("metadata", {})
+        external_ref = payment.get("external_reference", "")
+        try:
+            if metadata.get("suscripcion_id"):
+                suscripcion_id = UUID(str(metadata["suscripcion_id"]))
+                usuario_id = str(metadata["usuario_id"])
+            else:
+                parts = external_ref.split("|")
+                suscripcion_id = UUID(parts[1])
+                usuario_id = parts[2]
+        except (KeyError, ValueError, IndexError):
+            raise BadRequestException("Metadatos del pago inválidos")
+
+        if str(current_user.id) != usuario_id:
+            raise BadRequestException("Este pago no corresponde a tu usuario")
+
+        monto = Decimal(str(payment["transaction_amount"]))
+        result = await SuscripcionService(self.db).renovar_suscripcion(
+            current_user,
+            suscripcion_id,
+            monto,
+            mp_payment_id=str(payment_id),
         )
 
         return {"status": "approved", **result.model_dump()}

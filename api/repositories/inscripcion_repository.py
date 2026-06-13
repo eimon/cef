@@ -12,7 +12,7 @@ from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
 from models.suscripciones import Suscripcion
-from core.enums import TipoInscripcion, EstadoPago
+from core.enums import TipoInscripcion, EstadoPago, EstadoSuscripcion
 
 
 class InscripcionRepository:
@@ -45,6 +45,7 @@ class InscripcionRepository:
                 Suscripcion.fecha_inicio <= fecha,
                 Suscripcion.fecha_fin >= fecha,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
             )
         )
         return result.scalar() or 0
@@ -129,6 +130,7 @@ class InscripcionRepository:
                 Suscripcion.fecha_inicio <= fecha,
                 Suscripcion.fecha_fin >= fecha,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
             )
         )
         return result.scalars().first() is not None

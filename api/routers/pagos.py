@@ -8,7 +8,9 @@ from core.database import get_db
 from dependencies.auth import get_current_user
 from models.usuario import Usuario
 from schemas.pago import MiPagoResponse
+from schemas.suscripcion import RenovacionSuscripcionPendienteResponse
 from services.pago_service import PagoService
+from services.suscripcion_service import SuscripcionService
 
 router = APIRouter(prefix="/pagos", tags=["pagos"])
 
@@ -19,6 +21,14 @@ async def get_mis_pagos(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await PagoService(db).get_mis_pagos(current_user)
+
+
+@router.get("/renovaciones-pendientes", response_model=list[RenovacionSuscripcionPendienteResponse])
+async def get_renovaciones_pendientes(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await SuscripcionService(db).list_renovaciones_pendientes(current_user)
 
 
 @router.post("/mp/preferencia")
@@ -76,3 +86,21 @@ async def confirmar_suscripcion_mp(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await PagoService(db).confirmar_suscripcion_mp(current_user, payment_id)
+
+
+@router.post("/mp/preferencia-renovacion-suscripcion")
+async def crear_preferencia_renovacion_suscripcion_mp(
+    suscripcion_id: UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).crear_preferencia_renovacion_suscripcion_mp(current_user, suscripcion_id)
+
+
+@router.post("/mp/confirmar-renovacion-suscripcion")
+async def confirmar_renovacion_suscripcion_mp(
+    payment_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).confirmar_renovacion_suscripcion_mp(current_user, payment_id)

@@ -15,7 +15,7 @@ from core.config import settings
 from core.database import Base
 
 # Import all models so Alembic detects them
-from models import Usuario, RefreshToken, RegistrationToken, Profesor, Suscripcion, ClaseTemplate, ClaseInstancia, Asistencia, Pago, FichaMedica, Sala  # noqa: F401
+from models import Usuario, RefreshToken, RegistrationToken, Profesor, Suscripcion, SuscripcionReserva, ClaseTemplate, ClaseInstancia, Asistencia, Pago, FichaMedica, Sala  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

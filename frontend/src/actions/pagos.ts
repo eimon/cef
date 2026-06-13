@@ -1,7 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
-import { MiPago } from "@/types/api";
+import { MiPago, RenovacionSuscripcionPendiente } from "@/types/api";
 
 export type PreferenciaResult = {
     init_point?: string;
@@ -18,6 +18,16 @@ export type ConfirmarPagoResult = {
 export async function getMisPagos(): Promise<MiPago[]> {
     try {
         const res = await serverApi("/pagos/mios");
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
+
+export async function getRenovacionesPendientes(): Promise<RenovacionSuscripcionPendiente[]> {
+    try {
+        const res = await serverApi("/pagos/renovaciones-pendientes");
         if (!res.ok) return [];
         return res.json();
     } catch {
@@ -68,6 +78,24 @@ export async function crearPreferenciaSuscripcionMP(
     }
 }
 
+export async function crearPreferenciaRenovacionSuscripcionMP(
+    suscripcionId: string,
+): Promise<PreferenciaResult> {
+    try {
+        const res = await serverApi("/pagos/mp/preferencia-renovacion-suscripcion", {
+            method: "POST",
+            params: { suscripcion_id: suscripcionId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al iniciar la renovación" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
 export async function crearPreferenciaDeudaMP(asistenciaId: string): Promise<PreferenciaResult> {
     try {
         const res = await serverApi("/pagos/mp/preferencia-deuda", {
@@ -109,6 +137,22 @@ export async function confirmarSuscripcionMP(paymentId: string): Promise<Confirm
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             return { error: error.detail || "Error al confirmar la suscripción" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function confirmarRenovacionSuscripcionMP(paymentId: string): Promise<ConfirmarPagoResult> {
+    try {
+        const res = await serverApi("/pagos/mp/confirmar-renovacion-suscripcion", {
+            method: "POST",
+            params: { payment_id: paymentId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al confirmar la renovación" };
         }
         return res.json();
     } catch {

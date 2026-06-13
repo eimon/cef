@@ -14,12 +14,13 @@ from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, Cla
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, BadRequestException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
-from core.enums import DiaSemana, TipoInscripcion
+from core.enums import DiaSemana, TipoInscripcion, EstadoSuscripcion
 from models.asistencia import Asistencia
 from models.clase_template import ClaseTemplate
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
 from core.timezone import LOCAL_TZ
+from services.suscripcion_service import SuscripcionService
 
 _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
     0: DiaSemana.LUNES,
@@ -207,6 +208,10 @@ class ClaseTemplateService:
         fechas = [week_start + timedelta(days=i) for i in range(7)]
 
         templates = await self.repo.get_all()
+        suscripcion_service = SuscripcionService(self.db)
+        for template in templates:
+            await suscripcion_service.sync_template_subscriptions(template.id)
+
         subscription_dates_by_template: dict[uuid.UUID, list[date]] = {}
         subscription_dates: set[date] = set()
         for template in templates:
@@ -228,6 +233,7 @@ class ClaseTemplateService:
             select(Suscripcion).where(
                 Suscripcion.clase_template_id.in_(template_ids),
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
             )
         )
         subs = subs_result.scalars().all()
@@ -243,14 +249,11 @@ class ClaseTemplateService:
             )
             asistencia_counts = {row[0]: row[1] for row in asistencia_result.all()}
 
-        def count_all_subs(template_id: uuid.UUID) -> int:
-            return sum(1 for s in subs if s.clase_template_id == template_id)
-
         def cupo_disponible_for(template, target_date: date) -> int:
             instancia = instancia_map.get((template.id, target_date))
             if instancia:
-                return max(0, template.capacidad_maxima - asistencia_counts.get(instancia.id, 0))
-            return max(0, template.capacidad_maxima - count_all_subs(template.id))
+                return max(0, instancia.cupo)
+            return template.capacidad_maxima
 
         def cupo_suscripcion_disponible(template) -> bool:
             fechas_suscripcion = subscription_dates_by_template.get(template.id, [])
@@ -280,6 +283,7 @@ class ClaseTemplateService:
                 ).where(
                     Suscripcion.usuario_id == current_user.id,
                     Suscripcion.activo == True,
+                    Suscripcion.estado != EstadoSuscripcion.VENCIDA,
                 )
             )
             user_subs = user_subs_result.all()

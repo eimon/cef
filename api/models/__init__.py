@@ -2,7 +2,7 @@ from models.usuario import Usuario
 from models.refresh_token import RefreshToken
 from models.registration_token import RegistrationToken
 from models.profesor import Profesor
-from models.suscripciones import Suscripcion
+from models.suscripciones import Suscripcion, SuscripcionReserva
 from models.clase_template import ClaseTemplate
 from models.clase_instancia import ClaseInstancia
 from models.asistencia import Asistencia
@@ -22,6 +22,7 @@ __all__ = [
     "PasswordResetToken",
     "Profesor",
     "Suscripcion",
+    "SuscripcionReserva",
     "ClaseTemplate",
     "ClaseInstancia",
     "Asistencia",

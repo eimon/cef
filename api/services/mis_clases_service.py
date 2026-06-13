@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.mis_clases_repository import MisClasesRepository
+from services.suscripcion_service import SuscripcionService
 from schemas.mis_clases import (
     MiClaseIndividualResponse,
     MiSuscripcionResponse,
@@ -37,6 +38,7 @@ class MisClasesService:
         ]
 
     async def get_suscripciones(self, usuario_id: uuid.UUID) -> list[MiSuscripcionResponse]:
+        await SuscripcionService(self.db).sync_user_subscriptions(usuario_id)
         suscripciones = await self.repo.get_suscripciones(usuario_id)
         result = []
         for s in suscripciones:
@@ -59,6 +61,7 @@ class MisClasesService:
                 fecha_inicio=s.fecha_inicio,
                 fecha_fin=s.fecha_fin,
                 monto=float(s.monto),
+                estado=s.estado,
                 activo=s.activo,
                 instancias=[
                     InstanciaEnSuscripcionResponse(
