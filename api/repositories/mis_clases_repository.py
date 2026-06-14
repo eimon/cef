@@ -10,7 +10,7 @@ from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
 from models.disciplina import Disciplina as DisciplinaModel
-from models.suscripciones import Suscripcion
+from models.suscripciones import Suscripcion, SuscripcionReserva
 from core.enums import TipoInscripcion
 
 
@@ -91,8 +91,31 @@ class MisClasesRepository:
         return list(result.scalars().all())
 
     async def get_instancias_de_suscripcion(
-        self, clase_template_id: uuid.UUID, fecha_inicio, fecha_fin
+        self, suscripcion_id: uuid.UUID, clase_template_id: uuid.UUID, fecha_inicio, fecha_fin
     ) -> list[ClaseInstancia]:
+        result = await self.db.execute(
+            select(ClaseInstancia)
+            .join(SuscripcionReserva, SuscripcionReserva.clase_instancia_id == ClaseInstancia.id)
+            .where(
+                SuscripcionReserva.suscripcion_id == suscripcion_id,
+                SuscripcionReserva.activa == True,
+                ClaseInstancia.clase_template_id == clase_template_id,
+                ClaseInstancia.fecha >= fecha_inicio,
+                ClaseInstancia.fecha <= fecha_fin,
+                ClaseInstancia.activo == True,
+            )
+            .order_by(ClaseInstancia.fecha.asc())
+        )
+        instancias = list(result.scalars().all())
+        if instancias:
+            return instancias
+
+        reserva_count = (await self.db.execute(
+            select(func.count()).where(SuscripcionReserva.suscripcion_id == suscripcion_id)
+        )).scalar() or 0
+        if reserva_count > 0:
+            return []
+
         result = await self.db.execute(
             select(ClaseInstancia)
             .where(

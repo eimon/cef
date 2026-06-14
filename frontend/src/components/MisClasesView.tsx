@@ -18,6 +18,7 @@ type MisClasesItem = {
     hora_fin: string;
     profesor_nombre: string | null;
     cancelada: boolean;
+    deuda_vencida?: boolean;
     // individual only
     asistencia_id?: string;
     monto_pagado?: number | null;
@@ -40,6 +41,7 @@ function buildItems(
             hora_fin: c.hora_fin,
             profesor_nombre: c.profesor_nombre,
             cancelada: c.cancelo,
+            deuda_vencida: c.deuda_vencida,
             asistencia_id: c.asistencia_id,
             monto_pagado: c.monto_pagado,
             precio_clase: c.precio_clase,
@@ -56,6 +58,7 @@ function buildItems(
                 hora_fin: s.hora_fin,
                 profesor_nombre: s.profesor_nombre,
                 cancelada: inst.cancelada,
+                deuda_vencida: false,
             }))
         ),
     ];
@@ -171,7 +174,7 @@ function DebtDialog({
                             : "border-cef-warning/20 bg-cef-warning/10 text-slate-700"
                     }`}>
                         {canPay
-                            ? "Podés completar el saldo pendiente desde Mis Pagos. El sistema permite hacerlo hasta 24 horas antes del inicio de la clase."
+                            ? "Podés completar el pago hasta 24 horas antes del inicio de la clase"
                             : getBlockedDebtMessage(item)}
                     </div>
 
@@ -251,7 +254,12 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                 </span>
 
                 {/* Estado */}
-                {item.cancelada && (
+                {item.deuda_vencida && (
+                    <span className="mt-2 inline-flex flex-shrink-0 rounded-full border border-cef-warning/20 bg-cef-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-cef-warning sm:mt-0">
+                        Deuda vencida
+                    </span>
+                )}
+                {item.cancelada && !item.deuda_vencida && (
                     <span className="mt-2 inline-flex flex-shrink-0 rounded-full border border-cef-danger/20 bg-cef-danger/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-cef-danger sm:mt-0">
                         Cancelada
                     </span>
@@ -380,7 +388,7 @@ export default function MisClasesView({
             {grouped.size === 0 ? (
                 <div className="glass rounded-2xl p-10 text-center">
                     <p className="text-slate-400 text-sm">
-                        {tiempoTab === "proximas" ? "No tenés clases próximas." : "No tenés clases pasadas."}
+                        No hay nada que mostrar en este momento
                     </p>
                 </div>
             ) : (

@@ -6,7 +6,9 @@ from datetime import date, timedelta
 from core.enums import EstadoSuscripcion
 
 
-RENOVABLE_AFTER_DAYS = 30
+# With date-only payments, the renewal starts on the same day number of the next
+# month-like period: 10/5 -> 10/6, then stays open for 10 days.
+RENOVABLE_AFTER_DAYS = 31
 RENEWAL_WINDOW_DAYS = 10
 
 

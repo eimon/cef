@@ -69,7 +69,7 @@ class SuscripcionRepository:
                 Suscripcion.usuario_id == usuario_id,
                 Suscripcion.activo == True,
             )
-            .order_by(Suscripcion.clase_template_id, Suscripcion.created_at.desc())
+            .order_by(Suscripcion.clase_template_id, Suscripcion.fecha_inicio.desc(), Suscripcion.created_at.desc())
         )
         return list(result.scalars().all())
 
@@ -94,10 +94,38 @@ class SuscripcionRepository:
                 Suscripcion.clase_template_id == clase_template_id,
                 Suscripcion.activo == True,
             )
-            .order_by(Suscripcion.created_at.desc())
+            .order_by(Suscripcion.fecha_inicio.desc(), Suscripcion.created_at.desc())
             .limit(1)
         )
         return result.scalars().first()
+
+    async def get_next_suscripcion_for_template(
+        self, usuario_id: uuid.UUID, clase_template_id: uuid.UUID, after_date: date
+    ) -> Suscripcion | None:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .where(
+                Suscripcion.usuario_id == usuario_id,
+                Suscripcion.clase_template_id == clase_template_id,
+                Suscripcion.fecha_inicio > after_date,
+                Suscripcion.activo == True,
+            )
+            .order_by(Suscripcion.fecha_inicio.asc(), Suscripcion.created_at.asc())
+            .limit(1)
+        )
+        return result.scalars().first()
+
+    async def has_paid_payment(self, suscripcion_id: uuid.UUID) -> bool:
+        result = await self.db.execute(
+            select(Pago.id)
+            .where(
+                Pago.suscripcion_id == suscripcion_id,
+                Pago.estado == EstadoPago.PAGADO,
+                Pago.activo == True,
+            )
+            .limit(1)
+        )
+        return result.scalars().first() is not None
 
     async def count_suscripciones_en_fecha(
         self, clase_template_id: uuid.UUID, fecha: date
@@ -299,6 +327,7 @@ class SuscripcionRepository:
         fecha_inicio: date,
         fecha_fin: date,
         fecha_pago: date,
+        estado: EstadoSuscripcion = EstadoSuscripcion.VIGENTE,
     ) -> Suscripcion:
         suscripcion = Suscripcion(
             usuario_id=usuario_id,
@@ -307,7 +336,7 @@ class SuscripcionRepository:
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             fecha_pago=fecha_pago,
-            estado=EstadoSuscripcion.VIGENTE,
+            estado=estado,
             activo=True,
         )
         self.db.add(suscripcion)

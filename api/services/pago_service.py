@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from core.config import settings
-from core.enums import EstadoPago
+from core.enums import EstadoPago, TipoInscripcion
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
@@ -84,10 +84,11 @@ class PagoService:
     async def list_deudas_pendientes(
         self, current_user: Usuario
     ) -> list[DeudaPendienteResponse]:
-        from core.enums import TipoInscripcion
         from models.clase_instancia import ClaseInstancia
         from models.clase_template import ClaseTemplate
         from models.disciplina import Disciplina
+
+        await self.sync_expired_partial_debts(current_user.id)
 
         monto_pagado_sq = (
             select(func.coalesce(func.sum(Pago.monto), 0))
@@ -95,6 +96,7 @@ class PagoService:
                 Pago.usuario_id == current_user.id,
                 Pago.clase_instancia_id == Asistencia.clase_instancia_id,
                 Pago.activo == True,
+                Pago.estado == EstadoPago.PAGADO,
             )
             .correlate(Asistencia)
             .scalar_subquery()
@@ -144,6 +146,64 @@ class PagoService:
             ))
 
         return pendientes
+
+    async def sync_expired_partial_debts(self, usuario_id: UUID | None = None) -> None:
+        from models.clase_instancia import ClaseInstancia
+        from models.clase_template import ClaseTemplate
+        from models.disciplina import Disciplina
+
+        monto_pagado_sq = (
+            select(func.coalesce(func.sum(Pago.monto), 0))
+            .where(
+                Pago.usuario_id == Asistencia.usuario_id,
+                Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                Pago.activo == True,
+                Pago.estado == EstadoPago.PAGADO,
+            )
+            .correlate(Asistencia)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                Asistencia,
+                ClaseInstancia,
+                ClaseTemplate,
+                monto_pagado_sq.label("monto_pagado"),
+                Disciplina.precio_individual.label("precio_total"),
+            )
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .join(Disciplina, Disciplina.nombre == ClaseTemplate.disciplina)
+            .where(
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                Asistencia.cancelo == False,
+            )
+        )
+        if usuario_id:
+            stmt = stmt.where(Asistencia.usuario_id == usuario_id)
+
+        rows = (await self.db.execute(stmt)).all()
+        released_any = False
+        for asistencia, instancia, template, monto_pagado_raw, precio_total_raw in rows:
+            monto_pagado = Decimal(str(monto_pagado_raw or 0))
+            precio_total = Decimal(str(precio_total_raw or 0))
+            monto_restante = precio_total - monto_pagado
+
+            if monto_pagado <= 0 or monto_restante <= 0:
+                continue
+            if _deuda_saldable(instancia.fecha, template.hora_inicio):
+                continue
+
+            self._release_partial_debt_reservation(asistencia, instancia)
+            released_any = True
+
+        if released_any:
+            await self.db.flush()
+
+    def _release_partial_debt_reservation(self, asistencia: Asistencia, instancia) -> None:
+        asistencia.cancelo = True
+        instancia.cupo += 1
 
     async def _record_failed_mp_payment(
         self,
@@ -337,6 +397,8 @@ class PagoService:
         asistencia, instancia, template = row
 
         if not _deuda_saldable(instancia.fecha, template.hora_inicio):
+            self._release_partial_debt_reservation(asistencia, instancia)
+            await self.db.flush()
             raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
 
         total_pagado = Decimal(str(
@@ -443,7 +505,11 @@ class PagoService:
             raise NotFoundException("Clase no encontrada")
 
         instancia, template = row
+        if asistencia.cancelo:
+            raise BadRequestException("La reserva ya no esta disponible")
         if not _deuda_saldable(instancia.fecha, template.hora_inicio):
+            self._release_partial_debt_reservation(asistencia, instancia)
+            await self.db.flush()
             raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
 
         pago = Pago(

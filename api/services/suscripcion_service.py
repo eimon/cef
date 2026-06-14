@@ -79,14 +79,17 @@ class SuscripcionService:
 
     async def sync_suscripcion_state(self, suscripcion) -> None:
         today = datetime.now(LOCAL_TZ).date()
+        has_paid_payment = await self.repo.has_paid_payment(suscripcion.id)
         current_state = get_subscription_state(suscripcion.estado)
         next_estado = current_state.next_state(suscripcion.fecha_pago, today)
-        if next_estado == suscripcion.estado:
-            return
 
-        await self.repo.mark_subscription_state(suscripcion, next_estado)
-        if next_estado == EstadoSuscripcion.VENCIDA:
-            await self.repo.release_future_reservas(suscripcion, today)
+        if next_estado != suscripcion.estado:
+            await self.repo.mark_subscription_state(suscripcion, next_estado)
+            if next_estado == EstadoSuscripcion.VENCIDA:
+                await self.repo.release_future_reservas(suscripcion, today)
+
+        if suscripcion.estado == EstadoSuscripcion.RENOVABLE and has_paid_payment:
+            await self._ensure_pending_renewal(suscripcion, today)
 
     async def sync_user_subscriptions(self, usuario_id: uuid.UUID) -> None:
         suscripciones = await self.repo.get_suscripciones_for_renewal(usuario_id)
@@ -97,6 +100,72 @@ class SuscripcionService:
         suscripciones = await self.repo.get_suscripciones_for_template(clase_template_id)
         for suscripcion in suscripciones:
             await self.sync_suscripcion_state(suscripcion)
+
+    async def _create_period_reservas(
+        self,
+        suscripcion,
+        template,
+        fechas_clases: list[date],
+        usuario_id: uuid.UUID,
+    ) -> None:
+        for fecha in fechas_clases:
+            instancia = await self.repo.get_instancia(template.id, fecha)
+            if instancia:
+                instancia.cupo = max(0, instancia.cupo - 1)
+            else:
+                reservas = await self.repo.count_active_reservas_en_fecha(template.id, fecha)
+                cupo = max(0, template.capacidad_maxima - reservas - 1)
+                instancia = await self.repo.create_instancia(template.id, fecha, cupo)
+
+            await self.repo.create_reserva(suscripcion.id, instancia.id)
+            await self.repo.create_asistencia(usuario_id, instancia.id)
+
+    async def _ensure_pending_renewal(self, suscripcion, today: date):
+        if today <= suscripcion.fecha_fin:
+            return None
+
+        disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion)
+        if not (disponible_desde <= today <= disponible_hasta):
+            return None
+
+        existing_next = await self.repo.get_next_suscripcion_for_template(
+            suscripcion.usuario_id,
+            suscripcion.clase_template_id,
+            suscripcion.fecha_fin,
+        )
+        if existing_next:
+            return existing_next
+
+        template = suscripcion.clase_template or await self.repo.get_template(suscripcion.clase_template_id)
+        if not template or not template.activo:
+            return None
+
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not disciplina_obj:
+            return None
+
+        nueva_fecha_inicio = _proxima_fecha_desde(
+            template.dia_semana, suscripcion.fecha_fin + timedelta(days=1)
+        )
+        nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
+        fechas_clases = _calcular_fechas_clases(nueva_fecha_inicio, nueva_fecha_fin)
+
+        pending = await self.repo.create_suscripcion(
+            usuario_id=suscripcion.usuario_id,
+            clase_template_id=template.id,
+            monto=Decimal(str(disciplina_obj.precio_suscripcion)),
+            fecha_inicio=nueva_fecha_inicio,
+            fecha_fin=nueva_fecha_fin,
+            fecha_pago=suscripcion.fecha_pago,
+            estado=EstadoSuscripcion.RENOVABLE,
+        )
+        await self._create_period_reservas(
+            pending,
+            template,
+            fechas_clases,
+            suscripcion.usuario_id,
+        )
+        return pending
 
     async def _validar_elegibilidad(
         self, current_user: Usuario, clase_template_id: uuid.UUID
@@ -179,6 +248,15 @@ class SuscripcionService:
             raise NotFoundException("Suscripción no encontrada")
 
         await self.sync_suscripcion_state(suscripcion)
+        hoy = datetime.now(LOCAL_TZ).date()
+
+        if await self.repo.has_paid_payment(suscripcion.id):
+            pending = await self._ensure_pending_renewal(suscripcion, hoy)
+            if not pending:
+                raise BadRequestException("La renovación todavía no está disponible")
+            suscripcion = await self.repo.get_suscripcion_by_id_for_user(
+                pending.id, current_user.id
+            )
 
         latest = await self.repo.get_latest_suscripcion_for_template(
             current_user.id, suscripcion.clase_template_id
@@ -192,45 +270,18 @@ class SuscripcionService:
             if suscripcion.estado == EstadoSuscripcion.VENCIDA:
                 raise BadRequestException("El período de renovación venció")
             raise BadRequestException("La renovación todavía no está disponible")
-        hoy = datetime.now(LOCAL_TZ).date()
         if hoy < disponible_desde:
             raise BadRequestException("La renovación todavía no está disponible")
         if hoy > disponible_hasta:
             raise BadRequestException("El período de renovación venció")
+        if await self.repo.has_paid_payment(suscripcion.id):
+            raise BadRequestException("La suscripción ya fue renovada")
 
         template = suscripcion.clase_template
         if not template.activo:
             raise BadRequestException("La clase ya no está disponible")
 
-        nueva_fecha_inicio = _proxima_fecha_desde(
-            template.dia_semana, suscripcion.fecha_fin + timedelta(days=1)
-        )
-        nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
-        fechas_clases = _calcular_fechas_clases(nueva_fecha_inicio, nueva_fecha_fin)
-
-        if await self.repo.has_suscripcion_activa(
-            current_user.id, template.id, nueva_fecha_inicio, nueva_fecha_fin
-        ):
-            raise ConflictException("Ya tenés una suscripción activa para este período")
-
-        if await self.repo.has_conflicto_suscripcion(
-            current_user.id,
-            template.dia_semana,
-            template.hora_inicio,
-            template.hora_fin,
-            nueva_fecha_inicio,
-            nueva_fecha_fin,
-            template.id,
-        ):
-            raise ConflictException("Ya tenés otra inscripción en el mismo horario para esta fecha")
-
-        conflicto_fecha = await self.repo.get_conflicto_individual(
-            current_user.id, fechas_clases, template.hora_inicio, template.hora_fin
-        )
-        if conflicto_fecha:
-            raise ConflictException(
-                f"Tenés una inscripción individual en el mismo horario el {conflicto_fecha.strftime('%d/%m/%Y')}"
-            )
+        fechas_clases = _calcular_fechas_clases(suscripcion.fecha_inicio, suscripcion.fecha_fin)
 
         disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
         if not disciplina_obj:
@@ -239,8 +290,8 @@ class SuscripcionService:
         return (
             suscripcion,
             template,
-            nueva_fecha_inicio,
-            nueva_fecha_fin,
+            suscripcion.fecha_inicio,
+            suscripcion.fecha_fin,
             fechas_clases,
             Decimal(str(disciplina_obj.precio_suscripcion)),
             disponible_desde,
@@ -263,6 +314,8 @@ class SuscripcionService:
                 continue
             if suscripcion.estado != EstadoSuscripcion.RENOVABLE:
                 continue
+            if await self.repo.has_paid_payment(suscripcion.id):
+                continue
 
             disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion)
             if not (disponible_desde <= hoy <= disponible_hasta):
@@ -276,11 +329,7 @@ class SuscripcionService:
             if not disciplina_obj:
                 continue
 
-            nueva_fecha_inicio = _proxima_fecha_desde(
-                template.dia_semana, suscripcion.fecha_fin + timedelta(days=1)
-            )
-            nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
-            cantidad_clases = len(_calcular_fechas_clases(nueva_fecha_inicio, nueva_fecha_fin))
+            cantidad_clases = len(_calcular_fechas_clases(suscripcion.fecha_inicio, suscripcion.fecha_fin))
 
             pendientes.append(RenovacionSuscripcionPendienteResponse(
                 suscripcion_id=suscripcion.id,
@@ -291,8 +340,8 @@ class SuscripcionService:
                 fecha_fin=suscripcion.fecha_fin,
                 renovacion_disponible_desde=disponible_desde,
                 renovacion_disponible_hasta=disponible_hasta,
-                nueva_fecha_inicio=nueva_fecha_inicio,
-                nueva_fecha_fin=nueva_fecha_fin,
+                nueva_fecha_inicio=suscripcion.fecha_inicio,
+                nueva_fecha_fin=suscripcion.fecha_fin,
                 cantidad_clases=cantidad_clases,
                 precio_total=float(disciplina_obj.precio_suscripcion),
             ))
@@ -322,28 +371,10 @@ class SuscripcionService:
                 f"El monto debe ser el precio completo: ${float(precio):.2f}"
             )
 
-        await self.repo.mark_subscription_state(suscripcion_anterior, EstadoSuscripcion.VENCIDA)
-
-        suscripcion = await self.repo.create_suscripcion(
-            usuario_id=current_user.id,
-            clase_template_id=template.id,
-            monto=monto,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            fecha_pago=datetime.now(LOCAL_TZ).date(),
-        )
-
-        for fecha in fechas_clases:
-            instancia = await self.repo.get_instancia(template.id, fecha)
-            if instancia:
-                instancia.cupo = max(0, instancia.cupo - 1)
-            else:
-                reservas = await self.repo.count_active_reservas_en_fecha(template.id, fecha)
-                cupo = max(0, template.capacidad_maxima - reservas - 1)
-                instancia = await self.repo.create_instancia(template.id, fecha, cupo)
-
-            await self.repo.create_reserva(suscripcion.id, instancia.id)
-            await self.repo.create_asistencia(current_user.id, instancia.id)
+        suscripcion = suscripcion_anterior
+        suscripcion.monto = monto
+        suscripcion.fecha_pago = datetime.now(LOCAL_TZ).date()
+        await self.repo.mark_subscription_state(suscripcion, EstadoSuscripcion.VIGENTE)
 
         pago = await self.repo.create_pago(
             usuario_id=current_user.id,

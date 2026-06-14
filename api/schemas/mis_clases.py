@@ -19,6 +19,7 @@ class MiClaseIndividualResponse(BaseModel):
     precio_clase: Optional[float] = None
     asistio: bool
     cancelo: bool
+    deuda_vencida: bool = False
 
     class Config:
         from_attributes = True

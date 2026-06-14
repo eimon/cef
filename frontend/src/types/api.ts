@@ -213,6 +213,7 @@ export interface MiClaseIndividual {
     precio_clase: number | null;
     asistio: boolean;
     cancelo: boolean;
+    deuda_vencida: boolean;
 }
 
 export interface InstanciaEnSuscripcion {
