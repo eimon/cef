@@ -3,6 +3,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.mis_clases_repository import MisClasesRepository
+from services.pago_service import PagoService
+from services.suscripcion_service import SuscripcionService
 from schemas.mis_clases import (
     MiClaseIndividualResponse,
     MiSuscripcionResponse,
@@ -16,9 +18,20 @@ class MisClasesService:
         self.repo = MisClasesRepository(db)
 
     async def get_individuales(self, usuario_id: uuid.UUID) -> list[MiClaseIndividualResponse]:
+        await PagoService(self.db).sync_expired_partial_debts(usuario_id)
         rows = await self.repo.get_individuales(usuario_id)
-        return [
-            MiClaseIndividualResponse(
+        result = []
+        for row in rows:
+            monto_pagado = float(row.monto_pagado) if row.monto_pagado is not None else None
+            precio_clase = float(row.precio_clase) if row.precio_clase is not None else None
+            deuda_vencida = (
+                row.cancelo
+                and monto_pagado is not None
+                and precio_clase is not None
+                and monto_pagado > 0
+                and monto_pagado < precio_clase
+            )
+            result.append(MiClaseIndividualResponse(
                 asistencia_id=row.asistencia_id,
                 clase_nombre=row.clase_nombre,
                 disciplina=row.disciplina,
@@ -27,23 +40,26 @@ class MisClasesService:
                 hora_fin=row.hora_fin,
                 profesor_nombre=row.profesor_nombre,
                 sala_nombre=row.sala_nombre,
-                monto_pagado=float(row.monto_pagado) if row.monto_pagado is not None else None,
+                monto_pagado=monto_pagado,
                 estado_pago=row.estado_pago,
-                precio_clase=float(row.precio_clase) if row.precio_clase is not None else None,
+                precio_clase=precio_clase,
                 asistio=row.asistio,
                 cancelo=row.cancelo,
-            )
-            for row in rows
-        ]
+                deuda_vencida=deuda_vencida,
+            ))
+        return result
 
     async def get_suscripciones(self, usuario_id: uuid.UUID) -> list[MiSuscripcionResponse]:
+        await SuscripcionService(self.db).sync_user_subscriptions(usuario_id)
         suscripciones = await self.repo.get_suscripciones(usuario_id)
         result = []
         for s in suscripciones:
             t = s.clase_template
             instancias = await self.repo.get_instancias_de_suscripcion(
-                t.id, s.fecha_inicio, s.fecha_fin
+                s.id, t.id, s.fecha_inicio, s.fecha_fin
             )
+            if not instancias:
+                continue
             result.append(MiSuscripcionResponse(
                 id=s.id,
                 clase_template_id=t.id,
@@ -59,6 +75,7 @@ class MisClasesService:
                 fecha_inicio=s.fecha_inicio,
                 fecha_fin=s.fecha_fin,
                 monto=float(s.monto),
+                estado=s.estado,
                 activo=s.activo,
                 instancias=[
                     InstanciaEnSuscripcionResponse(

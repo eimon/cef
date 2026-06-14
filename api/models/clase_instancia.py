@@ -23,3 +23,4 @@ class ClaseInstancia(Base):
     clase_template = relationship("ClaseTemplate", back_populates="instancias")
     asistencias = relationship("Asistencia", back_populates="clase_instancia")
     pagos = relationship("Pago", back_populates="clase_instancia")
+    reservas_suscripcion = relationship("SuscripcionReserva", back_populates="clase_instancia")

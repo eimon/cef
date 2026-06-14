@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from core.config import settings
-from core.enums import EstadoPago
+from core.enums import EstadoPago, TipoInscripcion
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
@@ -19,7 +19,7 @@ from repositories.inscripcion_repository import InscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.inscripcion import InscripcionIndividualCreate
-from schemas.pago import MiPagoResponse
+from schemas.pago import DeudaPendienteResponse, MiPagoResponse
 from schemas.suscripcion import SuscripcionCreate
 from services.inscripcion_service import InscripcionService
 from services.suscripcion_service import SuscripcionService
@@ -80,6 +80,130 @@ class PagoService:
             ))
 
         return historial
+
+    async def list_deudas_pendientes(
+        self, current_user: Usuario
+    ) -> list[DeudaPendienteResponse]:
+        from models.clase_instancia import ClaseInstancia
+        from models.clase_template import ClaseTemplate
+        from models.disciplina import Disciplina
+
+        await self.sync_expired_partial_debts(current_user.id)
+
+        monto_pagado_sq = (
+            select(func.coalesce(func.sum(Pago.monto), 0))
+            .where(
+                Pago.usuario_id == current_user.id,
+                Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                Pago.activo == True,
+                Pago.estado == EstadoPago.PAGADO,
+            )
+            .correlate(Asistencia)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                Asistencia.id.label("asistencia_id"),
+                ClaseTemplate.nombre.label("clase_nombre"),
+                ClaseTemplate.disciplina,
+                ClaseTemplate.hora_inicio,
+                ClaseInstancia.fecha,
+                monto_pagado_sq.label("monto_pagado"),
+                Disciplina.precio_individual.label("precio_total"),
+            )
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .join(Disciplina, Disciplina.nombre == ClaseTemplate.disciplina)
+            .where(
+                Asistencia.usuario_id == current_user.id,
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                Asistencia.cancelo == False,
+            )
+            .order_by(ClaseInstancia.fecha.asc(), ClaseTemplate.hora_inicio.asc())
+        )
+
+        rows = (await self.db.execute(stmt)).all()
+        pendientes: list[DeudaPendienteResponse] = []
+        for row in rows:
+            monto_pagado = Decimal(str(row.monto_pagado or 0))
+            precio_total = Decimal(str(row.precio_total or 0))
+            monto_restante = precio_total - monto_pagado
+            if monto_pagado <= 0 or monto_restante <= 0:
+                continue
+            if not _deuda_saldable(row.fecha, row.hora_inicio):
+                continue
+
+            pendientes.append(DeudaPendienteResponse(
+                asistencia_id=row.asistencia_id,
+                clase_nombre=row.clase_nombre,
+                disciplina=row.disciplina,
+                fecha=datetime.combine(row.fecha, row.hora_inicio),
+                hora_inicio=row.hora_inicio.strftime("%H:%M"),
+                monto_pagado=float(monto_pagado),
+                precio_total=float(precio_total),
+                monto_restante=float(monto_restante),
+            ))
+
+        return pendientes
+
+    async def sync_expired_partial_debts(self, usuario_id: UUID | None = None) -> None:
+        from models.clase_instancia import ClaseInstancia
+        from models.clase_template import ClaseTemplate
+        from models.disciplina import Disciplina
+
+        monto_pagado_sq = (
+            select(func.coalesce(func.sum(Pago.monto), 0))
+            .where(
+                Pago.usuario_id == Asistencia.usuario_id,
+                Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                Pago.activo == True,
+                Pago.estado == EstadoPago.PAGADO,
+            )
+            .correlate(Asistencia)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                Asistencia,
+                ClaseInstancia,
+                ClaseTemplate,
+                monto_pagado_sq.label("monto_pagado"),
+                Disciplina.precio_individual.label("precio_total"),
+            )
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .join(Disciplina, Disciplina.nombre == ClaseTemplate.disciplina)
+            .where(
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                Asistencia.cancelo == False,
+            )
+        )
+        if usuario_id:
+            stmt = stmt.where(Asistencia.usuario_id == usuario_id)
+
+        rows = (await self.db.execute(stmt)).all()
+        released_any = False
+        for asistencia, instancia, template, monto_pagado_raw, precio_total_raw in rows:
+            monto_pagado = Decimal(str(monto_pagado_raw or 0))
+            precio_total = Decimal(str(precio_total_raw or 0))
+            monto_restante = precio_total - monto_pagado
+
+            if monto_pagado <= 0 or monto_restante <= 0:
+                continue
+            if _deuda_saldable(instancia.fecha, template.hora_inicio):
+                continue
+
+            self._release_partial_debt_reservation(asistencia, instancia)
+            released_any = True
+
+        if released_any:
+            await self.db.flush()
+
+    def _release_partial_debt_reservation(self, asistencia: Asistencia, instancia) -> None:
+        asistencia.cancelo = True
+        instancia.cupo += 1
 
     async def _record_failed_mp_payment(
         self,
@@ -273,6 +397,8 @@ class PagoService:
         asistencia, instancia, template = row
 
         if not _deuda_saldable(instancia.fecha, template.hora_inicio):
+            self._release_partial_debt_reservation(asistencia, instancia)
+            await self.db.flush()
             raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
 
         total_pagado = Decimal(str(
@@ -379,7 +505,11 @@ class PagoService:
             raise NotFoundException("Clase no encontrada")
 
         instancia, template = row
+        if asistencia.cancelo:
+            raise BadRequestException("La reserva ya no esta disponible")
         if not _deuda_saldable(instancia.fecha, template.hora_inicio):
+            self._release_partial_debt_reservation(asistencia, instancia)
+            await self.db.flush()
             raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
 
         pago = Pago(
@@ -437,6 +567,45 @@ class PagoService:
             "preference_id": pref["id"],
         }
 
+    async def crear_preferencia_renovacion_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        suscripcion_id: UUID,
+    ) -> dict:
+        (
+            _suscripcion,
+            template,
+            _fecha_inicio,
+            _fecha_fin,
+            _fechas_clases,
+            precio,
+            _disponible_desde,
+            _disponible_hasta,
+        ) = await SuscripcionService(self.db)._validar_renovacion(current_user, suscripcion_id)
+
+        dia = template.dia_semana.value.capitalize()
+        pref_data = self._make_preference(
+            title=f"Renovación suscripción — {template.nombre} {dia}",
+            monto=round(float(precio), 2),
+            back_url_suffix="?tipo=renovacion-suscripcion",
+            metadata={
+                "suscripcion_id": str(suscripcion_id),
+                "usuario_id": str(current_user.id),
+                "tipo": "renovacion_suscripcion",
+            },
+            external_reference=f"renovacion_suscripcion|{suscripcion_id}|{current_user.id}",
+        )
+
+        response = self.sdk.preference().create(pref_data)
+        if response["status"] not in (200, 201):
+            raise BadRequestException("Error al conectar con MercadoPago")
+
+        pref = response["response"]
+        return {
+            "init_point": self._init_point_from_response(pref),
+            "preference_id": pref["id"],
+        }
+
     async def confirmar_suscripcion_mp(
         self,
         current_user: Usuario,
@@ -447,7 +616,10 @@ class PagoService:
             raise NotFoundException("Pago no encontrado en MercadoPago")
 
         payment = payment_response["response"]
-        if payment.get("status") not in ("approved", "pending"):
+        if payment.get("status") == "pending":
+            return {"status": "pending"}
+
+        if payment.get("status") != "approved":
             await self._record_failed_mp_payment(
                 current_user,
                 payment_id,
@@ -482,6 +654,60 @@ class PagoService:
         data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto)
         result = await SuscripcionService(self.db).suscribirse(
             current_user, data, mp_payment_id=str(payment_id)
+        )
+
+        return {"status": "approved", **result.model_dump()}
+
+    async def confirmar_renovacion_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+    ) -> dict:
+        payment_response = self.sdk.payment().get(payment_id)
+        if payment_response["status"] != 200:
+            raise NotFoundException("Pago no encontrado en MercadoPago")
+
+        payment = payment_response["response"]
+        if payment.get("status") == "pending":
+            return {"status": "pending"}
+
+        if payment.get("status") != "approved":
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Renovación suscripción no completada",
+            )
+            return {"status": payment.get("status")}
+
+        existing = await self.db.execute(
+            select(Pago).where(Pago.mp_payment_id == str(payment_id))
+        )
+        if existing.scalars().first():
+            return {"status": "approved", "already_processed": True}
+
+        metadata = payment.get("metadata", {})
+        external_ref = payment.get("external_reference", "")
+        try:
+            if metadata.get("suscripcion_id"):
+                suscripcion_id = UUID(str(metadata["suscripcion_id"]))
+                usuario_id = str(metadata["usuario_id"])
+            else:
+                parts = external_ref.split("|")
+                suscripcion_id = UUID(parts[1])
+                usuario_id = parts[2]
+        except (KeyError, ValueError, IndexError):
+            raise BadRequestException("Metadatos del pago inválidos")
+
+        if str(current_user.id) != usuario_id:
+            raise BadRequestException("Este pago no corresponde a tu usuario")
+
+        monto = Decimal(str(payment["transaction_amount"]))
+        result = await SuscripcionService(self.db).renovar_suscripcion(
+            current_user,
+            suscripcion_id,
+            monto,
+            mp_payment_id=str(payment_id),
         )
 
         return {"status": "approved", **result.model_dump()}

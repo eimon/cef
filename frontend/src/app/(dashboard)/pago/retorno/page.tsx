@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { CheckCircle, XCircle, Clock, AlertCircle } from "lucide-react";
-import { confirmarPagoMP, confirmarDeudaMP, confirmarSuscripcionMP } from "@/actions/pagos";
+import {
+    confirmarPagoMP,
+    confirmarDeudaMP,
+    confirmarSuscripcionMP,
+    confirmarRenovacionSuscripcionMP,
+} from "@/actions/pagos";
 
 export default async function PagoRetornoPage({
     searchParams,
@@ -19,11 +24,15 @@ export default async function PagoRetornoPage({
     const paymentId = rawPaymentId && rawPaymentId !== "null" ? rawPaymentId : undefined;
     const tipo = params.tipo;
 
+    async function confirmPayment(id: string) {
+        if (tipo === "deuda") return confirmarDeudaMP(id);
+        if (tipo === "suscripcion") return confirmarSuscripcionMP(id);
+        if (tipo === "renovacion-suscripcion") return confirmarRenovacionSuscripcionMP(id);
+        return confirmarPagoMP(id);
+    }
+
     if ((status === "approved" || status === "pending") && paymentId) {
-        const result =
-            tipo === "deuda"        ? await confirmarDeudaMP(paymentId) :
-            tipo === "suscripcion"  ? await confirmarSuscripcionMP(paymentId) :
-                                     await confirmarPagoMP(paymentId);
+        const result = await confirmPayment(paymentId);
 
         if (result.error) {
             return (
@@ -37,13 +46,28 @@ export default async function PagoRetornoPage({
             );
         }
 
-        const esSuscripcion = tipo === "suscripcion";
+        if (result.status === "pending") {
+            return (
+                <RetornoLayout
+                    icon={<Clock size={40} className="text-cef-warning" />}
+                    title="Pago pendiente"
+                    message="Tu pago está siendo procesado. Te notificaremos cuando se confirme."
+                    linkHref="/clases"
+                    linkLabel="Volver a clases"
+                />
+            );
+        }
+
+        const esSuscripcion = tipo === "suscripcion" || tipo === "renovacion-suscripcion";
+        const esRenovacion = tipo === "renovacion-suscripcion";
         return (
             <RetornoLayout
                 icon={<CheckCircle size={40} className="text-cef-success" />}
                 title={esSuscripcion ? "¡Suscripción confirmada!" : "¡Pago exitoso!"}
                 message={
-                    esSuscripcion
+                    esRenovacion
+                        ? "Tu suscripción fue renovada. Ya podés verla en Mis Clases."
+                        : esSuscripcion
                         ? "Tu suscripción fue activada. Ya podés verla en Mis Clases."
                         : tipo === "deuda"
                         ? "Tu pago fue completado. Ya podés verlo en Mis Clases."
@@ -68,10 +92,7 @@ export default async function PagoRetornoPage({
     }
 
     if (paymentId) {
-        const result =
-            tipo === "deuda"        ? await confirmarDeudaMP(paymentId) :
-            tipo === "suscripcion"  ? await confirmarSuscripcionMP(paymentId) :
-                                     await confirmarPagoMP(paymentId);
+        const result = await confirmPayment(paymentId);
 
         if (result.error) {
             return (
@@ -111,14 +132,14 @@ function RetornoLayout({
     linkLabel: string;
 }) {
     return (
-        <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="glass rounded-2xl p-10 max-w-sm w-full text-center space-y-4">
+        <div className="flex min-h-[60vh] items-center justify-center">
+            <div className="glass w-full max-w-sm space-y-4 rounded-2xl p-10 text-center">
                 <div className="flex justify-center">{icon}</div>
                 <h1 className="text-xl font-bold text-slate-800">{title}</h1>
-                <p className="text-sm text-slate-500 leading-relaxed">{message}</p>
+                <p className="text-sm leading-relaxed text-slate-500">{message}</p>
                 <Link
                     href={linkHref}
-                    className="inline-block mt-2 px-6 py-2.5 rounded-lg bg-cef-primary text-white text-sm font-semibold hover:bg-cef-primary/90 transition-colors"
+                    className="mt-2 inline-block rounded-lg bg-cef-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cef-primary/90"
                 >
                     {linkLabel}
                 </Link>

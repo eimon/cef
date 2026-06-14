@@ -2,7 +2,7 @@ from pydantic import BaseModel, UUID4
 from typing import Optional
 from datetime import date, time
 
-from core.enums import EstadoPago, DiaSemana
+from core.enums import EstadoPago, DiaSemana, EstadoSuscripcion
 
 
 class MiClaseIndividualResponse(BaseModel):
@@ -19,6 +19,7 @@ class MiClaseIndividualResponse(BaseModel):
     precio_clase: Optional[float] = None
     asistio: bool
     cancelo: bool
+    deuda_vencida: bool = False
 
     class Config:
         from_attributes = True
@@ -46,6 +47,7 @@ class MiSuscripcionResponse(BaseModel):
     fecha_inicio: date
     fecha_fin: date
     monto: float
+    estado: EstadoSuscripcion
     activo: bool
     instancias: list[InstanciaEnSuscripcionResponse]
 

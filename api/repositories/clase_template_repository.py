@@ -9,7 +9,7 @@ from models.clase_instancia import ClaseInstancia
 from models.asistencia import Asistencia
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
-from core.enums import DiaSemana
+from core.enums import DiaSemana, EstadoSuscripcion
 
 
 class ClaseTemplateRepository:
@@ -74,6 +74,7 @@ class ClaseTemplateRepository:
             select(Suscripcion.id).where(
                 Suscripcion.clase_template_id == template_id,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
             ).limit(1)
         )).scalars().first()
         if sub:
@@ -103,6 +104,7 @@ class ClaseTemplateRepository:
             .where(
                 Suscripcion.clase_template_id == template_id,
                 Suscripcion.activo == True,
+                Suscripcion.estado != EstadoSuscripcion.VENCIDA,
                 Usuario.email.isnot(None),
             )
         )

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, CalendarDays, AlertCircle, Loader2, X, Info, CreditCard } from "lucide-react";
+import { Clock, CalendarDays, X, Info, CreditCard } from "lucide-react";
 import { MiClaseIndividual, MiSuscripcion, Disciplina } from "@/types/api";
-import { crearPreferenciaDeudaMP } from "@/actions/pagos";
 
 // ─── Unified item ─────────────────────────────────────────────────────────────
 
@@ -19,6 +18,7 @@ type MisClasesItem = {
     hora_fin: string;
     profesor_nombre: string | null;
     cancelada: boolean;
+    deuda_vencida?: boolean;
     // individual only
     asistencia_id?: string;
     monto_pagado?: number | null;
@@ -41,6 +41,7 @@ function buildItems(
             hora_fin: c.hora_fin,
             profesor_nombre: c.profesor_nombre,
             cancelada: c.cancelo,
+            deuda_vencida: c.deuda_vencida,
             asistencia_id: c.asistencia_id,
             monto_pagado: c.monto_pagado,
             precio_clase: c.precio_clase,
@@ -57,6 +58,7 @@ function buildItems(
                 hora_fin: s.hora_fin,
                 profesor_nombre: s.profesor_nombre,
                 cancelada: inst.cancelada,
+                deuda_vencida: false,
             }))
         ),
     ];
@@ -119,21 +121,10 @@ function DebtDialog({
     montoRestante: number;
     onClose: () => void;
 }) {
-    const [paying, setPaying] = useState(false);
-    const [payError, setPayError] = useState("");
     const canPay = Boolean(item.asistencia_id) && canCompleteDebt(item.fecha, item.hora_inicio);
 
-    async function handleCompletarPago() {
-        if (!item.asistencia_id || !canPay) return;
-        setPaying(true);
-        setPayError("");
-        const result = await crearPreferenciaDeudaMP(item.asistencia_id);
-        if (result.error) {
-            setPaying(false);
-            setPayError(result.error);
-            return;
-        }
-        if (result.init_point) window.location.href = result.init_point;
+    function handleGoToPayments() {
+        window.location.href = "/mis-pagos";
     }
 
     return (
@@ -183,16 +174,10 @@ function DebtDialog({
                             : "border-cef-warning/20 bg-cef-warning/10 text-slate-700"
                     }`}>
                         {canPay
-                            ? "Podes completar el saldo pendiente. El sistema permite hacerlo hasta 24 horas antes del inicio de la clase."
+                            ? "Podés completar el pago hasta 24 horas antes del inicio de la clase"
                             : getBlockedDebtMessage(item)}
                     </div>
 
-                    {payError && (
-                        <p className="flex items-center gap-1.5 rounded-lg border border-cef-danger/20 bg-cef-danger/10 px-3 py-2 text-xs font-medium text-cef-danger">
-                            <AlertCircle size={14} />
-                            {payError}
-                        </p>
-                    )}
                 </div>
 
                 <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -206,12 +191,11 @@ function DebtDialog({
                     {canPay && (
                         <button
                             type="button"
-                            onClick={handleCompletarPago}
-                            disabled={paying}
+                            onClick={handleGoToPayments}
                             className="inline-flex items-center justify-center gap-2 rounded-lg bg-cef-warning px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cef-warning/90 disabled:opacity-60"
                         >
-                            {paying ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />}
-                            Completar pago
+                            <CreditCard size={16} />
+                            Pagar en Mis Pagos
                         </button>
                     )}
                 </div>
@@ -270,7 +254,12 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                 </span>
 
                 {/* Estado */}
-                {item.cancelada && (
+                {item.deuda_vencida && (
+                    <span className="mt-2 inline-flex flex-shrink-0 rounded-full border border-cef-warning/20 bg-cef-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-cef-warning sm:mt-0">
+                        Deuda vencida
+                    </span>
+                )}
+                {item.cancelada && !item.deuda_vencida && (
                     <span className="mt-2 inline-flex flex-shrink-0 rounded-full border border-cef-danger/20 bg-cef-danger/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-cef-danger sm:mt-0">
                         Cancelada
                     </span>
@@ -399,7 +388,7 @@ export default function MisClasesView({
             {grouped.size === 0 ? (
                 <div className="glass rounded-2xl p-10 text-center">
                     <p className="text-slate-400 text-sm">
-                        {tiempoTab === "proximas" ? "No tenés clases próximas." : "No tenés clases pasadas."}
+                        No hay nada que mostrar en este momento
                     </p>
                 </div>
             ) : (

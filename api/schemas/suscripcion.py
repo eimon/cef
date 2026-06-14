@@ -2,6 +2,8 @@ from datetime import date
 from decimal import Decimal
 from pydantic import BaseModel, UUID4, Field
 
+from core.enums import EstadoSuscripcion
+
 
 class SuscripcionCreate(BaseModel):
     clase_template_id: UUID4
@@ -24,5 +26,22 @@ class SuscripcionResponse(BaseModel):
     monto: float
     fecha_inicio: date
     fecha_fin: date
+    fecha_pago: date
+    estado: EstadoSuscripcion
     fechas_clases: list[date]
     activo: bool
+
+
+class RenovacionSuscripcionPendienteResponse(BaseModel):
+    suscripcion_id: UUID4
+    clase_template_id: UUID4
+    clase_nombre: str
+    disciplina: str
+    fecha_inicio: date
+    fecha_fin: date
+    renovacion_disponible_desde: date
+    renovacion_disponible_hasta: date
+    nueva_fecha_inicio: date
+    nueva_fecha_fin: date
+    cantidad_clases: int
+    precio_total: float

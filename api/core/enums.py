@@ -18,6 +18,12 @@ class EstadoPago(str, enum.Enum):
     ANULADO = "anulado"
 
 
+class EstadoSuscripcion(str, enum.Enum):
+    VIGENTE = "vigente"
+    RENOVABLE = "renovable"
+    VENCIDA = "vencida"
+
+
 class DiaSemana(str, enum.Enum):
     LUNES = "lunes"
     MARTES = "martes"

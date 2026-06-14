@@ -12,6 +12,7 @@ from exceptions.general import BadRequestException, ConflictException, NotFoundE
 from models.usuario import Usuario
 from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
+from services.suscripcion_service import SuscripcionService
 
 
 class InscripcionService:
@@ -27,6 +28,8 @@ class InscripcionService:
         template = await self.repo.get_template(clase_template_id)
         if not template:
             raise NotFoundException("Clase no encontrada")
+
+        await SuscripcionService(self.db).sync_template_subscriptions(clase_template_id)
 
         clase_inicio = datetime.combine(fecha, template.hora_inicio, tzinfo=LOCAL_TZ)
         if clase_inicio <= datetime.now(LOCAL_TZ):
