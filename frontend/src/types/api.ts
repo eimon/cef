@@ -188,6 +188,17 @@ export interface RenovacionSuscripcionPendiente {
     precio_total: number;
 }
 
+export interface DeudaPendiente {
+    asistencia_id: string;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    fecha: string;
+    hora_inicio: string;
+    monto_pagado: number;
+    precio_total: number;
+    monto_restante: number;
+}
+
 export interface MiClaseIndividual {
     asistencia_id: string;
     clase_nombre: string;

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from dependencies.auth import get_current_user
 from models.usuario import Usuario
-from schemas.pago import MiPagoResponse
+from schemas.pago import DeudaPendienteResponse, MiPagoResponse
 from schemas.suscripcion import RenovacionSuscripcionPendienteResponse
 from services.pago_service import PagoService
 from services.suscripcion_service import SuscripcionService
@@ -29,6 +29,14 @@ async def get_renovaciones_pendientes(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await SuscripcionService(db).list_renovaciones_pendientes(current_user)
+
+
+@router.get("/deudas-pendientes", response_model=list[DeudaPendienteResponse])
+async def get_deudas_pendientes(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).list_deudas_pendientes(current_user)
 
 
 @router.post("/mp/preferencia")

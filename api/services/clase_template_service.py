@@ -83,10 +83,10 @@ class ClaseTemplateService:
 
     async def _load_precios(self) -> dict[str, tuple[float, float]]:
         items = await DisciplinaRepository(self.db).get_all()
-        return {d.nombre: (float(d.precio_individual), float(d.precio_suscripcion)) for d in items}
+        return {d.nombre.lower(): (float(d.precio_individual), float(d.precio_suscripcion)) for d in items}
 
     def _to_response(self, clase, precios: dict[str, tuple[float, float]]) -> ClaseTemplateResponse:
-        pi, ps = precios.get(clase.disciplina, (0.0, 0.0))
+        pi, ps = precios.get(clase.disciplina.lower(), (0.0, 0.0))
         return ClaseTemplateResponse(
             id=clase.id,
             nombre=clase.nombre,
@@ -130,10 +130,10 @@ class ClaseTemplateService:
         if await self.repo.get_conflicting_profesor(data.profesor_id, data.dia_semana, data.hora_inicio, data.hora_fin):
             raise ProfesorOcupadoException()
 
-        nombre = data.disciplina.capitalize()
+        nombre = disciplina_obj.nombre.capitalize()
         clase = ClaseTemplate(
             nombre=nombre,
-            disciplina=data.disciplina,
+            disciplina=disciplina_obj.nombre,
             dia_semana=data.dia_semana,
             hora_inicio=data.hora_inicio,
             hora_fin=data.hora_fin,
@@ -159,6 +159,10 @@ class ClaseTemplateService:
         if not clase:
             raise NotFoundException("Clase no encontrada")
 
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(data.disciplina)
+        if not disciplina_obj:
+            raise BadRequestException("Disciplina no encontrada")
+
         await self._validar_capacidad_sala(data.sala_id, data.capacidad_maxima)
 
         if await self.repo.get_conflicting_sala(data.sala_id, data.dia_semana, data.hora_inicio, data.hora_fin, exclude_id=clase_id):
@@ -170,13 +174,13 @@ class ClaseTemplateService:
         emails = await self.repo.get_enrolled_emails(clase_id)
 
         await self.repo.update_fields(clase, {
-            "disciplina": data.disciplina,
+            "disciplina": disciplina_obj.nombre,
             "dia_semana": data.dia_semana,
             "hora_inicio": data.hora_inicio,
             "hora_fin": data.hora_fin,
             "sala_id": data.sala_id,
             "profesor_id": data.profesor_id,
-            "nombre": data.disciplina.capitalize(),
+            "nombre": disciplina_obj.nombre.capitalize(),
             "capacidad_maxima": data.capacidad_maxima,
         })
 
@@ -184,7 +188,7 @@ class ClaseTemplateService:
         hora_inicio_str = data.hora_inicio.strftime("%H:%M")
         hora_fin_str = data.hora_fin.strftime("%H:%M")
         await EmailService().send_clase_update_notification(
-            emails, data.disciplina.capitalize(), dia_label, hora_inicio_str, hora_fin_str
+            emails, disciplina_obj.nombre.capitalize(), dia_label, hora_inicio_str, hora_fin_str
         )
 
         clase = await self.repo.get_by_id(clase_id)
@@ -295,7 +299,7 @@ class ClaseTemplateService:
             instancia = instancia_map.get((template.id, fecha_clase))
             cupo_disponible = cupo_disponible_for(template, fecha_clase)
 
-            pi, ps = precios.get(template.disciplina, (0.0, 0.0))
+            pi, ps = precios.get(template.disciplina.lower(), (0.0, 0.0))
 
             inscrito = instancia is not None and instancia.id in inscrito_instancia_ids
             suscrito = any(

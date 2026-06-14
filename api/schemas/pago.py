@@ -19,3 +19,14 @@ class MiPagoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DeudaPendienteResponse(BaseModel):
+    asistencia_id: UUID4
+    clase_nombre: str
+    disciplina: str
+    fecha: datetime
+    hora_inicio: str
+    monto_pagado: float
+    precio_total: float
+    monto_restante: float

@@ -1,7 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
-import { MiPago, RenovacionSuscripcionPendiente } from "@/types/api";
+import { DeudaPendiente, MiPago, RenovacionSuscripcionPendiente } from "@/types/api";
 
 export type PreferenciaResult = {
     init_point?: string;
@@ -28,6 +28,16 @@ export async function getMisPagos(): Promise<MiPago[]> {
 export async function getRenovacionesPendientes(): Promise<RenovacionSuscripcionPendiente[]> {
     try {
         const res = await serverApi("/pagos/renovaciones-pendientes");
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
+
+export async function getDeudasPendientes(): Promise<DeudaPendiente[]> {
+    try {
+        const res = await serverApi("/pagos/deudas-pendientes");
         if (!res.ok) return [];
         return res.json();
     } catch {

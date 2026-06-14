@@ -19,7 +19,7 @@ from repositories.inscripcion_repository import InscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.inscripcion import InscripcionIndividualCreate
-from schemas.pago import MiPagoResponse
+from schemas.pago import DeudaPendienteResponse, MiPagoResponse
 from schemas.suscripcion import SuscripcionCreate
 from services.inscripcion_service import InscripcionService
 from services.suscripcion_service import SuscripcionService
@@ -80,6 +80,70 @@ class PagoService:
             ))
 
         return historial
+
+    async def list_deudas_pendientes(
+        self, current_user: Usuario
+    ) -> list[DeudaPendienteResponse]:
+        from core.enums import TipoInscripcion
+        from models.clase_instancia import ClaseInstancia
+        from models.clase_template import ClaseTemplate
+        from models.disciplina import Disciplina
+
+        monto_pagado_sq = (
+            select(func.coalesce(func.sum(Pago.monto), 0))
+            .where(
+                Pago.usuario_id == current_user.id,
+                Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                Pago.activo == True,
+            )
+            .correlate(Asistencia)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                Asistencia.id.label("asistencia_id"),
+                ClaseTemplate.nombre.label("clase_nombre"),
+                ClaseTemplate.disciplina,
+                ClaseTemplate.hora_inicio,
+                ClaseInstancia.fecha,
+                monto_pagado_sq.label("monto_pagado"),
+                Disciplina.precio_individual.label("precio_total"),
+            )
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .join(Disciplina, Disciplina.nombre == ClaseTemplate.disciplina)
+            .where(
+                Asistencia.usuario_id == current_user.id,
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                Asistencia.cancelo == False,
+            )
+            .order_by(ClaseInstancia.fecha.asc(), ClaseTemplate.hora_inicio.asc())
+        )
+
+        rows = (await self.db.execute(stmt)).all()
+        pendientes: list[DeudaPendienteResponse] = []
+        for row in rows:
+            monto_pagado = Decimal(str(row.monto_pagado or 0))
+            precio_total = Decimal(str(row.precio_total or 0))
+            monto_restante = precio_total - monto_pagado
+            if monto_pagado <= 0 or monto_restante <= 0:
+                continue
+            if not _deuda_saldable(row.fecha, row.hora_inicio):
+                continue
+
+            pendientes.append(DeudaPendienteResponse(
+                asistencia_id=row.asistencia_id,
+                clase_nombre=row.clase_nombre,
+                disciplina=row.disciplina,
+                fecha=datetime.combine(row.fecha, row.hora_inicio),
+                hora_inicio=row.hora_inicio.strftime("%H:%M"),
+                monto_pagado=float(monto_pagado),
+                precio_total=float(precio_total),
+                monto_restante=float(monto_restante),
+            ))
+
+        return pendientes
 
     async def _record_failed_mp_payment(
         self,
