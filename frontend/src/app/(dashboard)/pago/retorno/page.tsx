@@ -38,10 +38,10 @@ export default async function PagoRetornoPage({
             return (
                 <RetornoLayout
                     icon={<AlertCircle size={40} className="text-cef-warning" />}
-                    title="Error al confirmar el pago"
+                    title="Ocurrió un error en el pago"
                     message={result.error}
-                    linkHref="/clases"
-                    linkLabel="Volver a clases"
+                    linkHref={tipo === "deuda" ? "/mis-pagos" : "/clases"}
+                    linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : "Volver a clases"}
                 />
             );
         }
@@ -70,7 +70,7 @@ export default async function PagoRetornoPage({
                         : esSuscripcion
                         ? "Tu suscripción fue activada. Ya podés verla en Mis Clases."
                         : tipo === "deuda"
-                        ? "Tu pago fue completado. Ya podés verlo en Mis Clases."
+                        ? "El pago de la deuda fue exitoso"
                         : "Tu inscripción fue confirmada. Ya podés ver tu clase en Mis Clases."
                 }
                 linkHref="/mis-clases"
@@ -98,10 +98,10 @@ export default async function PagoRetornoPage({
             return (
                 <RetornoLayout
                     icon={<AlertCircle size={40} className="text-cef-warning" />}
-                    title="Error al registrar el pago"
+                    title="Ocurrió un error en el pago"
                     message={result.error}
-                    linkHref="/clases"
-                    linkLabel="Volver a clases"
+                    linkHref={tipo === "deuda" ? "/mis-pagos" : "/clases"}
+                    linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : "Volver a clases"}
                 />
             );
         }
@@ -110,10 +110,12 @@ export default async function PagoRetornoPage({
     return (
         <RetornoLayout
             icon={<XCircle size={40} className="text-cef-danger" />}
-            title="Pago no completado"
-            message="No se pudo procesar el pago. Podés intentar nuevamente desde la grilla de clases."
-            linkHref="/clases"
-            linkLabel="Volver a clases"
+            title="Ocurrió un error en el pago"
+            message={tipo === "deuda"
+                ? "No se pudo procesar el pago. Podés intentarlo nuevamente desde Mis Pagos."
+                : "No se pudo procesar el pago. Podés intentar nuevamente desde la grilla de clases."}
+            linkHref={tipo === "deuda" ? "/mis-pagos" : "/clases"}
+            linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : "Volver a clases"}
         />
     );
 }
