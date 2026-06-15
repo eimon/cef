@@ -36,6 +36,16 @@ class AsistenciaRepository:
         )
         return list(result.scalars().all())
 
+    async def get_by_id_with_relations(self, asistencia_id: uuid.UUID) -> Asistencia | None:
+        result = await self.db.execute(
+            select(Asistencia)
+            .options(
+                selectinload(Asistencia.clase_instancia).selectinload(ClaseInstancia.clase_template)
+            )
+            .where(Asistencia.id == asistencia_id)
+        )
+        return result.scalars().first()
+
     async def marcar_presente(self, asistencia_id: uuid.UUID) -> Asistencia | None:
         result = await self.db.execute(
             select(Asistencia).where(Asistencia.id == asistencia_id)

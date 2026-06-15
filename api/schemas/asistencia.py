@@ -22,6 +22,8 @@ class AsistenciaEscaneoItem(BaseModel):
     tipo: TipoInscripcion
     asistio: bool
     cancelo: bool
+    puede_marcar: bool
+    razon_no_puede: str | None = None
 
 
 class EscaneoQRResponse(BaseModel):

@@ -18,7 +18,7 @@ class Asistencia(Base):
         nullable=False,
         default=TipoInscripcion.INDIVIDUAL,
     )
-    asistio = Column(Boolean, default=True)
+    asistio = Column(Boolean, default=False)
     cancelo = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
