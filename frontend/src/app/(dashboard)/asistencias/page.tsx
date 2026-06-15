@@ -1,4 +1,4 @@
-import MarcarAsistenciaView from "@/components/MarcarAsistenciaView";
+import AsistenciasTabView from "@/components/AsistenciasTabView";
 
 export default function AsistenciasPage() {
     return (
@@ -6,10 +6,10 @@ export default function AsistenciasPage() {
             <div className="mb-6">
                 <h1 className="text-xl font-semibold text-slate-800">Marcar Asistencia</h1>
                 <p className="text-sm text-slate-500 mt-1">
-                    Ingresá el DNI del cliente para registrar su presencia en la clase
+                    Registrá la asistencia ingresando el DNI del cliente o escaneando su código QR
                 </p>
             </div>
-            <MarcarAsistenciaView />
+            <AsistenciasTabView />
         </main>
     );
 }

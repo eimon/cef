@@ -293,6 +293,15 @@ export interface EscaneoQRResult {
     asistencias: AsistenciaEscaneoItem[];
 }
 
+export interface InstanciaHoy {
+    instancia_id: string;
+    clase_nombre: string;
+    disciplina: string;
+    hora_inicio: string;
+    hora_fin: string;
+    sala_nombre: string;
+}
+
 export interface ClaseSemana {
     id: string;
     nombre: string;

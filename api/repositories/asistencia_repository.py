@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
+from models.clase_template import ClaseTemplate
 
 
 class AsistenciaRepository:
@@ -43,6 +44,35 @@ class AsistenciaRepository:
                 selectinload(Asistencia.clase_instancia).selectinload(ClaseInstancia.clase_template)
             )
             .where(Asistencia.id == asistencia_id)
+        )
+        return result.scalars().first()
+
+    async def get_instancias_hoy(self) -> list[ClaseInstancia]:
+        today = date.today()
+        result = await self.db.execute(
+            select(ClaseInstancia)
+            .options(
+                selectinload(ClaseInstancia.clase_template).selectinload(ClaseTemplate.sala)
+            )
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .where(
+                ClaseInstancia.fecha == today,
+                ClaseInstancia.activo == True,
+                ClaseInstancia.cancelada == False,
+            )
+            .order_by(ClaseTemplate.hora_inicio)
+        )
+        return list(result.scalars().all())
+
+    async def get_by_instancia_y_usuario(
+        self, instancia_id: uuid.UUID, usuario_id: uuid.UUID
+    ) -> Asistencia | None:
+        result = await self.db.execute(
+            select(Asistencia).where(
+                Asistencia.clase_instancia_id == instancia_id,
+                Asistencia.usuario_id == usuario_id,
+                Asistencia.cancelo == False,
+            )
         )
         return result.scalars().first()
 

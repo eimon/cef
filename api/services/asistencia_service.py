@@ -8,6 +8,7 @@ from schemas.asistencia import (
     AsistenciaRecepcionResponse,
     AsistenciaEscaneoItem,
     EscaneoQRResponse,
+    InstanciaHoyItem,
 )
 from exceptions.general import NotFoundException, BadRequestException
 
@@ -73,6 +74,34 @@ class AsistenciaService:
         ]
 
         return EscaneoQRResponse(usuario_nombre=nombre, asistencias=items)
+
+    async def get_instancias_hoy(self) -> list[InstanciaHoyItem]:
+        instancias = await self.repo.get_instancias_hoy()
+        return [
+            InstanciaHoyItem(
+                instancia_id=inst.id,
+                clase_nombre=inst.clase_template.nombre,
+                disciplina=inst.clase_template.disciplina,
+                hora_inicio=str(inst.clase_template.hora_inicio)[:5],
+                hora_fin=str(inst.clase_template.hora_fin)[:5],
+                sala_nombre=inst.clase_template.sala.nombre if inst.clase_template.sala else "Sin sala",
+            )
+            for inst in instancias
+        ]
+
+    async def marcar_por_qr(self, instancia_id: uuid.UUID, dni: str) -> None:
+        usuario = await UserRepository(self.db).get_by_dni(dni)
+        if not usuario:
+            raise BadRequestException("El cliente no se encuentra inscripto a la clase")
+
+        asistencia = await self.repo.get_by_instancia_y_usuario(instancia_id, usuario.id)
+        if not asistencia:
+            raise BadRequestException("El cliente no se encuentra inscripto a la clase")
+
+        if asistencia.asistio:
+            raise BadRequestException("El cliente ya registró la asistencia")
+
+        await self.repo.marcar_presente(asistencia.id)
 
     async def marcar_presente(self, asistencia_id: uuid.UUID) -> None:
         asistencia = await self.repo.get_by_id_with_relations(asistencia_id)

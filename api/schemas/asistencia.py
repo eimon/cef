@@ -2,6 +2,15 @@ from pydantic import BaseModel, UUID4
 from core.enums import TipoInscripcion
 
 
+class InstanciaHoyItem(BaseModel):
+    instancia_id: UUID4
+    clase_nombre: str
+    disciplina: str
+    hora_inicio: str
+    hora_fin: str
+    sala_nombre: str
+
+
 class AsistenciaRecepcionResponse(BaseModel):
     asistencia_id: UUID4
     usuario_nombre: str
