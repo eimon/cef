@@ -3,6 +3,19 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from services.auth_service import AuthService
+from services.email_service import EmailService
+
+
+@pytest.fixture(autouse=True)
+def mock_staff_credentials_email(monkeypatch):
+    async def _send_staff_credentials(self, to_email, password, nombre=None):
+        return None
+
+    monkeypatch.setattr(
+        EmailService,
+        "send_staff_credentials",
+        _send_staff_credentials,
+    )
 
 
 # ---------- Register ----------
@@ -20,6 +33,35 @@ async def test_register_success(client, admin_headers):
     data = resp.json()
     assert data["email"] == "nuevo@test.com"
     assert "id" in data
+
+
+async def test_register_staff_sends_credentials_email(client, admin_headers, monkeypatch):
+    sent = {}
+
+    async def _send_staff_credentials(self, to_email, password, nombre=None):
+        sent["to_email"] = to_email
+        sent["password"] = password
+        sent["nombre"] = nombre
+
+    monkeypatch.setattr(
+        EmailService,
+        "send_staff_credentials",
+        _send_staff_credentials,
+    )
+
+    resp = await client.post("/auth/register", json={
+        "email": "staff@test.com",
+        "password": "secret123",
+        "nombre": "Staff",
+        "role": "recepcion",
+    }, headers=admin_headers)
+
+    assert resp.status_code == 200
+    assert sent == {
+        "to_email": "staff@test.com",
+        "password": "secret123",
+        "nombre": "Staff",
+    }
 
 
 async def test_register_duplicate_email(client, admin_headers):

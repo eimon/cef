@@ -42,6 +42,7 @@ const updateUserSchema = z.object({
 export type UserFormState = {
     error?: string;
     success?: boolean;
+    message?: string;
 };
 
 export type GetUsersParams = {
@@ -74,13 +75,13 @@ export async function getUsers(filters?: GetUsersParams): Promise<User[]> {
 
 export async function createUser(prevState: UserFormState, formData: FormData): Promise<UserFormState> {
     const validatedFields = createUserSchema.safeParse({
-        email: formData.get("email"),
+        email: formData.get("new_user_email") || formData.get("email"),
         telefono: formData.get("telefono") || undefined,
         nombre: formData.get("nombre") || undefined,
         apellido: formData.get("apellido") || undefined,
         dni: formData.get("dni") || undefined,
         role: formData.get("role"),
-        password: formData.get("password"),
+        password: formData.get("new_user_password") || formData.get("password"),
     });
 
     if (!validatedFields.success) {
@@ -104,7 +105,11 @@ export async function createUser(prevState: UserFormState, formData: FormData): 
 
     revalidatePath("/users/personal");
     revalidatePath("/users/clientes");
-    return { success: true };
+    const message = validatedFields.data.role === UserRole.CLIENTE
+        ? "Usuario agregado correctamente"
+        : "Usuario agregado correctamente. Se envió un mail con la contraseña.";
+
+    return { success: true, message };
 }
 
 export async function updateUser(

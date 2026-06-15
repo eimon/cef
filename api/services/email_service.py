@@ -1,4 +1,5 @@
 import logging
+from html import escape
 
 from core.config import settings
 from exceptions.general import BadRequestException
@@ -11,6 +12,59 @@ def _https_url(base: str) -> str:
 
 
 class EmailService:
+    async def send_staff_credentials(
+        self,
+        to_email: str,
+        password: str,
+        nombre: str | None = None,
+    ) -> None:
+        login_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/login"
+
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se envio la contrasena a %s", to_email)
+            raise BadRequestException("No esta configurado el envio de emails")
+
+        try:
+            import resend
+        except ImportError:
+            logger.exception("Paquete resend no instalado")
+            raise BadRequestException("No esta disponible el servicio de emails")
+
+        safe_email = escape(to_email)
+        safe_password = escape(password)
+        safe_nombre = escape(nombre) if nombre else None
+        greeting = f"Hola {safe_nombre}," if safe_nombre else "Hola,"
+
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": "Acceso al sistema CEF",
+            "html": (
+                f"<p>{greeting}</p>"
+                "<p>Se creo tu usuario de personal en CEF.</p>"
+                f"<p>Email: <strong>{safe_email}</strong></p>"
+                f"<p>Contrasena: <strong>{safe_password}</strong></p>"
+                f'<p>Podes ingresar desde <a href="{login_url}">este enlace</a>.</p>'
+                "<p>Por seguridad, te recomendamos cambiar la contrasena despues de iniciar sesion.</p>"
+            ),
+        }
+
+        try:
+            resend.Emails.send(params)
+        except Exception as exc:
+            logger.exception("Error enviando credenciales de personal con Resend")
+            error_message = str(exc)
+            if "API key is invalid" in error_message:
+                raise BadRequestException("La API key de Resend es invalida") from exc
+            if "You can only send testing emails" in error_message:
+                raise BadRequestException(
+                    "El remitente de prueba de Resend solo puede enviar al email de la cuenta"
+                ) from exc
+            if "domain" in error_message.lower() and "verify" in error_message.lower():
+                raise BadRequestException("El dominio remitente de Resend no esta verificado") from exc
+            raise BadRequestException("No pudimos enviar el email con la contrasena") from exc
+
     async def send_verification_email(self, to_email: str, token: str) -> None:
         verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/verify-email?token={token}"
 
