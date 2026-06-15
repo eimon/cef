@@ -78,9 +78,8 @@ class ProfesorService:
                 )
                 conflicting = list(result.scalars().all())
                 if conflicting:
-                    nombres = ", ".join(sorted({c.disciplina for c in conflicting}))
                     raise BadRequestException(
-                        f"No es posible quitar la disciplina porque el profesor tiene clases activas asignadas: {nombres}"
+                        "No es posible quitar la disciplina porque el profesor tiene clases activas asignadas"
                     )
 
         updated = await self.repo.update(profesor_id, data)
