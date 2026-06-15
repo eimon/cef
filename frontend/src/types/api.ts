@@ -284,6 +284,8 @@ export interface AsistenciaEscaneoItem {
     tipo: string;
     asistio: boolean;
     cancelo: boolean;
+    puede_marcar: boolean;
+    razon_no_puede: string | null;
 }
 
 export interface EscaneoQRResult {

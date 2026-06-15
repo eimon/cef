@@ -82,6 +82,15 @@ async def _seed_cliente(session) -> None:
             "fecha_nacimiento": date(1989, 11, 3),
             "dni": "28123456",
         },
+        {
+            "email": "cliente4@cef.ar",
+            "telefono": "1100000008",
+            "password": "cliente123",
+            "nombre": "Laura",
+            "apellido": "Sánchez",
+            "fecha_nacimiento": date(1996, 3, 15),
+            "dni": "40123456",
+        },
     ]
 
     for i, data in enumerate(clientes, 1):
@@ -751,6 +760,290 @@ async def _seed_pilates_martes_inscripto(session, clase: ClaseTemplate) -> None:
         print("  [ok]   pago Pilates 2026-06-09")
 
 
+async def _seed_inscripcion_hoy(session, profesores: list[Profesor], salas: list[Sala]) -> None:
+    """Inscripción para HOY con asistio=False para probar el registro manual de asistencia."""
+    usuario = (await session.execute(
+        select(Usuario).where(Usuario.email == "cliente@cef.ar")
+    )).scalars().first()
+    if not usuario:
+        print("  [skip] inscripcion hoy: falta cliente@cef.ar")
+        return
+
+    # Clase para el día de hoy — ventana amplia para poder probar en cualquier hora
+    clase = (await session.execute(
+        select(ClaseTemplate).where(
+            ClaseTemplate.nombre == "Yoga",
+            ClaseTemplate.dia_semana == DiaSemana.LUNES,
+            ClaseTemplate.hora_inicio == time(0, 0),
+        )
+    )).scalars().first()
+
+    if clase is None:
+        clase = ClaseTemplate(
+            nombre="Yoga",
+            descripcion="Clase de prueba — registro de asistencia manual",
+            profesor_id=profesores[0].id,
+            sala_id=salas[0].id,
+            disciplina="yoga",
+            dia_semana=DiaSemana.LUNES,
+            hora_inicio=time(0, 0),
+            hora_fin=time(23, 59),
+            capacidad_maxima=15,
+            activo=True,
+        )
+        session.add(clase)
+        await session.flush()
+        print("  [ok]   clase Yoga Lunes (dev)")
+    else:
+        clase.activo = True
+        print("  [update] clase Yoga Lunes (dev)")
+
+    fecha_hoy = date.today()
+    instancia = (await session.execute(
+        select(ClaseInstancia).where(
+            ClaseInstancia.clase_template_id == clase.id,
+            ClaseInstancia.fecha == fecha_hoy,
+        )
+    )).scalars().first()
+
+    if instancia is None:
+        instancia = ClaseInstancia(
+            clase_template_id=clase.id,
+            fecha=fecha_hoy,
+            cupo=clase.capacidad_maxima - 1,
+            activo=True,
+        )
+        session.add(instancia)
+        await session.flush()
+        print(f"  [ok]   instancia Yoga {fecha_hoy}")
+    else:
+        instancia.cupo = clase.capacidad_maxima - 1
+        instancia.activo = True
+        instancia.cancelada = False
+        instancia.motivo_cancelacion = None
+        print(f"  [update] instancia Yoga {fecha_hoy}")
+
+    asistencia = (await session.execute(
+        select(Asistencia).where(
+            Asistencia.usuario_id == usuario.id,
+            Asistencia.clase_instancia_id == instancia.id,
+        )
+    )).scalars().first()
+
+    if asistencia is None:
+        session.add(Asistencia(
+            usuario_id=usuario.id,
+            clase_instancia_id=instancia.id,
+            tipo=TipoInscripcion.INDIVIDUAL,
+            asistio=False,
+            cancelo=False,
+        ))
+        print(f"  [ok]   asistencia Yoga {fecha_hoy} (asistio=False)")
+    else:
+        asistencia.asistio = False
+        asistencia.cancelo = False
+        print(f"  [update] asistencia Yoga {fecha_hoy} (asistio=False)")
+
+    seed_key = f"seed-dev-yoga-hoy-{fecha_hoy}"
+    pago = (await session.execute(
+        select(Pago).where(Pago.mp_payment_id == seed_key)
+    )).scalars().first()
+    if pago is None:
+        session.add(Pago(
+            usuario_id=usuario.id,
+            clase_instancia_id=instancia.id,
+            monto=Decimal("1500.00"),
+            fecha_pago=datetime.now(timezone.utc),
+            estado=EstadoPago.PAGADO,
+            mp_payment_id=seed_key,
+            descripcion=f"Pago seed Yoga hoy {fecha_hoy}",
+            activo=True,
+        ))
+        print(f"  [ok]   pago Yoga hoy {fecha_hoy}")
+    else:
+        print(f"  [skip] pago Yoga hoy {fecha_hoy}")
+    await session.flush()
+
+
+async def _seed_casos_asistencia_hoy(session, profesores: list[Profesor], salas: list[Sala]) -> None:
+    """
+    Crea los datos para probar todos los escenarios del registro manual de asistencia:
+
+    Escenario 1 — ÉXITO             DNI 30123456  (cliente@cef.ar)   → inscripto hoy, asistio=False
+    Escenario 2 — SIN INSCRIPCIÓN   DNI 32123456  (cliente2@cef.ar)  → existe pero sin Asistencia hoy
+    Escenario 3 — YA REGISTRADA     DNI 28123456  (cliente3@cef.ar)  → inscripto hoy, asistio=True
+    Escenario 4 — FUERA DE HORARIO  DNI 40123456  (cliente4@cef.ar)  → clase en ventana 04:00-04:30 UTC
+    Escenario 5 — DNI INEXISTENTE   cualquier DNI que no exista, ej. 99999999
+    """
+
+    # ---------- Escenario 3: Joaquín López (cliente3) — asistencia ya marcada ----------
+    cliente3 = (await session.execute(
+        select(Usuario).where(Usuario.email == "cliente3@cef.ar")
+    )).scalars().first()
+
+    if not cliente3:
+        print("  [skip] caso 3: falta cliente3@cef.ar")
+    else:
+        # Reusar la instancia de Yoga que crea _seed_inscripcion_hoy
+        clase_yoga = (await session.execute(
+            select(ClaseTemplate).where(
+                ClaseTemplate.nombre == "Yoga",
+                ClaseTemplate.dia_semana == DiaSemana.LUNES,
+                ClaseTemplate.hora_inicio == time(0, 0),
+            )
+        )).scalars().first()
+
+        instancia_yoga = (await session.execute(
+            select(ClaseInstancia).where(
+                ClaseInstancia.clase_template_id == clase_yoga.id,
+                ClaseInstancia.fecha == date.today(),
+            )
+        )).scalars().first() if clase_yoga else None
+
+        if not instancia_yoga:
+            print("  [skip] caso 3: no se encontró instancia Yoga de hoy")
+        else:
+            asistencia3 = (await session.execute(
+                select(Asistencia).where(
+                    Asistencia.usuario_id == cliente3.id,
+                    Asistencia.clase_instancia_id == instancia_yoga.id,
+                )
+            )).scalars().first()
+            if asistencia3 is None:
+                session.add(Asistencia(
+                    usuario_id=cliente3.id,
+                    clase_instancia_id=instancia_yoga.id,
+                    tipo=TipoInscripcion.INDIVIDUAL,
+                    asistio=True,
+                    cancelo=False,
+                ))
+                print("  [ok]   caso 3 — Asistencia Yoga hoy asistio=True (cliente3 DNI 28123456)")
+            else:
+                asistencia3.asistio = True
+                asistencia3.cancelo = False
+                print("  [update] caso 3 — Asistencia Yoga hoy asistio=True (cliente3 DNI 28123456)")
+
+            seed_key_3 = f"seed-dev-caso3-yoga-{date.today()}"
+            if not (await session.execute(
+                select(Pago).where(Pago.mp_payment_id == seed_key_3)
+            )).scalars().first():
+                session.add(Pago(
+                    usuario_id=cliente3.id,
+                    clase_instancia_id=instancia_yoga.id,
+                    monto=Decimal("1500.00"),
+                    fecha_pago=datetime.now(timezone.utc),
+                    estado=EstadoPago.PAGADO,
+                    mp_payment_id=seed_key_3,
+                    descripcion="Seed caso 3 — asistencia ya marcada",
+                    activo=True,
+                ))
+                print("  [ok]   pago caso 3")
+
+    await session.flush()
+
+    # ---------- Escenario 4: Laura Sánchez (cliente4) — clase fuera de horario ----------
+    # La clase tiene ventana 04:00–04:30 UTC (01:00–01:30 Argentina).
+    # A cualquier hora normal de testing la clase quedará fuera del rango horario.
+    cliente4 = (await session.execute(
+        select(Usuario).where(Usuario.email == "cliente4@cef.ar")
+    )).scalars().first()
+
+    if not cliente4:
+        print("  [skip] caso 4: falta cliente4@cef.ar")
+        return
+
+    clase_fuera = (await session.execute(
+        select(ClaseTemplate).where(
+            ClaseTemplate.nombre == "Funcional",
+            ClaseTemplate.dia_semana == DiaSemana.LUNES,
+            ClaseTemplate.hora_inicio == time(4, 0),
+        )
+    )).scalars().first()
+
+    if clase_fuera is None:
+        clase_fuera = ClaseTemplate(
+            nombre="Funcional",
+            descripcion="Clase seed — fuera de horario de testing",
+            profesor_id=profesores[1].id,
+            sala_id=salas[1].id,
+            disciplina="funcional",
+            dia_semana=DiaSemana.LUNES,
+            hora_inicio=time(4, 0),
+            hora_fin=time(4, 30),
+            capacidad_maxima=15,
+            activo=True,
+        )
+        session.add(clase_fuera)
+        await session.flush()
+        print("  [ok]   caso 4 — ClaseTemplate Funcional 04:00–04:30 UTC")
+    else:
+        clase_fuera.activo = True
+        print("  [update] caso 4 — ClaseTemplate Funcional 04:00–04:30 UTC")
+
+    fecha_hoy = date.today()
+    instancia4 = (await session.execute(
+        select(ClaseInstancia).where(
+            ClaseInstancia.clase_template_id == clase_fuera.id,
+            ClaseInstancia.fecha == fecha_hoy,
+        )
+    )).scalars().first()
+
+    if instancia4 is None:
+        instancia4 = ClaseInstancia(
+            clase_template_id=clase_fuera.id,
+            fecha=fecha_hoy,
+            cupo=clase_fuera.capacidad_maxima - 1,
+            activo=True,
+        )
+        session.add(instancia4)
+        await session.flush()
+        print(f"  [ok]   caso 4 — instancia Funcional {fecha_hoy}")
+    else:
+        instancia4.cupo = clase_fuera.capacidad_maxima - 1
+        instancia4.activo = True
+        instancia4.cancelada = False
+        instancia4.motivo_cancelacion = None
+        print(f"  [update] caso 4 — instancia Funcional {fecha_hoy}")
+
+    asistencia4 = (await session.execute(
+        select(Asistencia).where(
+            Asistencia.usuario_id == cliente4.id,
+            Asistencia.clase_instancia_id == instancia4.id,
+        )
+    )).scalars().first()
+    if asistencia4 is None:
+        session.add(Asistencia(
+            usuario_id=cliente4.id,
+            clase_instancia_id=instancia4.id,
+            tipo=TipoInscripcion.INDIVIDUAL,
+            asistio=False,
+            cancelo=False,
+        ))
+        print(f"  [ok]   caso 4 — Asistencia Funcional hoy asistio=False (cliente4 DNI 40123456)")
+    else:
+        asistencia4.asistio = False
+        asistencia4.cancelo = False
+        print(f"  [update] caso 4 — Asistencia Funcional hoy asistio=False (cliente4 DNI 40123456)")
+
+    seed_key_4 = f"seed-dev-caso4-funcional-{fecha_hoy}"
+    if not (await session.execute(
+        select(Pago).where(Pago.mp_payment_id == seed_key_4)
+    )).scalars().first():
+        session.add(Pago(
+            usuario_id=cliente4.id,
+            clase_instancia_id=instancia4.id,
+            monto=Decimal("1800.00"),
+            fecha_pago=datetime.now(timezone.utc),
+            estado=EstadoPago.PAGADO,
+            mp_payment_id=seed_key_4,
+            descripcion="Seed caso 4 — clase fuera de horario",
+            activo=True,
+        ))
+        print(f"  [ok]   pago caso 4")
+
+    await session.flush()
+
+
 async def seed_dev() -> None:
     print("Iniciando seed de desarrollo...")
     async with AsyncSessionLocal() as session:
@@ -763,8 +1056,17 @@ async def seed_dev() -> None:
         await _seed_clases(session, profesores, salas)
         await _seed_yoga_lunes_individual_pasada(session, profesores[0], salas[0])
         await _seed_yoga_martes_suscripcion_pasada(session, profesores[0], salas[0])
+        await _seed_inscripcion_hoy(session, profesores, salas)
+        await _seed_casos_asistencia_hoy(session, profesores, salas)
         await session.commit()
-    print("Listo.")
+    print("\nListo.")
+    print("\n--- Cheat sheet /asistencias ---")
+    print("  Esc. 1 — Confirmar asistencia  → DNI 30123456  (cliente@cef.ar)")
+    print("  Esc. 2 — Sin inscripción activa → DNI 32123456  (cliente2@cef.ar)")
+    print("  Esc. 3 — Ya registrada          → DNI 28123456  (cliente3@cef.ar)")
+    print("  Esc. 4 — Fuera de horario       → DNI 40123456  (cliente4@cef.ar)")
+    print("  Esc. 5 — DNI inexistente        → DNI 99999999  (no existe)")
+    print("---------------------------------")
 
 
 if __name__ == "__main__":
