@@ -1,7 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
-import { AsistenciaRecepcion, EscaneoQRResult } from "@/types/api";
+import { AsistenciaRecepcion, EscaneoQRResult, InstanciaHoy } from "@/types/api";
 
 export type AsistenciasClaseState = {
     data: AsistenciaRecepcion[];
@@ -29,6 +29,37 @@ export async function marcarPresente(asistenciaId: string): Promise<{ error?: st
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             return { error: (err as { detail?: string }).detail || "No se pudo marcar la asistencia" };
+        }
+        return {};
+    } catch {
+        return { error: "Error al contactar el servidor" };
+    }
+}
+
+export async function getInstanciasHoy(): Promise<{ data?: InstanciaHoy[]; error?: string }> {
+    try {
+        const res = await serverApi("/asistencias/instancias/hoy");
+        if (!res.ok) {
+            return { error: "No se pudieron cargar las clases de hoy" };
+        }
+        return { data: await res.json() };
+    } catch {
+        return { error: "Error al consultar el servidor" };
+    }
+}
+
+export async function marcarAsistenciaQR(
+    instanciaId: string,
+    dni: string,
+): Promise<{ error?: string }> {
+    try {
+        const res = await serverApi(
+            `/asistencias/instancia/${instanciaId}/qr?dni=${encodeURIComponent(dni)}`,
+            { method: "POST" },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { error: (err as { detail?: string }).detail || "No se pudo registrar la asistencia" };
         }
         return {};
     } catch {
