@@ -38,6 +38,13 @@ async def list_users(
     return await UserService(db).list(skip, limit, dni, nombre, apellido, current_user)
 
 
+@router.get("/me", response_model=UsuarioResponse)
+async def get_me(
+    current_user: Usuario = Depends(get_current_user),
+):
+    return current_user
+
+
 @router.get("/{usuario_id}", response_model=UsuarioResponse)
 async def get_user(
     usuario_id: UUID,

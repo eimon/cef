@@ -275,6 +275,22 @@ export interface AsistenciaRecepcion {
     cancelo: boolean;
 }
 
+export interface AsistenciaEscaneoItem {
+    asistencia_id: string;
+    clase_nombre: string;
+    disciplina: string;
+    hora_inicio: string;
+    hora_fin: string;
+    tipo: string;
+    asistio: boolean;
+    cancelo: boolean;
+}
+
+export interface EscaneoQRResult {
+    usuario_nombre: string;
+    asistencias: AsistenciaEscaneoItem[];
+}
+
 export interface ClaseSemana {
     id: string;
     nombre: string;

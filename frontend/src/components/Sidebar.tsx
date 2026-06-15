@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown, Building2, Layers, ReceiptText } from "lucide-react";
+import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown, Building2, Layers, ReceiptText, QrCode } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
@@ -24,6 +24,7 @@ const navigation: NavItem[] = [
     { name: "Clases",     href: "/clases",     icon: BookOpen,   adminOnly: false, clientOnly: false, staffOnly: false },
     { name: "Mis Clases", href: "/mis-clases", icon: CalendarCheck, adminOnly: false, clientOnly: true, staffOnly: false },
     { name: "Mis Pagos",  href: "/mis-pagos",  icon: ReceiptText, adminOnly: false, clientOnly: true, staffOnly: false },
+    { name: "Mi QR",     href: "/mi-qr",      icon: QrCode,     adminOnly: false, clientOnly: true, staffOnly: false },
     { name: "Perfil",     href: "/profile",    icon: UserRound,  adminOnly: false, clientOnly: false, staffOnly: false },
     {
         name: "Usuarios",
