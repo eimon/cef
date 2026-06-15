@@ -180,15 +180,8 @@ function DebtDialog({
 
                 </div>
 
-                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
-                    >
-                        Cerrar
-                    </button>
-                    {canPay && (
+                {canPay && (
+                    <div className="mt-5 flex justify-end">
                         <button
                             type="button"
                             onClick={handleGoToPayments}
@@ -197,8 +190,8 @@ function DebtDialog({
                             <CreditCard size={16} />
                             Pagar en Mis Pagos
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );

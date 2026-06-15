@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, Clock, CreditCard, Loader2, ReceiptText, RefreshCw } from "lucide-react";
+import { AlertCircle, Clock, CreditCard, Loader2, ReceiptText, RefreshCw } from "lucide-react";
 import { crearPreferenciaDeudaMP, crearPreferenciaRenovacionSuscripcionMP } from "@/actions/pagos";
 import { DeudaPendiente, MiPago, RenovacionSuscripcionPendiente } from "@/types/api";
 
@@ -63,15 +63,6 @@ function formatDiscipline(value: string | null) {
 
 function getPaymentTypeLabel(payment: MiPago) {
     return payment.tipo === "suscripcion" ? "Suscripción" : "Individual";
-}
-
-function PaymentStatusBadge() {
-    return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-cef-success/20 bg-cef-success/10 px-2.5 py-1 text-xs font-semibold text-cef-success">
-            <CheckCircle2 size={13} />
-            Exitoso
-        </span>
-    );
 }
 
 function PendingRenewalRow({ renewal }: { renewal: RenovacionSuscripcionPendiente }) {
@@ -223,7 +214,6 @@ function PaymentRow({ payment }: { payment: MiPago }) {
 
                 <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                     <span className="text-xs font-medium text-slate-400">{formatPaymentDate(payment.fecha_pago)}</span>
-                    <PaymentStatusBadge />
                     <span className="min-w-24 text-left text-sm font-bold text-slate-800 sm:text-right">
                         {formatPaymentAmount(payment.monto)}
                     </span>
@@ -244,6 +234,7 @@ export default function MisPagosView({
 }) {
     const hasPending = renovacionesPendientes.length > 0 || deudasPendientes.length > 0;
     const hasPayments = pagos.length > 0;
+    const isCompletelyEmpty = !hasPending && !hasPayments;
 
     return (
         <div className="space-y-6">
@@ -266,14 +257,14 @@ export default function MisPagosView({
                 </section>
             )}
 
-            {!hasPayments ? (
+            {!hasPayments ? (isCompletelyEmpty ? (
                 <div className="glass rounded-2xl px-6 py-12 text-center">
                     <ReceiptText className="mx-auto text-slate-300" size={34} />
                     <p className="mt-3 text-sm font-semibold text-slate-600">Aún no se han realizado pagos</p>
                 </div>
-            ) : (
+            ) : null) : (
                 <section className="space-y-2">
-                    {hasPending && <h2 className="text-sm font-bold text-slate-800">Pagos exitosos</h2>}
+                    <h2 className="text-sm font-bold text-slate-800">Pagos exitosos</h2>
                     <div className="space-y-2">
                         {pagos.map((payment) => (
                             <PaymentRow key={payment.id} payment={payment} />
