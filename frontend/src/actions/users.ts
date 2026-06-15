@@ -152,6 +152,16 @@ export async function updateUser(
     return { success: true };
 }
 
+export async function getMe(): Promise<User | null> {
+    try {
+        const res = await serverApi("/users/me");
+        if (!res.ok) return null;
+        return res.json();
+    } catch {
+        return null;
+    }
+}
+
 export async function deleteUser(userId: string): Promise<{ success?: boolean; error?: string }> {
     try {
         const res = await serverApi(`/users/${userId}`, {
