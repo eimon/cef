@@ -678,7 +678,7 @@ export async function updateMedicalRecord(
     }
 }
 
-export async function logout() {
+export async function clearSession() {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("refresh_token")?.value;
 
@@ -696,5 +696,9 @@ export async function logout() {
 
     cookieStore.delete("access_token");
     cookieStore.delete("refresh_token");
+}
+
+export async function logout() {
+    await clearSession();
     redirect("/auth/login");
 }
