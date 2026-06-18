@@ -268,9 +268,16 @@ class AuthService:
         usuario_id: uuid.UUID,
         cuerpo_ficha: str,
     ) -> FichaMedicaPerfilResponse:
-        ficha = await self.ficha_medica_repo.update_by_usuario_id(usuario_id, cuerpo_ficha)
-        if not ficha:
+        existing = await self.ficha_medica_repo.get_by_usuario_id(usuario_id)
+        if not existing:
             raise NotFoundException("Ficha medica no encontrada")
+
+        ficha_data = FichaMedicaCreate(
+            usuario_id=usuario_id,
+            fecha=date.today(),
+            cuerpo_ficha=cuerpo_ficha,
+        )
+        ficha = await self.ficha_medica_repo.create(ficha_data)
 
         try:
             parsed_body = json.loads(ficha.cuerpo_ficha)
