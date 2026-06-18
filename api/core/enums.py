@@ -34,3 +34,17 @@ class DiaSemana(str, enum.Enum):
     DOMINGO = "domingo"
 
 
+class TipoLicencia(str, enum.Enum):
+    VACACIONES = "vacaciones"
+    ENFERMEDAD = "enfermedad"
+    PERSONAL = "personal"
+    ESTUDIO = "estudio"
+    OTRO = "otro"
+
+
+class EstadoLicencia(str, enum.Enum):
+    PENDIENTE = "pendiente"
+    APROBADA = "aprobada"
+    RECHAZADA = "rechazada"
+
+
