@@ -242,6 +242,11 @@ class ClaseTemplateService:
         )
         subs = subs_result.scalars().all()
 
+        # Count active subscriptions per template — used to compute cupo when no instancia exists yet
+        active_subs_count: dict[uuid.UUID, int] = {}
+        for s in subs:
+            active_subs_count[s.clase_template_id] = active_subs_count.get(s.clase_template_id, 0) + 1
+
         instancia_ids = [i.id for i in instancias]
         asistencia_counts: dict[uuid.UUID, int] = {}
         if instancia_ids:
@@ -257,7 +262,10 @@ class ClaseTemplateService:
             instancia = instancia_map.get((template.id, target_date))
             if instancia:
                 return max(0, instancia.cupo)
-            return template.capacidad_maxima
+            # IMPORTANT: when no instancia exists, cupo = capacidad_maxima minus ALL active
+            # subscriptions for this template (date-independent), because subscriptions
+            # pre-reserve slots regardless of whether the specific class instance is created yet.
+            return max(0, template.capacidad_maxima - active_subs_count.get(template.id, 0))
 
         def cupo_suscripcion_disponible(template) -> bool:
             fechas_suscripcion = subscription_dates_by_template.get(template.id, [])
