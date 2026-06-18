@@ -40,6 +40,19 @@ class PagoRepository:
         )
         return list(result.scalars().all())
 
+    async def get_paid_by_usuario_and_instancia(
+        self, usuario_id: uuid.UUID, clase_instancia_id: uuid.UUID
+    ) -> list[Pago]:
+        result = await self.db.execute(
+            select(Pago).where(
+                Pago.usuario_id == usuario_id,
+                Pago.clase_instancia_id == clase_instancia_id,
+                Pago.estado == EstadoPago.PAGADO,
+                Pago.activo == True,
+            )
+        )
+        return list(result.scalars().all())
+
     async def create_failed_mp(
         self,
         usuario_id: uuid.UUID,

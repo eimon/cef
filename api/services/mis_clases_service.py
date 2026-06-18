@@ -60,6 +60,9 @@ class MisClasesService:
             )
             if not instancias:
                 continue
+            asistencia_ids = await self.repo.get_asistencia_ids_for_instancias(
+                usuario_id, [i.id for i in instancias]
+            )
             result.append(MiSuscripcionResponse(
                 id=s.id,
                 clase_template_id=t.id,
@@ -82,6 +85,7 @@ class MisClasesService:
                         instancia_id=i.id,
                         fecha=i.fecha,
                         cancelada=i.cancelada,
+                        asistencia_id=asistencia_ids.get(i.id),
                     )
                     for i in instancias
                 ],

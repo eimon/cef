@@ -9,6 +9,7 @@ from core.enums import DiaSemana, EstadoSuscripcion
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
+from repositories.cupon_descuento_repository import CuponDescuentoRepository
 from repositories.suscripcion_repository import SuscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
@@ -87,6 +88,7 @@ class SuscripcionService:
             await self.repo.mark_subscription_state(suscripcion, next_estado)
             if next_estado == EstadoSuscripcion.VENCIDA:
                 await self.repo.release_future_reservas(suscripcion, today)
+                await CuponDescuentoRepository(self.db).delete_unused_by_suscripcion(suscripcion.id)
 
         if suscripcion.estado == EstadoSuscripcion.RENOVABLE and has_paid_payment:
             await self._ensure_pending_renewal(suscripcion, today)
@@ -366,15 +368,22 @@ class SuscripcionService:
             _disponible_hasta,
         ) = await self._validar_renovacion(current_user, suscripcion_id)
 
-        if monto != precio:
+        cupon_repo = CuponDescuentoRepository(self.db)
+        cupones = await cupon_repo.list_unused_for_renewal(current_user.id, template.id)
+        descuento_total = sum(float(c.descuento_porcentaje) for c in cupones)
+        precio_esperado = Decimal(str(max(round(float(precio) * (1 - descuento_total / 100), 2), 0.01)))
+
+        if abs(monto - precio_esperado) > Decimal("0.02"):
             raise BadRequestException(
-                f"El monto debe ser el precio completo: ${float(precio):.2f}"
+                f"El monto debe ser ${float(precio_esperado):.2f}"
             )
 
         suscripcion = suscripcion_anterior
         suscripcion.monto = monto
         suscripcion.fecha_pago = datetime.now(LOCAL_TZ).date()
         await self.repo.mark_subscription_state(suscripcion, EstadoSuscripcion.VIGENTE)
+
+        await cupon_repo.mark_used(cupones)
 
         pago = await self.repo.create_pago(
             usuario_id=current_user.id,
