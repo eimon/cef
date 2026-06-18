@@ -24,11 +24,15 @@ const createUserSchema = z.object({
 });
 
 const updateUserSchema = z.object({
+    email: z.string().email("Email invalido").optional(),
+    telefono: z.string().optional(),
     nombre: z.string().optional(),
     apellido: z.string().optional(),
+    fecha_nacimiento: z.string().optional(),
     dni: z.string().optional(),
+    genero: z.string().optional(),
+    activo: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
     role: z.nativeEnum(UserRole).optional(),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional().or(z.literal("")),
 }).superRefine((data, ctx) => {
     if (data.role && data.role !== UserRole.CLIENTE && !data.dni?.trim()) {
         ctx.addIssue({
@@ -117,30 +121,26 @@ export async function updateUser(
     prevState: UserFormState,
     formData: FormData
 ): Promise<UserFormState> {
-    const rawPassword = formData.get("password") as string;
-
     const validatedFields = updateUserSchema.safeParse({
+        email: formData.get("email") || undefined,
+        telefono: formData.get("telefono") || undefined,
         nombre: formData.get("nombre") || undefined,
         apellido: formData.get("apellido") || undefined,
+        fecha_nacimiento: formData.get("fecha_nacimiento") || undefined,
         dni: formData.get("dni") || undefined,
+        genero: formData.get("genero") || undefined,
+        activo: formData.get("activo") || undefined,
         role: formData.get("role") || undefined,
-        password: rawPassword || undefined,
     });
 
     if (!validatedFields.success) {
         return { error: validatedFields.error.issues[0].message };
     }
 
-    const data = validatedFields.data;
-    // Remove empty password
-    if (!data.password) {
-        delete data.password;
-    }
-
     try {
         const res = await serverApi(`/users/${userId}`, {
             method: "PUT",
-            body: JSON.stringify(data),
+            body: JSON.stringify(validatedFields.data),
         });
 
         if (!res.ok) {

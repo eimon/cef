@@ -8,8 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientesPage() {
     const userRole = await getUserRole();
-    // Solo administradores pueden editar clientes
-    const editableRoles = userRole === "admin" ? [UserRole.CLIENTE] : [];
+    const editableRoles = userRole === UserRole.ADMIN || userRole === UserRole.RECEPCION ? [UserRole.CLIENTE] : [];
 
     return (
         <UsersManagementPage
@@ -20,6 +19,7 @@ export default async function ClientesPage() {
             emptyMessage="No hay clientes registrados."
             filteredEmptyMessage="No se encontraron clientes con los filtros ingresados"
             showAddButton={false}
+            showRoleColumn={false}
         />
     );
 }
