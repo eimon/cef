@@ -283,3 +283,24 @@ Implementado en: `services/clase_template_service.py` → `get_semana()` → fun
 - La lógica de cupones (calcular descuento + marcar usados) vive en `SuscripcionService.renovar_suscripcion`, no en el router ni en PagoService.
 - Si la suscripción vence por falta de pago, los cupones no usados se eliminan en `SuscripcionService.sync_suscripcion_state` al transicionar a VENCIDA.
 - Máximo 2 cupones por ciclo (por `suscripcion_id`). Descuento proporcional: 25% para ciclos de 4 clases, 20% para ciclos de 5.
+
+### Ciclo de suscripción y renovación automática
+
+**Período de facturación:**
+- El primer ciclo comienza el día de la primera clase (ej. miércoles 13 de mayo).
+- Los ciclos siguientes comienzan el mismo día del mes (ej. 13 de junio, 13 de julio…).
+- `fecha_fin = mismo_día_mes_siguiente - 1 día` (ej. 12 de junio).
+- Para días 29, 30 o 31: se usan 30 días corridos (`fecha_fin = fecha_inicio + 29 días`) para evitar problemas de fin de mes.
+- Implementado en `_calcular_fecha_fin()` en `services/suscripcion_service.py`.
+
+**Clases dentro del período:**
+- `fecha_inicio` del período puede NO ser el día de la clase (ej. 13 de junio es sábado, la clase es miércoles).
+- La primera clase del ciclo es el primer día de semana correcto a partir de `fecha_inicio`.
+- Usar siempre `_primera_clase_en_periodo(dia_semana, fecha_inicio)` para obtener la primera fecha de clase, y pasarla como inicio a `_calcular_fechas_clases`.
+- **Nunca** pasar `fecha_inicio` del período directamente a `_calcular_fechas_clases` en contextos de renovación.
+
+**Quién crea la siguiente suscripción:**
+- Solo el cron (`POST /suscripciones/cron/procesar`, rol ADMIN) crea suscripciones del siguiente ciclo.
+- `sync_suscripcion_state` **solo avanza estados** (VIGENTE → RENOVABLE → VENCIDA). No crea nada.
+- `list_renovaciones_pendientes` **solo lee**. No llama a sync ni crea suscripciones.
+- No existe endpoint manual de renovación en el frontend de cliente ni de admin; el cron lo hace por todas las suscripciones activas con `fecha_fin < hoy`.
