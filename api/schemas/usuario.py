@@ -10,6 +10,15 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AvisoMasivoRequest(BaseModel):
+    mensaje: str = Field(min_length=10)
+
+
+class AvisoMasivoResponse(BaseModel):
+    enviados: int
+    total: int
+
+
 class UsuarioBase(BaseModel):
     email: EmailStr
     telefono: Optional[str] = None

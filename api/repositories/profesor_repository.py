@@ -89,8 +89,7 @@ class ProfesorRepository:
             profesor.disciplinas = disciplinas
 
         await self.db.flush()
-        await self.db.refresh(profesor)
-        return profesor
+        return await self.get_by_id(profesor.id)
 
     async def soft_delete(self, profesor_id: uuid.UUID) -> Profesor | None:
         profesor = await self.get_by_id(profesor_id)
@@ -98,8 +97,7 @@ class ProfesorRepository:
             return None
         profesor.activo = False
         await self.db.flush()
-        await self.db.refresh(profesor)
-        return profesor
+        return await self.get_by_id(profesor_id)
 
     async def reactivate(self, profesor_id: uuid.UUID) -> Profesor | None:
         result = await self.db.execute(
@@ -112,5 +110,4 @@ class ProfesorRepository:
             return None
         profesor.activo = True
         await self.db.flush()
-        await self.db.refresh(profesor)
-        return profesor
+        return await self.get_by_id(profesor_id)

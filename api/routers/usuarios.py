@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from schemas.usuario import UsuarioUpdate, UsuarioResponse
+from schemas.usuario import UsuarioUpdate, UsuarioResponse, AvisoMasivoRequest, AvisoMasivoResponse
 from services.user_service import UserService
 from core.database import get_db
 from dependencies.auth import has_role, get_current_user
@@ -101,3 +101,12 @@ async def delete_user(
             raise ForbiddenException("No autorizado para esta acción")
     
     await UserService(db).delete(usuario_id, current_user.id, current_user)
+
+
+@router.post("/aviso-masivo", response_model=AvisoMasivoResponse)
+async def enviar_aviso_masivo(
+    data: AvisoMasivoRequest,
+    db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
+):
+    return await UserService(db).enviar_aviso_masivo(data.mensaje)
