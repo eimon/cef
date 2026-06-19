@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, CalendarDays, X, Info, CreditCard } from "lucide-react";
-import { MiClaseIndividual, MiSuscripcion, Disciplina } from "@/types/api";
+import { useState, useTransition } from "react";
+import { Clock, CalendarDays, X, Info, CreditCard, Ban } from "lucide-react";
+import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult } from "@/types/api";
+import { cancelarClase } from "@/actions/mis_clases";
 
 // ─── Unified item ─────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ function buildItems(
         })),
         ...suscripciones.flatMap(s =>
             s.instancias.map((inst): MisClasesItem => ({
-                key: inst.instancia_id,
+                key: inst.asistencia_id ?? inst.instancia_id,
                 tipo: "suscripcion",
                 clase_nombre: s.clase_nombre,
                 disciplina: s.disciplina,
@@ -59,6 +60,7 @@ function buildItems(
                 profesor_nombre: s.profesor_nombre,
                 cancelada: inst.cancelada,
                 deuda_vencida: false,
+                asistencia_id: inst.asistencia_id ?? undefined,
             }))
         ),
     ];
@@ -110,6 +112,127 @@ function getBlockedDebtMessage(item: MisClasesItem): string {
         return "La clase ya paso. La deuda no se puede completar desde la app.";
     }
     return "Ya no se puede completar el pago desde la app porque faltan menos de 24 horas para la clase.";
+}
+
+function CancelDialog({
+    item,
+    onClose,
+}: {
+    item: MisClasesItem;
+    onClose: () => void;
+}) {
+    const [isPending, startTransition] = useTransition();
+    const [result, setResult] = useState<CancelacionResult | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const hoursLeft = (getClassStart(item.fecha, item.hora_inicio).getTime() - Date.now()) / 3_600_000;
+    const hasRefund = hoursLeft >= 24;
+
+    function handleConfirm() {
+        if (!item.asistencia_id) return;
+        startTransition(async () => {
+            const res = await cancelarClase(item.asistencia_id!);
+            if (res.error) setError(res.error);
+            else setResult(res.data!);
+        });
+    }
+
+    const refundHint =
+        !hasRefund
+            ? "Como faltan menos de 24 horas, no se realizará ningún reintegro."
+            : item.tipo === "individual"
+            ? "Se reintegrará el importe abonado a tu cuenta de MercadoPago."
+            : "Si aplica, se generará un cupón de descuento para tu próxima renovación.";
+
+    if (result) {
+        return (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+                <div className="glass-modal w-full max-w-md rounded-2xl p-5 shadow-2xl">
+                    <div className="flex items-start gap-3">
+                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border ${
+                            result.refund_error
+                                ? "border-cef-warning/20 bg-cef-warning/10 text-cef-warning"
+                                : "border-cef-success/20 bg-cef-success/10 text-cef-success"
+                        }`}>
+                            <Info size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Clase cancelada</h3>
+                            <p className="mt-1 text-sm text-slate-600">{result.mensaje}</p>
+                        </div>
+                    </div>
+                    <div className="mt-5 flex justify-end">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-lg bg-cef-primary px-4 py-2 text-sm font-semibold text-white hover:bg-cef-primary/90"
+                        >
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+            <div className="glass-modal w-full max-w-md rounded-2xl p-5 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-cef-danger/20 bg-cef-danger/10 text-cef-danger">
+                            <Ban size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Cancelar clase</h3>
+                            <p className="mt-1 text-sm text-slate-500">{item.clase_nombre}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                    <div className={`rounded-xl border p-3 text-sm ${
+                        hasRefund
+                            ? "border-cef-success/20 bg-cef-success/10 text-slate-700"
+                            : "border-cef-warning/20 bg-cef-warning/10 text-slate-700"
+                    }`}>
+                        {refundHint}
+                    </div>
+                    {error && (
+                        <p className="text-sm text-cef-danger">{error}</p>
+                    )}
+                </div>
+
+                <div className="mt-5 flex justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                        Volver
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={isPending}
+                        className="rounded-lg bg-cef-danger px-4 py-2 text-sm font-semibold text-white hover:bg-cef-danger/90 disabled:opacity-60"
+                    >
+                        {isPending ? "Cancelando..." : "Confirmar cancelación"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function DebtDialog({
@@ -201,6 +324,7 @@ function DebtDialog({
 
 function MiClaseRow({ item }: { item: MisClasesItem }) {
     const [debtOpen, setDebtOpen] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
 
     const upcoming = isUpcoming(item.fecha, item.hora_inicio);
     const montoRestante =
@@ -273,6 +397,18 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                         Ver deuda
                     </button>
                 )}
+
+                {/* Cancelar */}
+                {upcoming && !item.cancelada && item.asistencia_id && (
+                    <button
+                        type="button"
+                        onClick={() => setCancelOpen(true)}
+                        className="mt-3 flex w-full flex-shrink-0 items-center justify-center gap-1 rounded-lg border border-cef-danger/20 bg-cef-danger/10 px-2.5 py-2 text-[11px] font-semibold text-cef-danger transition-colors hover:bg-cef-danger/20 sm:mt-0 sm:w-auto sm:py-1"
+                    >
+                        <Ban size={11} />
+                        Cancelar
+                    </button>
+                )}
             </div>
         </div>
 
@@ -281,6 +417,12 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                 item={item}
                 montoRestante={montoRestante}
                 onClose={() => setDebtOpen(false)}
+            />
+        )}
+        {cancelOpen && (
+            <CancelDialog
+                item={item}
+                onClose={() => setCancelOpen(false)}
             />
         )}
         </>

@@ -13,6 +13,7 @@ from models.email_change_token import EmailChangeToken
 from models.password_reset_token import PasswordResetToken
 from models.configuracion import Configuracion
 from models.disciplina import Disciplina
+from models.cupon_descuento import CuponDescuento
 
 __all__ = [
     "Usuario",
@@ -31,4 +32,5 @@ __all__ = [
     "Sala",
     "Configuracion",
     "Disciplina",
+    "CuponDescuento",
 ]

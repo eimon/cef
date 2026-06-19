@@ -256,3 +256,30 @@ Actualmente definido y en uso: `UserRole` (`ADMIN`, `RECEPCION`, `CLIENT`).
 - Mensajes de error: **español**
 - Nombres de código (clases, funciones, variables, archivos): **inglés**
 - Endpoint paths: **inglés** (excepto `/auth/perfil`)
+
+## Reglas de Dominio — IMPORTANTE
+
+### Cupo disponible en clases sin instancia creada
+
+Al calcular `cupo_disponible` para una fecha donde no existe todavía una `ClaseInstancia`, **NO** retornar `capacidad_maxima` directamente. El cupo correcto es:
+
+```
+cupo_disponible = capacidad_maxima − cantidad_de_suscripciones_activas_para_ese_template
+```
+
+Las suscripciones activas pre-reservan slots independientemente de si la instancia existe. El conteo **no filtra por fecha** — todas las suscripciones activas del template (estado != VENCIDA, activo=True) cuentan.
+
+Implementado en: `services/clase_template_service.py` → `get_semana()` → función interna `cupo_disponible_for()`.
+
+### Cancelación de clases
+
+- **Por el usuario** → `DELETE` de la fila `Asistencia`. Nunca `cancelo=True`.
+- **Por el sistema** (deuda vencida, suscripción expirada) → `cancelo=True` en `Asistencia`.
+- Al cancelar clase de suscripción: solo se libera la `SuscripcionReserva` de esa instancia específica, sin tocar las reservas futuras.
+- Siempre incrementar `ClaseInstancia.cupo += 1` al cancelar.
+
+### Cupones de descuento en renovación de suscripciones
+
+- La lógica de cupones (calcular descuento + marcar usados) vive en `SuscripcionService.renovar_suscripcion`, no en el router ni en PagoService.
+- Si la suscripción vence por falta de pago, los cupones no usados se eliminan en `SuscripcionService.sync_suscripcion_state` al transicionar a VENCIDA.
+- Máximo 2 cupones por ciclo (por `suscripcion_id`). Descuento proporcional: 25% para ciclos de 4 clases, 20% para ciclos de 5.

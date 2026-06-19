@@ -265,7 +265,7 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                 </div>
             </div>
 
-            <form ref={formRef} action={formAction} noValidate className="space-y-5 bg-slate-50/70 p-4 sm:p-6" onChange={(e) => { if ((e.target as HTMLInputElement).name !== "consent") setHasChanges(true); }}>
+            <form ref={formRef} action={formAction} noValidate className="space-y-5 bg-slate-50/70 p-4 sm:p-6" onChange={(e) => { if ((e.target as unknown as HTMLInputElement).name !== "consent") setHasChanges(true); }}>
                 <ErrorText message={fieldErrors._form} field="_form" />
 
                 <section className={sectionCls}>

@@ -14,6 +14,7 @@ from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
 from models.pagos import Pago
 from models.usuario import Usuario
+from repositories.cupon_descuento_repository import CuponDescuentoRepository
 from repositories.pago_repository import PagoRepository
 from repositories.inscripcion_repository import InscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
@@ -583,10 +584,17 @@ class PagoService:
             _disponible_hasta,
         ) = await SuscripcionService(self.db)._validar_renovacion(current_user, suscripcion_id)
 
+        cupones = await CuponDescuentoRepository(self.db).list_unused_for_renewal(
+            current_user.id, template.id
+        )
+        descuento_total = sum(float(c.descuento_porcentaje) for c in cupones)
+        precio_final = round(float(precio) * (1 - descuento_total / 100), 2)
+        precio_final = max(precio_final, 0.01)
+
         dia = template.dia_semana.value.capitalize()
         pref_data = self._make_preference(
             title=f"Renovación suscripción — {template.nombre} {dia}",
-            monto=round(float(precio), 2),
+            monto=precio_final,
             back_url_suffix="?tipo=renovacion-suscripcion",
             metadata={
                 "suscripcion_id": str(suscripcion_id),

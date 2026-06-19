@@ -29,6 +29,7 @@ class InstanciaEnSuscripcionResponse(BaseModel):
     instancia_id: UUID4
     fecha: date
     cancelada: bool
+    asistencia_id: Optional[UUID4] = None
 
     class Config:
         from_attributes = True

@@ -220,6 +220,15 @@ export interface InstanciaEnSuscripcion {
     instancia_id: string;
     fecha: string;
     cancelada: boolean;
+    asistencia_id: string | null;
+}
+
+export interface CancelacionResult {
+    reintegro: "none" | "mp" | "cupon";
+    mensaje: string;
+    monto_reintegrado?: number;
+    descuento_porcentaje?: number;
+    refund_error: boolean;
 }
 
 export interface MiSuscripcion {

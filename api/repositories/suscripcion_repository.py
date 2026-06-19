@@ -319,6 +319,26 @@ class SuscripcionRepository:
                 asistencia.cancelo = True
         await self.db.flush()
 
+    async def get_reserva_by_instancia_and_usuario(
+        self, instancia_id: uuid.UUID, usuario_id: uuid.UUID
+    ) -> SuscripcionReserva | None:
+        result = await self.db.execute(
+            select(SuscripcionReserva)
+            .join(Suscripcion, SuscripcionReserva.suscripcion_id == Suscripcion.id)
+            .where(
+                SuscripcionReserva.clase_instancia_id == instancia_id,
+                SuscripcionReserva.activa == True,
+                Suscripcion.usuario_id == usuario_id,
+            )
+        )
+        return result.scalars().first()
+
+    async def count_reservas_by_suscripcion(self, suscripcion_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).where(SuscripcionReserva.suscripcion_id == suscripcion_id)
+        )
+        return result.scalar() or 0
+
     async def create_suscripcion(
         self,
         usuario_id: uuid.UUID,
