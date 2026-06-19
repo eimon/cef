@@ -1,6 +1,7 @@
 from models.usuario import Usuario
-from schemas.usuario import UsuarioUpdate
+from schemas.usuario import UsuarioUpdate, AvisoMasivoResponse
 from repositories.user_repository import UserRepository
+from services.email_service import EmailService
 from exceptions.general import NotFoundException, BadRequestException, ConflictException, ForbiddenException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.enums import UserRole
@@ -66,6 +67,12 @@ class UserService:
         if not updated:
             raise NotFoundException("Usuario no encontrado")
         return updated
+
+    async def enviar_aviso_masivo(self, mensaje: str) -> AvisoMasivoResponse:
+        clientes = await self.repo.get_all_clientes()
+        emails = [c.email for c in clientes]
+        enviados = await EmailService().send_aviso_masivo(emails, mensaje)
+        return AvisoMasivoResponse(enviados=enviados, total=len(emails))
 
     async def delete(self, usuario_id: uuid.UUID, current_usuario_id: uuid.UUID, current_user: Usuario | None = None) -> Usuario:
         if usuario_id == current_usuario_id:

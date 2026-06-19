@@ -5,6 +5,24 @@ import { serverApi } from "@/lib/server-api";
 import { revalidatePath } from "next/cache";
 import { User, UserRole } from "@/types/api";
 
+export async function enviarAvisoMasivo(
+    mensaje: string,
+): Promise<{ data?: { enviados: number; total: number }; error?: string }> {
+    try {
+        const res = await serverApi("/users/aviso-masivo", {
+            method: "POST",
+            body: JSON.stringify({ mensaje }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { error: (err as { detail?: string }).detail || "No se pudo enviar el aviso" };
+        }
+        return { data: await res.json() };
+    } catch {
+        return { error: "Error al contactar el servidor" };
+    }
+}
+
 const createUserSchema = z.object({
     email: z.string().email("Email inválido"),
     telefono: z.string().optional(),
