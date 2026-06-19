@@ -28,6 +28,10 @@ export async function getStaffRegistrationsReport(): Promise<UserRegistrationsRe
     return getRegistrationsReport("/reports/staff-registrations");
 }
 
+export async function getDeletedUsersReport(): Promise<UserRegistrationsReport | null> {
+    return getRegistrationsReport("/reports/deleted-users");
+}
+
 export async function getActiveUsersByActivityReport(): Promise<ActiveUsersByActivityReport | null> {
     try {
         const res = await serverApi("/reports/active-users-by-activity");

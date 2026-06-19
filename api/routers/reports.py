@@ -36,6 +36,14 @@ async def get_staff_registrations_report(
     return await ReportService(db).get_staff_registrations_report()
 
 
+@router.get("/deleted-users", response_model=UserRegistrationsReportResponse)
+async def get_deleted_users_report(
+    db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
+):
+    return await ReportService(db).get_deleted_users_report()
+
+
 @router.get("/active-users-by-activity", response_model=ActiveUsersByActivityReportResponse)
 async def get_active_users_by_activity_report(
     db: AsyncSession = Depends(get_db),

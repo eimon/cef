@@ -42,6 +42,10 @@ class ReportService:
     async def get_staff_registrations_report(self) -> UserRegistrationsReportResponse:
         return await self._get_registrations_report([UserRole.ADMIN, UserRole.RECEPCION])
 
+    async def get_deleted_users_report(self) -> UserRegistrationsReportResponse:
+        monthly_counts = await self.repo.count_deleted_users_by_month()
+        return self._cumulative_user_report(monthly_counts)
+
     async def get_active_users_by_activity_report(self) -> ActiveUsersByActivityReportResponse:
         today = datetime.now(LOCAL_TZ).date()
         week_start = today - timedelta(days=today.weekday())
@@ -113,7 +117,9 @@ class ReportService:
 
     async def _get_registrations_report(self, roles: list[UserRole]) -> UserRegistrationsReportResponse:
         monthly_counts = await self.repo.count_present_users_by_month(roles)
+        return self._cumulative_user_report(monthly_counts)
 
+    def _cumulative_user_report(self, monthly_counts: list[tuple[str, int]]) -> UserRegistrationsReportResponse:
         cumulative = 0
         points: list[UserRegistrationsPoint] = []
         for period, period_count in monthly_counts:
