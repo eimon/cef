@@ -60,7 +60,7 @@ class UserRepository:
         nombre: str | None = None,
         apellido: str | None = None,
     ) -> list[Usuario]:
-        query = select(Usuario).where(Usuario.activo == True)
+        query = select(Usuario)
 
         dni = dni.strip() if dni else None
         nombre = _normalize_text_search(nombre)

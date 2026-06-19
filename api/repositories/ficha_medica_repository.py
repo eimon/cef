@@ -12,7 +12,9 @@ class FichaMedicaRepository:
 
     async def get_by_usuario_id(self, usuario_id: uuid.UUID) -> FichaMedica | None:
         result = await self.db.execute(
-            select(FichaMedica).where(FichaMedica.usuario_id == usuario_id)
+            select(FichaMedica)
+            .where(FichaMedica.usuario_id == usuario_id)
+            .order_by(FichaMedica.created_at.desc())
         )
         return result.scalars().first()
 

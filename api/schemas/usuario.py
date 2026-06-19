@@ -50,12 +50,14 @@ class PublicSignupResponse(BaseModel):
 
 
 class UsuarioUpdate(BaseModel):
+    email: Optional[EmailStr] = None
     telefono: Optional[str] = None
     nombre: Optional[str] = None
     apellido: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     dni: Optional[str] = None
     genero: Optional[str] = None
+    activo: Optional[bool] = None
     password: Optional[str] = None
     role: Optional[UserRole] = None
 

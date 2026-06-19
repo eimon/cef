@@ -48,10 +48,10 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
     useEffect(() => {
         if (!state.success || !isOpen || !submitRef.current) return;
         submitRef.current = false;
-        showSuccess("Usuario agregado correctamente");
+        showSuccess(state.message || "Usuario agregado correctamente");
         closeDialog();
         onSuccess?.();
-    }, [state.success, isOpen, showSuccess, closeDialog, onSuccess]);
+    }, [state.success, state.message, isOpen, showSuccess, closeDialog, onSuccess]);
 
     return (
         <>
@@ -78,6 +78,7 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
 
                         <form
                             action={formAction}
+                            autoComplete="off"
                             onSubmit={() => { submitRef.current = true; }}
                             className="p-6 space-y-4"
                         >
@@ -89,7 +90,7 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
 
                             <div>
                                 <label className={labelCls}>Email</label>
-                                <input name="email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} className={inputCls} />
+                                <input name="new_user_email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="off" className={inputCls} />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -149,7 +150,7 @@ export default function AddUserDialog({ onSuccess, roleOptions }: AddUserDialogP
 
                             <div>
                                 <label className={labelCls}>Contraseña</label>
-                                <input name="password" type="password" required value={password} onChange={(event) => setPassword(event.target.value)} className={inputCls} />
+                                <input name="new_user_password" type="password" required value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" className={inputCls} />
                             </div>
 
                             <div className="pt-2 flex justify-end space-x-3">

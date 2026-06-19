@@ -47,6 +47,11 @@ const medicalRecordFieldsSchema = z.object({
     });
 
 const medicalRecordSchema = medicalRecordFieldsSchema
+    .extend({
+        consent: z.literal("on", {
+            error: "Debes aceptar el consentimiento y declaracion jurada",
+        }),
+    })
     .refine(
         (data) => !data.medical_conditions.includes("Otros") || Boolean(data.medical_other?.trim()),
         {
@@ -600,6 +605,7 @@ export async function updateMedicalRecord(
         physical_activity: merged.physical_activity,
         activity_frequency: merged.activity_frequency || undefined,
         goals: merged.goals || [],
+        consent: formData.get("consent"),
     });
 
     if (!validatedFields.success) {
@@ -678,7 +684,7 @@ export async function updateMedicalRecord(
     }
 }
 
-export async function logout() {
+export async function clearSession() {
     const cookieStore = await cookies();
     const refreshToken = cookieStore.get("refresh_token")?.value;
 
@@ -696,5 +702,9 @@ export async function logout() {
 
     cookieStore.delete("access_token");
     cookieStore.delete("refresh_token");
+}
+
+export async function logout() {
+    await clearSession();
     redirect("/auth/login");
 }

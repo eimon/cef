@@ -65,16 +65,14 @@ class ProfesorRepository:
         disciplinas_nombres = data.disciplinas
         create_data = data.model_dump(exclude={"disciplinas"})
         profesor = Profesor(**create_data)
-        self.db.add(profesor)
-        await self.db.flush()
 
         if disciplinas_nombres:
             disciplinas = await self._get_disciplinas_by_nombres(disciplinas_nombres)
             profesor.disciplinas = disciplinas
-            await self.db.flush()
 
-        await self.db.refresh(profesor)
-        return profesor
+        self.db.add(profesor)
+        await self.db.flush()
+        return await self.get_by_id(profesor.id)
 
     async def update(self, profesor_id: uuid.UUID, data: ProfesorUpdate) -> Profesor | None:
         profesor = await self.get_by_id(profesor_id)
@@ -89,7 +87,7 @@ class ProfesorRepository:
             profesor.disciplinas = disciplinas
 
         await self.db.flush()
-        return await self.get_by_id(profesor.id)
+        return await self.get_by_id(profesor_id)
 
     async def soft_delete(self, profesor_id: uuid.UUID) -> Profesor | None:
         profesor = await self.get_by_id(profesor_id)

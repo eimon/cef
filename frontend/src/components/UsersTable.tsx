@@ -15,6 +15,7 @@ interface UsersTableProps {
     emptyMessage?: string;
     onSuccess?: () => void;
     currentUserId?: string;
+    showRoleColumn?: boolean;
 }
 
 const roleBadgeClass: Record<string, string> = {
@@ -85,7 +86,14 @@ function UserCardMenu({
     );
 }
 
-export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess, currentUserId }: UsersTableProps) {
+export default function UsersTable({
+    users,
+    allowedRoles,
+    emptyMessage,
+    onSuccess,
+    currentUserId,
+    showRoleColumn = true,
+}: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError, showSuccess } = useToast();
@@ -125,9 +133,11 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                 <span className="text-sm font-semibold text-slate-700">
                                     {[displayValue(user.nombre), displayValue(user.apellido)].filter(Boolean).join(" ") || "—"}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
-                                    {roleLabels[user.role] ?? user.role}
-                                </span>
+                                {showRoleColumn && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
+                                        {roleLabels[user.role] ?? user.role}
+                                    </span>
+                                )}
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${user.activo
                                     ? "bg-cef-success/10 text-cef-success"
                                     : "bg-slate-100 text-slate-400"
@@ -186,9 +196,11 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Teléfono
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Rol
-                                </th>
+                                {showRoleColumn && (
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                        Rol
+                                    </th>
+                                )}
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Estado
                                 </th>
@@ -215,11 +227,13 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {user.telefono || "—"}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
-                                            {roleLabels[user.role] ?? user.role}
-                                        </span>
-                                    </td>
+                                    {showRoleColumn && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
+                                                {roleLabels[user.role] ?? user.role}
+                                            </span>
+                                        </td>
+                                    )}
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.activo
                                             ? "bg-cef-success/10 text-cef-success"

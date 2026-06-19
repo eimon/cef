@@ -13,6 +13,7 @@ import {
     Loader2,
     Pill,
     Plus,
+    ShieldCheck,
     Stethoscope,
 } from "lucide-react";
 
@@ -149,10 +150,14 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
     const [surgeryCount, setSurgeryCount] = useState(
         Math.max(1, submittedValues?.surgeries?.length ?? record?.cuerpo_ficha?.historial_cirugias?.length ?? 1)
     );
+    const [hasChanges, setHasChanges] = useState(false);
+    const [consentChecked, setConsentChecked] = useState(false);
     const { showSuccess } = useToast();
     const router = useRouter();
     const hasOtherCondition = selectedConditions.includes("Otros");
     const canSubmit =
+        hasChanges &&
+        consentChecked &&
         requiredTextValues.emergency_name.trim().length >= 2 &&
         requiredTextValues.emergency_relationship.trim().length >= 2 &&
         requiredTextValues.emergency_phone.trim().length >= 3 &&
@@ -260,7 +265,7 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                 </div>
             </div>
 
-            <form ref={formRef} action={formAction} noValidate className="space-y-5 bg-slate-50/70 p-4 sm:p-6">
+            <form ref={formRef} action={formAction} noValidate className="space-y-5 bg-slate-50/70 p-4 sm:p-6" onChange={(e) => { if ((e.target as HTMLInputElement).name !== "consent") setHasChanges(true); }}>
                 <ErrorText message={fieldErrors._form} field="_form" />
 
                 <section className={sectionCls}>
@@ -516,6 +521,33 @@ export default function MedicalRecordEditForm({ record }: { record: MedicalRecor
                         </div>
                     </div>
                 </section>
+
+                {hasChanges && (
+                    <section className={sectionCls}>
+                        <div className={sectionHeaderCls}>
+                            <div className={sectionIconCls}><ShieldCheck size={18} /></div>
+                            <h2 className={sectionTitleCls}>Consentimiento y declaración jurada</h2>
+                        </div>
+                        <div className={sectionBodyCls}>
+                            <label className="flex items-start gap-3 rounded-lg border border-cef-primary/20 bg-cef-primary/5 p-4 text-sm text-slate-600 transition-colors hover:border-cef-primary/30">
+                                <input
+                                    name="consent"
+                                    type="checkbox"
+                                    required
+                                    className="mt-1 accent-cef-primary"
+                                    checked={consentChecked}
+                                    onChange={(e) => setConsentChecked(e.target.checked)}
+                                />
+                                <span>
+                                    Declaro que la información proporcionada es verdadera y completa. Me comprometo a informar
+                                    cualquier cambio en mi estado de salud y asumo la responsabilidad de realizar actividad física bajo
+                                    mi propio riesgo.
+                                </span>
+                            </label>
+                            <ErrorText message={fieldErrors.consent} field="consent" />
+                        </div>
+                    </section>
+                )}
 
                 <div className="flex gap-3">
                     <Link href="/profile?seccion=ficha-medica" className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50">

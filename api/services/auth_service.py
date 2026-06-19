@@ -21,6 +21,7 @@ from schemas.usuario import (
 )
 from services.email_service import EmailService
 from services.refresh_token_service import RefreshTokenService
+from core.enums import UserRole
 from core.config import settings
 from core.security import verify_password, get_password_hash
 
@@ -39,7 +40,16 @@ class AuthService:
             raise ConflictException("Email ya registrado")
         await self._validate_unique_optional_fields(data.dni)
         hashed_password = get_password_hash(data.password)
-        return await self.user_repo.create(data, hashed_password)
+        usuario = await self.user_repo.create(data, hashed_password)
+
+        if self._is_staff_role(data.role):
+            await EmailService().send_staff_credentials(
+                usuario.email,
+                data.password,
+                usuario.nombre,
+            )
+
+        return usuario
 
     async def signup_user(self, data: PublicSignupRequest) -> None:
         if await self.user_repo.get_by_email(data.email):
@@ -258,9 +268,16 @@ class AuthService:
         usuario_id: uuid.UUID,
         cuerpo_ficha: str,
     ) -> FichaMedicaPerfilResponse:
-        ficha = await self.ficha_medica_repo.update_by_usuario_id(usuario_id, cuerpo_ficha)
-        if not ficha:
+        existing = await self.ficha_medica_repo.get_by_usuario_id(usuario_id)
+        if not existing:
             raise NotFoundException("Ficha medica no encontrada")
+
+        ficha_data = FichaMedicaCreate(
+            usuario_id=usuario_id,
+            fecha=date.today(),
+            cuerpo_ficha=cuerpo_ficha,
+        )
+        ficha = await self.ficha_medica_repo.create(ficha_data)
 
         try:
             parsed_body = json.loads(ficha.cuerpo_ficha)
@@ -281,6 +298,11 @@ class AuthService:
     ) -> None:
         if dni and await self.user_repo.get_by_dni(dni):
             raise ConflictException("DNI ya registrado")
+
+    @staticmethod
+    def _is_staff_role(role: str | UserRole) -> bool:
+        role_value = role.value if hasattr(role, "value") else str(role)
+        return role_value in {UserRole.ADMIN.value, UserRole.RECEPCION.value}
 
     async def _get_valid_registration_token(self, raw_token: str):
         token = await self.registration_token_repo.get_by_raw_token(raw_token)

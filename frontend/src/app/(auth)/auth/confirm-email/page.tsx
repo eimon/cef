@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SERVER_API_URL } from "@/lib/server-api";
+import { logout } from "@/actions/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,20 +44,14 @@ export default async function ConfirmEmailPage({ searchParams }: ConfirmEmailPag
             <div className="glass-modal w-full max-w-md rounded-2xl p-8 text-center">
                 <h1 className="text-lg font-semibold text-slate-800">Email actualizado</h1>
                 <p className="mt-3 text-sm text-slate-500">{detail}</p>
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                    <Link
-                        href="/profile"
+                <form action={logout} className="mt-6">
+                    <button
+                        type="submit"
                         className="rounded-lg bg-cef-primary px-4 py-2 text-sm font-semibold text-white hover:bg-cef-primary/90"
                     >
-                        Ir al perfil
-                    </Link>
-                    <Link
-                        href="/auth/login"
-                        className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                    >
                         Volver al login
-                    </Link>
-                </div>
+                    </button>
+                </form>
             </div>
         </main>
     );
