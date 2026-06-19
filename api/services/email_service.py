@@ -176,6 +176,38 @@ class EmailService:
             except Exception:
                 logger.exception("Error enviando notificación de cambio de clase a %s", email)
 
+    async def send_aviso_masivo(self, emails: list[str], mensaje: str) -> int:
+        if not emails:
+            return 0
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se enviaron avisos masivos.")
+            return 0
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se enviaron avisos masivos.")
+            return 0
+
+        resend.api_key = settings.RESEND_API_KEY
+        enviados = 0
+        for email in emails:
+            try:
+                params: resend.Emails.SendParams = {
+                    "from": settings.RESEND_FROM_EMAIL,
+                    "to": [email],
+                    "subject": "Aviso de CEF",
+                    "html": (
+                        "<p>Hola,</p>"
+                        f"<p>{mensaje}</p>"
+                        "<p>Saludos,<br>El equipo de CEF</p>"
+                    ),
+                }
+                resend.Emails.send(params)
+                enviados += 1
+            except Exception:
+                logger.exception("Error enviando aviso masivo a %s", email)
+        return enviados
+
     async def send_password_reset(self, to_email: str, token: str) -> None:
         verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/reset-password?token={token}"
 

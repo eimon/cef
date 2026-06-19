@@ -43,6 +43,15 @@ class UserRepository:
         result = await self.db.execute(select(Usuario).where(Usuario.dni == dni))
         return result.scalars().first()
 
+    async def get_all_clientes(self) -> list[Usuario]:
+        result = await self.db.execute(
+            select(Usuario).where(
+                Usuario.activo == True,
+                Usuario.role == UserRole.CLIENTE,
+            )
+        )
+        return list(result.scalars().all())
+
     async def get_all(
         self,
         skip: int = 0,
