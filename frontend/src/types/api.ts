@@ -17,6 +17,49 @@ export interface User {
     activo: boolean;
     created_at: string;
 }
+
+export interface UserRegistrationsPoint {
+    period: string;
+    total_count: number;
+}
+
+export interface UserRegistrationsReport {
+    points: UserRegistrationsPoint[];
+}
+
+export interface ActiveUsersByActivityPoint {
+    activity: string;
+    total_count: number;
+}
+
+export interface ActiveUsersByActivityReport {
+    points: ActiveUsersByActivityPoint[];
+}
+
+export interface BillingReport {
+    total_revenue: number;
+    message: string | null;
+}
+
+export interface ReportClassOption {
+    id: string;
+    nombre: string;
+    disciplina: string;
+    dia_semana: string;
+    hora_inicio: string;
+    hora_fin: string;
+}
+
+export interface ClassCancellationsPoint {
+    class_date: string;
+    total_count: number;
+}
+
+export interface ClassCancellationsReport {
+    clase: ReportClassOption;
+    points: ClassCancellationsPoint[];
+}
+
 export interface Profesor {
     id: string;
     dni: string;
