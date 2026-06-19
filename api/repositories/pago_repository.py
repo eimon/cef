@@ -40,6 +40,22 @@ class PagoRepository:
         )
         return list(result.scalars().all())
 
+    async def get_pendiente_by_suscripcion(self, suscripcion_id: uuid.UUID) -> Pago | None:
+        result = await self.db.execute(
+            select(Pago).where(
+                Pago.suscripcion_id == suscripcion_id,
+                Pago.estado == EstadoPago.PENDIENTE,
+                Pago.activo == True,
+            )
+        )
+        return result.scalars().first()
+
+    async def cancel_pending_by_suscripcion(self, suscripcion_id: uuid.UUID) -> None:
+        pago = await self.get_pendiente_by_suscripcion(suscripcion_id)
+        if pago:
+            pago.estado = EstadoPago.ANULADO
+            await self.db.flush()
+
     async def get_paid_by_usuario_and_instancia(
         self, usuario_id: uuid.UUID, clase_instancia_id: uuid.UUID
     ) -> list[Pago]:

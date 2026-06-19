@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { serverApi } from "@/lib/server-api";
-import { SuscripcionCheckResponse, SuscripcionResponse } from "@/types/api";
+import { RenovacionIniciada, SuscripcionCheckResponse, SuscripcionResponse } from "@/types/api";
+
+export type RenovacionIniciadaState = {
+    error?: string;
+    success?: boolean;
+    data?: RenovacionIniciada;
+};
 
 export type SuscripcionCheckState = {
     error?: string;
@@ -51,3 +57,22 @@ export async function suscribirse(
     revalidatePath("/mis-clases");
     return { success: true, data };
 }
+
+export async function iniciarRenovacion(
+    suscripcionId: string,
+): Promise<RenovacionIniciadaState> {
+    const res = await serverApi(`/suscripciones/${suscripcionId}/iniciar-renovacion`, {
+        method: "POST",
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        return { error: errorData.detail || "No se pudo iniciar la renovación" };
+    }
+
+    const data: RenovacionIniciada = await res.json();
+    revalidatePath("/mis-clases");
+    revalidatePath("/mis-pagos");
+    return { success: true, data };
+}
+

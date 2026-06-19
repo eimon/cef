@@ -78,6 +78,7 @@ class PagoService:
                 tipo=tipo,
                 clase_nombre=clase_template.nombre if clase_template else None,
                 disciplina=clase_template.disciplina if clase_template else None,
+                suscripcion_id=pago.suscripcion_id if pago.suscripcion else None,
             ))
 
         return historial

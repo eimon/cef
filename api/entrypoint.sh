@@ -8,6 +8,6 @@ alembic upgrade head
 
 # Seed activo:
 python scripts/seed_admin.py
-# python scripts/seed_dev.py
+python scripts/seed_dev.py
 
 exec "$@"

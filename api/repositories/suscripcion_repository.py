@@ -316,8 +316,31 @@ class SuscripcionRepository:
                 )
             )).scalars().first()
             if asistencia:
-                asistencia.cancelo = True
+                if asistencia.asistio:
+                    # Keep attended classes — they represent an unpaid debt
+                    pass
+                else:
+                    await self.db.delete(asistencia)
         await self.db.flush()
+
+    async def get_activas_con_clases_finalizadas(self, before_date: date) -> list[Suscripcion]:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(
+                Suscripcion.activo == True,
+                Suscripcion.fecha_fin < before_date,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def get_all_activas(self) -> list[Suscripcion]:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(Suscripcion.activo == True)
+        )
+        return list(result.scalars().all())
 
     async def get_reserva_by_instancia_and_usuario(
         self, instancia_id: uuid.UUID, usuario_id: uuid.UUID
@@ -370,13 +393,14 @@ class SuscripcionRepository:
         suscripcion_id: uuid.UUID,
         monto: Decimal,
         mp_payment_id: str = "mock",
+        estado: EstadoPago = EstadoPago.PAGADO,
     ) -> Pago:
         pago = Pago(
             usuario_id=usuario_id,
             suscripcion_id=suscripcion_id,
             monto=monto,
             fecha_pago=datetime.now(timezone.utc),
-            estado=EstadoPago.PAGADO,
+            estado=estado,
             mp_payment_id=mp_payment_id,
             descripcion="Pago suscripción" if mp_payment_id != "mock" else "Pago suscripción mock",
             activo=True,
