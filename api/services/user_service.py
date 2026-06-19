@@ -6,6 +6,10 @@ from exceptions.general import NotFoundException, BadRequestException, ConflictE
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.enums import UserRole
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 
 
 class UserService:
@@ -86,8 +90,12 @@ class UserService:
             if self._role_value(usuario.role) != UserRole.CLIENTE.value:
                 raise ForbiddenException("No autorizado para esta accion")
 
-        if await self.repo.has_active_enrollment(usuario_id):
-            raise ConflictException("No se puede eliminar el usuario porque está inscripto a una clase")
+        now = datetime.now(LOCAL_TZ)
+        await self.repo.cancel_pending_class_reservations(
+            usuario_id,
+            now.date(),
+            now.time(),
+        )
 
         usuario = await self.repo.delete(usuario_id)
         if not usuario:

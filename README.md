@@ -2,7 +2,7 @@
 
 Sistema de gestión para un centro de actividad física.
 
-Desarrollado con FastAPI (backend) y Next.js (frontend), con autenticación JWT y base de datos PostgreSQL.
+Desarrollado con FastAPI (backend) y Next.js (frontend), con autenticación JWT, gráficos con Recharts y base de datos PostgreSQL.
 
 ## Requisitos
 
