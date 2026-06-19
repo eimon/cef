@@ -30,6 +30,23 @@ class ReportRepository:
 
         return [(str(row.period), int(row.period_count)) for row in result.all()]
 
+    async def count_deleted_users_by_month(self) -> list[tuple[str, int]]:
+        month_start = func.date_trunc(
+            "month",
+            func.coalesce(Usuario.updated_at, Usuario.created_at, func.now()),
+        )
+        period = func.to_char(month_start, "YYYY-MM").label("period")
+        period_count = func.count(Usuario.id).label("period_count")
+
+        result = await self.db.execute(
+            select(period, period_count)
+            .where(Usuario.activo.is_(False))
+            .group_by(month_start)
+            .order_by(month_start)
+        )
+
+        return [(str(row.period), int(row.period_count)) for row in result.all()]
+
     async def count_active_clients_by_activity(
         self,
         week_start: date,

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, CalendarX, DollarSign, Loader2, Users, X } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarX, DollarSign, Loader2, UserX, Users, X } from "lucide-react";
 import {
     Bar,
     BarChart,
@@ -20,6 +20,7 @@ import {
     getBillingReport,
     getClassCancellationsReport,
     getClientRegistrationsReport,
+    getDeletedUsersReport,
     getReportClasses,
     getStaffRegistrationsReport,
 } from "@/actions/reports";
@@ -31,7 +32,7 @@ import {
     UserRegistrationsReport,
 } from "@/types/api";
 
-type ReportKind = "clients" | "staff" | "activeByActivity" | "billing" | "classCancellations";
+type ReportKind = "clients" | "staff" | "activeByActivity" | "billing" | "classCancellations" | "deletedUsers";
 type ReportData = UserRegistrationsReport | ActiveUsersByActivityReport | BillingReport | ClassCancellationsReport;
 
 type ReportDefinition = {
@@ -53,6 +54,12 @@ const reportDefinitions: ReportDefinition[] = [
         title: "Personal registrado",
         modalTitle: "Personal registrado",
         chartLabel: "Personal",
+    },
+    {
+        kind: "deletedUsers",
+        title: "Usuarios eliminados",
+        modalTitle: "Usuarios eliminados",
+        chartLabel: "Usuarios eliminados",
     },
     {
         kind: "activeByActivity",
@@ -112,7 +119,19 @@ function classSubtitle(clase: ReportClassOption): string {
     return `${formatDay(clase.dia_semana)} ${clase.hora_inicio} - ${clase.hora_fin}`;
 }
 
-function UsersChart({ report, title, seriesLabel }: { report: UserRegistrationsReport; title: string; seriesLabel: string }) {
+function UsersChart({
+    report,
+    title,
+    seriesLabel,
+    lineColor = "#0f766e",
+    activeLineColor = "#064e3b",
+}: {
+    report: UserRegistrationsReport;
+    title: string;
+    seriesLabel: string;
+    lineColor?: string;
+    activeLineColor?: string;
+}) {
     const chartData = useMemo(
         () =>
             report.points.map((point) => ({
@@ -167,10 +186,10 @@ function UsersChart({ report, title, seriesLabel }: { report: UserRegistrationsR
                         name={seriesLabel}
                         type="monotone"
                         dataKey="total"
-                        stroke="#0f766e"
+                        stroke={lineColor}
                         strokeWidth={4}
-                        dot={{ r: 7, fill: "#facc15", stroke: "#0f766e", strokeWidth: 3 }}
-                        activeDot={{ r: 9, fill: "#facc15", stroke: "#064e3b", strokeWidth: 3 }}
+                        dot={{ r: 7, fill: "#facc15", stroke: lineColor, strokeWidth: 3 }}
+                        activeDot={{ r: 9, fill: "#facc15", stroke: activeLineColor, strokeWidth: 3 }}
                         isAnimationActive={false}
                     >
                         <LabelList
@@ -581,6 +600,8 @@ function ReportModal({
                             report={report as UserRegistrationsReport}
                             title={definition.modalTitle}
                             seriesLabel={definition.chartLabel}
+                            lineColor={definition.kind === "deletedUsers" ? "#be123c" : undefined}
+                            activeLineColor={definition.kind === "deletedUsers" ? "#881337" : undefined}
                         />
                     ) : (
                         <div className="grid h-80 place-items-center">
@@ -626,7 +647,9 @@ export default function ReportsView() {
             ? await getClientRegistrationsReport()
             : definition.kind === "staff"
                 ? await getStaffRegistrationsReport()
-                : await getActiveUsersByActivityReport();
+                : definition.kind === "deletedUsers"
+                    ? await getDeletedUsersReport()
+                    : await getActiveUsersByActivityReport();
         setReport(data);
         setIsLoading(false);
     };
@@ -673,6 +696,8 @@ export default function ReportsView() {
                                 <div className="rounded-xl bg-cef-primary/10 p-3 text-cef-primary">
                                     {definition.kind === "billing" ? (
                                         <DollarSign size={24} />
+                                    ) : definition.kind === "deletedUsers" ? (
+                                        <UserX size={24} />
                                     ) : definition.kind === "classCancellations" ? (
                                         <CalendarX size={24} />
                                     ) : (
