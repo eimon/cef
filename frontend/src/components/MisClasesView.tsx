@@ -409,6 +409,7 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                         Cancelar
                     </button>
                 )}
+
             </div>
         </div>
 

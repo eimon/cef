@@ -171,6 +171,7 @@ export interface MiPago {
     tipo: string;
     clase_nombre: string | null;
     disciplina: Disciplina | null;
+    suscripcion_id: string | null;
 }
 
 export interface RenovacionSuscripcionPendiente {
@@ -221,6 +222,14 @@ export interface InstanciaEnSuscripcion {
     fecha: string;
     cancelada: boolean;
     asistencia_id: string | null;
+}
+
+export interface RenovacionIniciada {
+    siguiente_suscripcion_id: string;
+    clase_nombre: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    precio_total: number;
 }
 
 export interface CancelacionResult {

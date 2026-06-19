@@ -7,7 +7,7 @@ from core.database import get_db
 from core.roles import Role
 from dependencies.auth import has_role
 from models.usuario import Usuario
-from schemas.suscripcion import SuscripcionCreate, SuscripcionCheckResponse, SuscripcionResponse
+from schemas.suscripcion import SuscripcionCreate, SuscripcionCheckResponse, SuscripcionResponse, RenovacionIniciadaResponse
 from services.suscripcion_service import SuscripcionService
 
 router = APIRouter(prefix="/suscripciones", tags=["suscripciones"])
@@ -29,3 +29,20 @@ async def suscribirse(
     current_user: Usuario = Depends(has_role(Role.ROLE_CLIENT)),
 ):
     return await SuscripcionService(db).suscribirse(current_user, data)
+
+
+@router.post("/{suscripcion_id}/iniciar-renovacion", response_model=RenovacionIniciadaResponse, status_code=201)
+async def iniciar_renovacion(
+    suscripcion_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(has_role(Role.ROLE_CLIENT)),
+):
+    return await SuscripcionService(db).iniciar_renovacion(current_user, suscripcion_id)
+
+
+@router.post("/cron/procesar", status_code=200)
+async def procesar_renovaciones_cron(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
+):
+    return await SuscripcionService(db).procesar_renovaciones_cron()

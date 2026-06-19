@@ -1,5 +1,4 @@
 import uuid
-import calendar
 from datetime import date, timedelta, datetime
 from decimal import Decimal
 
@@ -9,11 +8,14 @@ from core.enums import DiaSemana, EstadoSuscripcion
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
+from core.enums import EstadoPago
 from repositories.cupon_descuento_repository import CuponDescuentoRepository
+from repositories.pago_repository import PagoRepository
 from repositories.suscripcion_repository import SuscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.suscripcion import (
+    RenovacionIniciadaResponse,
     RenovacionSuscripcionPendienteResponse,
     SuscripcionCreate,
     SuscripcionCheckResponse,
@@ -47,17 +49,18 @@ def _proxima_fecha(dia_semana: DiaSemana) -> date:
     return hoy + timedelta(days=dias)
 
 
-def _proxima_fecha_desde(dia_semana: DiaSemana, desde: date) -> date:
+def _primera_clase_en_periodo(dia_semana: DiaSemana, desde: date) -> date:
     dias = (_DIA_TO_WEEKDAY[dia_semana] - desde.weekday()) % 7
     return desde + timedelta(days=dias)
 
 
 def _calcular_fecha_fin(fecha_inicio: date) -> date:
+    if fecha_inicio.day >= 29:
+        return fecha_inicio + timedelta(days=29)
     month = fecha_inicio.month + 1
     year = fecha_inicio.year + (month - 1) // 12
     month = (month - 1) % 12 + 1
-    day = min(fecha_inicio.day, calendar.monthrange(year, month)[1])
-    return date(year, month, day) - timedelta(days=1)
+    return date(year, month, fecha_inicio.day) - timedelta(days=1)
 
 
 def _calcular_fechas_clases(fecha_inicio: date, fecha_fin: date) -> list[date]:
@@ -80,7 +83,6 @@ class SuscripcionService:
 
     async def sync_suscripcion_state(self, suscripcion) -> None:
         today = datetime.now(LOCAL_TZ).date()
-        has_paid_payment = await self.repo.has_paid_payment(suscripcion.id)
         current_state = get_subscription_state(suscripcion.estado)
         next_estado = current_state.next_state(suscripcion.fecha_pago, today)
 
@@ -89,14 +91,6 @@ class SuscripcionService:
             if next_estado == EstadoSuscripcion.VENCIDA:
                 await self.repo.release_future_reservas(suscripcion, today)
                 await CuponDescuentoRepository(self.db).delete_unused_by_suscripcion(suscripcion.id)
-
-        if suscripcion.estado == EstadoSuscripcion.RENOVABLE and has_paid_payment:
-            await self._ensure_pending_renewal(suscripcion, today)
-
-    async def sync_user_subscriptions(self, usuario_id: uuid.UUID) -> None:
-        suscripciones = await self.repo.get_suscripciones_for_renewal(usuario_id)
-        for suscripcion in suscripciones:
-            await self.sync_suscripcion_state(suscripcion)
 
     async def sync_template_subscriptions(self, clase_template_id: uuid.UUID) -> None:
         suscripciones = await self.repo.get_suscripciones_for_template(clase_template_id)
@@ -146,11 +140,10 @@ class SuscripcionService:
         if not disciplina_obj:
             return None
 
-        nueva_fecha_inicio = _proxima_fecha_desde(
-            template.dia_semana, suscripcion.fecha_fin + timedelta(days=1)
-        )
+        nueva_fecha_inicio = suscripcion.fecha_fin + timedelta(days=1)
         nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
-        fechas_clases = _calcular_fechas_clases(nueva_fecha_inicio, nueva_fecha_fin)
+        primera_clase = _primera_clase_en_periodo(template.dia_semana, nueva_fecha_inicio)
+        fechas_clases = _calcular_fechas_clases(primera_clase, nueva_fecha_fin)
 
         pending = await self.repo.create_suscripcion(
             usuario_id=suscripcion.usuario_id,
@@ -266,6 +259,32 @@ class SuscripcionService:
         if not latest or latest.id != suscripcion.id:
             raise BadRequestException("La suscripción ya fue renovada")
 
+        # Subscription created by iniciar_renovacion: VIGENTE + PENDIENTE pago → bypass window
+        if suscripcion.estado == EstadoSuscripcion.VIGENTE:
+            if await self.repo.has_paid_payment(suscripcion.id):
+                raise BadRequestException("La suscripción ya fue pagada")
+            pago_repo = PagoRepository(self.db)
+            if not await pago_repo.get_pendiente_by_suscripcion(suscripcion.id):
+                raise BadRequestException("La renovación todavía no está disponible")
+            template = suscripcion.clase_template
+            if not template.activo:
+                raise BadRequestException("La clase ya no está disponible")
+            primera_clase = _primera_clase_en_periodo(template.dia_semana, suscripcion.fecha_inicio)
+            fechas_clases = _calcular_fechas_clases(primera_clase, suscripcion.fecha_fin)
+            disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+            if not disciplina_obj:
+                raise BadRequestException("No hay precio configurado para esta disciplina")
+            return (
+                suscripcion,
+                template,
+                suscripcion.fecha_inicio,
+                suscripcion.fecha_fin,
+                fechas_clases,
+                Decimal(str(disciplina_obj.precio_suscripcion)),
+                hoy,
+                hoy + timedelta(days=10),
+            )
+
         disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion)
         state = get_subscription_state(suscripcion.estado)
         if not state.can_renew():
@@ -283,7 +302,8 @@ class SuscripcionService:
         if not template.activo:
             raise BadRequestException("La clase ya no está disponible")
 
-        fechas_clases = _calcular_fechas_clases(suscripcion.fecha_inicio, suscripcion.fecha_fin)
+        primera_clase = _primera_clase_en_periodo(template.dia_semana, suscripcion.fecha_inicio)
+        fechas_clases = _calcular_fechas_clases(primera_clase, suscripcion.fecha_fin)
 
         disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
         if not disciplina_obj:
@@ -303,7 +323,6 @@ class SuscripcionService:
     async def list_renovaciones_pendientes(
         self, current_user: Usuario
     ) -> list[RenovacionSuscripcionPendienteResponse]:
-        await self.sync_user_subscriptions(current_user.id)
         suscripciones = await self.repo.get_suscripciones_for_renewal(current_user.id)
         latest_by_template = {}
         for suscripcion in suscripciones:
@@ -348,7 +367,177 @@ class SuscripcionService:
                 precio_total=float(disciplina_obj.precio_suscripcion),
             ))
 
+        # Also include VIGENTE subscriptions with a PENDIENTE pago (created by iniciar_renovacion)
+        pago_repo = PagoRepository(self.db)
+        for suscripcion in latest_by_template.values():
+            if suscripcion.estado != EstadoSuscripcion.VIGENTE:
+                continue
+            if await self.repo.has_paid_payment(suscripcion.id):
+                continue
+            if not await pago_repo.get_pendiente_by_suscripcion(suscripcion.id):
+                continue
+            template = suscripcion.clase_template
+            if not template or not template.activo:
+                continue
+            disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+            if not disciplina_obj:
+                continue
+            cantidad_clases = len(_calcular_fechas_clases(suscripcion.fecha_inicio, suscripcion.fecha_fin))
+            pendientes.append(RenovacionSuscripcionPendienteResponse(
+                suscripcion_id=suscripcion.id,
+                clase_template_id=template.id,
+                clase_nombre=template.nombre,
+                disciplina=template.disciplina,
+                fecha_inicio=suscripcion.fecha_inicio,
+                fecha_fin=suscripcion.fecha_fin,
+                renovacion_disponible_desde=hoy,
+                renovacion_disponible_hasta=hoy + timedelta(days=10),
+                nueva_fecha_inicio=suscripcion.fecha_inicio,
+                nueva_fecha_fin=suscripcion.fecha_fin,
+                cantidad_clases=cantidad_clases,
+                precio_total=float(disciplina_obj.precio_suscripcion),
+            ))
+
         return pendientes
+
+    async def iniciar_renovacion(
+        self, current_user: Usuario, suscripcion_id: uuid.UUID
+    ) -> RenovacionIniciadaResponse:
+        suscripcion = await self.repo.get_suscripcion_by_id_for_user(suscripcion_id, current_user.id)
+        if not suscripcion:
+            raise NotFoundException("Suscripción no encontrada")
+
+        today = datetime.now(LOCAL_TZ).date()
+        if today <= suscripcion.fecha_fin:
+            raise BadRequestException("El ciclo actual todavía tiene clases pendientes")
+
+        template = suscripcion.clase_template or await self.repo.get_template(suscripcion.clase_template_id)
+        if not template or not template.activo:
+            raise BadRequestException("La clase ya no está disponible")
+
+        disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not disciplina_obj:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+
+        # Idempotent: check if next period already exists
+        existing_next = await self.repo.get_next_suscripcion_for_template(
+            current_user.id, suscripcion.clase_template_id, suscripcion.fecha_fin
+        )
+
+        if suscripcion.activo:
+            suscripcion.activo = False
+            await self.db.flush()
+
+        if not existing_next:
+            nueva_fecha_inicio = suscripcion.fecha_fin + timedelta(days=1)
+            nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
+            primera_clase = _primera_clase_en_periodo(template.dia_semana, nueva_fecha_inicio)
+            fechas_clases = _calcular_fechas_clases(primera_clase, nueva_fecha_fin)
+
+            existing_next = await self.repo.create_suscripcion(
+                usuario_id=current_user.id,
+                clase_template_id=template.id,
+                monto=Decimal(str(disciplina_obj.precio_suscripcion)),
+                fecha_inicio=nueva_fecha_inicio,
+                fecha_fin=nueva_fecha_fin,
+                fecha_pago=datetime.now(LOCAL_TZ).date(),
+                estado=EstadoSuscripcion.VIGENTE,
+            )
+            await self._create_period_reservas(existing_next, template, fechas_clases, current_user.id)
+
+        pago_repo = PagoRepository(self.db)
+        pago_existente = await pago_repo.get_pendiente_by_suscripcion(existing_next.id)
+        if not pago_existente and not await self.repo.has_paid_payment(existing_next.id):
+            await self.repo.create_pago(
+                usuario_id=current_user.id,
+                suscripcion_id=existing_next.id,
+                monto=Decimal(str(disciplina_obj.precio_suscripcion)),
+                mp_payment_id="pendiente",
+                estado=EstadoPago.PENDIENTE,
+            )
+
+        return RenovacionIniciadaResponse(
+            siguiente_suscripcion_id=existing_next.id,
+            clase_nombre=template.nombre,
+            fecha_inicio=existing_next.fecha_inicio,
+            fecha_fin=existing_next.fecha_fin,
+            precio_total=float(existing_next.monto),
+        )
+
+    async def renovar_todas_vencidas(self) -> dict:
+        today = datetime.now(LOCAL_TZ).date()
+        suscripciones = await self.repo.get_activas_con_clases_finalizadas(today)
+        procesadas = 0
+        creadas = 0
+        errores = 0
+
+        for suscripcion in suscripciones:
+            try:
+                template = suscripcion.clase_template or await self.repo.get_template(suscripcion.clase_template_id)
+                if not template or not template.activo:
+                    procesadas += 1
+                    continue
+
+                disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+                if not disciplina_obj:
+                    procesadas += 1
+                    continue
+
+                existing_next = await self.repo.get_next_suscripcion_for_template(
+                    suscripcion.usuario_id, suscripcion.clase_template_id, suscripcion.fecha_fin
+                )
+
+                if suscripcion.activo:
+                    suscripcion.activo = False
+                    await self.db.flush()
+
+                if not existing_next:
+                    nueva_fecha_inicio = suscripcion.fecha_fin + timedelta(days=1)
+                    nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
+                    primera_clase = _primera_clase_en_periodo(template.dia_semana, nueva_fecha_inicio)
+                    fechas_clases = _calcular_fechas_clases(primera_clase, nueva_fecha_fin)
+
+                    existing_next = await self.repo.create_suscripcion(
+                        usuario_id=suscripcion.usuario_id,
+                        clase_template_id=template.id,
+                        monto=Decimal(str(disciplina_obj.precio_suscripcion)),
+                        fecha_inicio=nueva_fecha_inicio,
+                        fecha_fin=nueva_fecha_fin,
+                        fecha_pago=today,
+                        estado=EstadoSuscripcion.VIGENTE,
+                    )
+                    await self._create_period_reservas(existing_next, template, fechas_clases, suscripcion.usuario_id)
+                    creadas += 1
+
+                pago_repo = PagoRepository(self.db)
+                pago_existente = await pago_repo.get_pendiente_by_suscripcion(existing_next.id)
+                if not pago_existente and not await self.repo.has_paid_payment(existing_next.id):
+                    await self.repo.create_pago(
+                        usuario_id=suscripcion.usuario_id,
+                        suscripcion_id=existing_next.id,
+                        monto=Decimal(str(disciplina_obj.precio_suscripcion)),
+                        mp_payment_id="pendiente",
+                        estado=EstadoPago.PENDIENTE,
+                    )
+
+                procesadas += 1
+            except Exception:
+                errores += 1
+
+        return {"procesadas": procesadas, "creadas": creadas, "errores": errores}
+
+    async def procesar_renovaciones_cron(self) -> dict:
+        suscripciones = await self.repo.get_all_activas()
+        procesadas = 0
+        vencidas = 0
+        for suscripcion in suscripciones:
+            estado_anterior = suscripcion.estado
+            await self.sync_suscripcion_state(suscripcion)
+            if suscripcion.estado == EstadoSuscripcion.VENCIDA and estado_anterior != EstadoSuscripcion.VENCIDA:
+                vencidas += 1
+            procesadas += 1
+        renovadas = await self.renovar_todas_vencidas()
+        return {"procesadas": procesadas, "vencidas": vencidas, "renovadas": renovadas["creadas"]}
 
     async def renovar_suscripcion(
         self,
@@ -384,6 +573,7 @@ class SuscripcionService:
         await self.repo.mark_subscription_state(suscripcion, EstadoSuscripcion.VIGENTE)
 
         await cupon_repo.mark_used(cupones)
+        await PagoRepository(self.db).cancel_pending_by_suscripcion(suscripcion.id)
 
         pago = await self.repo.create_pago(
             usuario_id=current_user.id,

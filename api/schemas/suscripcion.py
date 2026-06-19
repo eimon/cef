@@ -32,6 +32,14 @@ class SuscripcionResponse(BaseModel):
     activo: bool
 
 
+class RenovacionIniciadaResponse(BaseModel):
+    siguiente_suscripcion_id: UUID4
+    clase_nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    precio_total: float
+
+
 class RenovacionSuscripcionPendienteResponse(BaseModel):
     suscripcion_id: UUID4
     clase_template_id: UUID4

@@ -16,6 +16,7 @@ class MiPagoResponse(BaseModel):
     tipo: str
     clase_nombre: Optional[str] = None
     disciplina: Optional[str] = None
+    suscripcion_id: Optional[UUID4] = None
 
     class Config:
         from_attributes = True
