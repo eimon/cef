@@ -350,7 +350,10 @@ class SuscripcionService:
             if not disciplina_obj:
                 continue
 
-            cantidad_clases = len(_calcular_fechas_clases(suscripcion.fecha_inicio, suscripcion.fecha_fin))
+            nueva_fecha_inicio = suscripcion.fecha_fin + timedelta(days=1)
+            nueva_fecha_fin = _calcular_fecha_fin(nueva_fecha_inicio)
+            primera_clase = _primera_clase_en_periodo(template.dia_semana, nueva_fecha_inicio)
+            cantidad_clases = len(_calcular_fechas_clases(primera_clase, nueva_fecha_fin))
 
             pendientes.append(RenovacionSuscripcionPendienteResponse(
                 suscripcion_id=suscripcion.id,
@@ -361,8 +364,8 @@ class SuscripcionService:
                 fecha_fin=suscripcion.fecha_fin,
                 renovacion_disponible_desde=disponible_desde,
                 renovacion_disponible_hasta=disponible_hasta,
-                nueva_fecha_inicio=suscripcion.fecha_inicio,
-                nueva_fecha_fin=suscripcion.fecha_fin,
+                nueva_fecha_inicio=nueva_fecha_inicio,
+                nueva_fecha_fin=nueva_fecha_fin,
                 cantidad_clases=cantidad_clases,
                 precio_total=float(disciplina_obj.precio_suscripcion),
             ))
@@ -382,7 +385,8 @@ class SuscripcionService:
             disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
             if not disciplina_obj:
                 continue
-            cantidad_clases = len(_calcular_fechas_clases(suscripcion.fecha_inicio, suscripcion.fecha_fin))
+            primera_clase = _primera_clase_en_periodo(template.dia_semana, suscripcion.fecha_inicio)
+            cantidad_clases = len(_calcular_fechas_clases(primera_clase, suscripcion.fecha_fin))
             pendientes.append(RenovacionSuscripcionPendienteResponse(
                 suscripcion_id=suscripcion.id,
                 clase_template_id=template.id,

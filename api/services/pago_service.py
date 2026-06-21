@@ -569,6 +569,37 @@ class PagoService:
             "preference_id": pref["id"],
         }
 
+    async def preview_renovacion_suscripcion(
+        self,
+        current_user: Usuario,
+        suscripcion_id: UUID,
+    ) -> dict:
+        (
+            _suscripcion,
+            template,
+            _fecha_inicio,
+            _fecha_fin,
+            _fechas_clases,
+            precio,
+            _disponible_desde,
+            _disponible_hasta,
+        ) = await SuscripcionService(self.db)._validar_renovacion(current_user, suscripcion_id)
+
+        cupones = await CuponDescuentoRepository(self.db).list_unused_for_renewal(
+            current_user.id, template.id
+        )
+        descuento_total = sum(float(c.descuento_porcentaje) for c in cupones)
+        precio_base = float(precio)
+        precio_total = round(precio_base * (1 - descuento_total / 100), 2)
+        precio_total = max(precio_total, 0.01)
+
+        return {
+            "precio_base": precio_base,
+            "descuento_porcentaje": descuento_total,
+            "precio_total": precio_total,
+            "clases_canceladas": len(cupones),
+        }
+
     async def crear_preferencia_renovacion_suscripcion_mp(
         self,
         current_user: Usuario,
