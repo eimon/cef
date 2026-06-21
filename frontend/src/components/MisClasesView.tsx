@@ -486,7 +486,7 @@ export default function MisClasesView({
 
     const sorted = [...filtered].sort((a, b) => {
         const cmp = a.fecha.localeCompare(b.fecha) || a.hora_inicio.localeCompare(b.hora_inicio);
-        return tiempoTab === "proximas" ? cmp : -cmp;
+        return cmp;
     });
 
     // Group by date

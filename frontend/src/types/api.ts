@@ -232,6 +232,13 @@ export interface RenovacionSuscripcionPendiente {
     precio_total: number;
 }
 
+export interface PreviewRenovacion {
+    precio_base: number;
+    descuento_porcentaje: number;
+    precio_total: number;
+    clases_canceladas: number;
+}
+
 export interface DeudaPendiente {
     asistencia_id: string;
     clase_nombre: string;

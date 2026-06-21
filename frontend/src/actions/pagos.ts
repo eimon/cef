@@ -1,7 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
-import { DeudaPendiente, MiPago, RenovacionSuscripcionPendiente } from "@/types/api";
+import { DeudaPendiente, MiPago, PreviewRenovacion, RenovacionSuscripcionPendiente } from "@/types/api";
 
 export type PreferenciaResult = {
     init_point?: string;
@@ -81,6 +81,23 @@ export async function crearPreferenciaSuscripcionMP(
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             return { error: error.detail || "Error al iniciar el pago de suscripción" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function previewRenovacionSuscripcion(
+    suscripcionId: string,
+): Promise<PreviewRenovacion | { error: string }> {
+    try {
+        const res = await serverApi("/pagos/preview-renovacion-suscripcion", {
+            params: { suscripcion_id: suscripcionId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al obtener el precio" };
         }
         return res.json();
     } catch {

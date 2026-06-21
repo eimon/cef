@@ -8,7 +8,7 @@ from core.database import get_db
 from dependencies.auth import get_current_user
 from models.usuario import Usuario
 from schemas.pago import DeudaPendienteResponse, MiPagoResponse
-from schemas.suscripcion import RenovacionSuscripcionPendienteResponse
+from schemas.suscripcion import PreviewRenovacionResponse, RenovacionSuscripcionPendienteResponse
 from services.pago_service import PagoService
 from services.suscripcion_service import SuscripcionService
 
@@ -94,6 +94,15 @@ async def confirmar_suscripcion_mp(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await PagoService(db).confirmar_suscripcion_mp(current_user, payment_id)
+
+
+@router.get("/preview-renovacion-suscripcion", response_model=PreviewRenovacionResponse)
+async def preview_renovacion_suscripcion(
+    suscripcion_id: UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).preview_renovacion_suscripcion(current_user, suscripcion_id)
 
 
 @router.post("/mp/preferencia-renovacion-suscripcion")

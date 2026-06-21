@@ -53,3 +53,10 @@ class RenovacionSuscripcionPendienteResponse(BaseModel):
     nueva_fecha_fin: date
     cantidad_clases: int
     precio_total: float
+
+
+class PreviewRenovacionResponse(BaseModel):
+    precio_base: float
+    descuento_porcentaje: float
+    precio_total: float
+    clases_canceladas: int
