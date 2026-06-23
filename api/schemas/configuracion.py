@@ -13,3 +13,7 @@ class ConfiguracionResponse(BaseModel):
 
 class SenaMinimaUpdate(BaseModel):
     valor: str
+
+
+class DiasUpdate(BaseModel):
+    valor: str

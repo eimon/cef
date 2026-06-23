@@ -2,27 +2,34 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { getDisciplinaPrecios } from "@/actions/disciplinas";
-import { getSenaMinima } from "@/actions/config";
+import { getSenaMinima, getPlazoPago, getDiasAvisoVencimiento } from "@/actions/config";
 import { PrecioDisciplina } from "@/types/api";
 import PreciosTable from "@/components/PreciosTable";
 import SenaMinimaCard from "@/components/SenaMinimaCard";
+import PlazosCard from "@/components/PlazosCard";
 
-type Tab = "precios" | "sena";
+type Tab = "precios" | "sena" | "suscripciones";
 
 export default function PreciosPage() {
     const [activeTab, setActiveTab] = useState<Tab>("precios");
     const [precios, setPrecios] = useState<PrecioDisciplina[]>([]);
     const [senaMinima, setSenaMinima] = useState<string>("0");
+    const [plazoPago, setPlazoPago] = useState<string>("10");
+    const [diasAviso, setDiasAviso] = useState<string>("1");
     const [isLoading, setIsLoading] = useState(true);
 
     const refresh = useCallback(async () => {
         try {
-            const [dataPrecios, dataSena] = await Promise.all([
+            const [dataPrecios, dataSena, dataPlazo, dataDiasAviso] = await Promise.all([
                 getDisciplinaPrecios(),
                 getSenaMinima(),
+                getPlazoPago(),
+                getDiasAvisoVencimiento(),
             ]);
             setPrecios(dataPrecios);
             setSenaMinima(dataSena);
+            setPlazoPago(dataPlazo);
+            setDiasAviso(dataDiasAviso);
         } catch {
             setPrecios([]);
         } finally {
@@ -36,7 +43,8 @@ export default function PreciosPage() {
 
     const tabs: { id: Tab; label: string }[] = [
         { id: "precios", label: "Configuración de precios" },
-        { id: "sena", label: "Actualizar el porcentaje mínimo de seña" },
+        { id: "sena", label: "Porcentaje mínimo de seña" },
+        { id: "suscripciones", label: "Plazos de suscripción" },
     ];
 
     return (
@@ -74,6 +82,9 @@ export default function PreciosPage() {
                     )}
                     {activeTab === "sena" && (
                         <SenaMinimaCard valorActual={senaMinima} onSuccess={refresh} />
+                    )}
+                    {activeTab === "suscripciones" && (
+                        <PlazosCard plazoPago={plazoPago} diasAviso={diasAviso} onSuccess={refresh} />
                     )}
                 </>
             )}

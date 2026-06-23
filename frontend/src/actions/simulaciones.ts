@@ -18,3 +18,15 @@ export async function ejecutarCronRenovaciones(): Promise<SimulacionResult> {
     const data = await res.json();
     return { data };
 }
+
+export async function ejecutarCronNotificaciones(): Promise<SimulacionResult> {
+    const res = await serverApi("/suscripciones/cron/notificar-vencimientos", { method: "POST" });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        return { error: errorData.detail || "Error al ejecutar el cron de notificaciones" };
+    }
+
+    const data = await res.json();
+    return { data };
+}
