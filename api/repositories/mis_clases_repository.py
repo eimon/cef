@@ -21,6 +21,7 @@ class MisClasesRepository:
     async def get_individuales(self, usuario_id: uuid.UUID) -> list:
         from models.profesor import Profesor
         from models.sala import Sala
+        from sqlalchemy import case
 
         monto_pagado_sq = (
             select(func.coalesce(func.sum(Pago.monto), 0))
@@ -46,6 +47,9 @@ class MisClasesRepository:
             .scalar_subquery()
         )
 
+        # Use instance profesor_id if overridden (license replacement), otherwise template profesor_id
+        profesor_id_expr = func.coalesce(ClaseInstancia.profesor_id, ClaseTemplate.profesor_id)
+
         stmt = (
             select(
                 Asistencia.id.label("asistencia_id"),
@@ -64,7 +68,7 @@ class MisClasesRepository:
             )
             .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
             .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
-            .outerjoin(Profesor, ClaseTemplate.profesor_id == Profesor.id)
+            .outerjoin(Profesor, profesor_id_expr == Profesor.id)
             .outerjoin(Sala, ClaseTemplate.sala_id == Sala.id)
             .outerjoin(DisciplinaModel, DisciplinaModel.nombre == ClaseTemplate.disciplina)
             .where(

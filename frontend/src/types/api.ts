@@ -74,6 +74,37 @@ export interface Profesor {
     updated_at: string | null;
 }
 
+export enum TipoLicencia {
+    VACACIONES = "vacaciones",
+    ENFERMEDAD = "enfermedad",
+    PERSONAL = "personal",
+    ESTUDIO = "estudio",
+    OTRO = "otro",
+}
+
+export enum EstadoLicencia {
+    PENDIENTE = "pendiente",
+    APROBADA = "aprobada",
+    RECHAZADA = "rechazada",
+}
+
+export interface Licencia {
+    id: string;
+    profesor_id: string;
+    profesor_reemplazo_id: string | null;
+    fecha_inicio: string;
+    fecha_fin: string;
+    tipo: TipoLicencia;
+    estado: EstadoLicencia;
+    motivo: string | null;
+    notas_admin: string | null;
+    resuelto_por_id: string | null;
+    resuelto_at: string | null;
+    activo: boolean;
+    created_at: string;
+    updated_at: string | null;
+}
+
 export type MedicalRecordBody = {
     contacto_emergencia?: {
         nombre?: string;

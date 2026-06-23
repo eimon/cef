@@ -11,6 +11,7 @@ class ClaseInstancia(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     clase_template_id = Column(UUID(as_uuid=True), ForeignKey("clase_templates.id", ondelete="CASCADE"), nullable=False, index=True)
+    profesor_id = Column(UUID(as_uuid=True), ForeignKey("profesores.id", ondelete="SET NULL"), nullable=True, index=True)
     fecha = Column(Date, nullable=False)
     # cupo regular para suscriptos
     cupo = Column(Integer, nullable=False)
@@ -21,6 +22,7 @@ class ClaseInstancia(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     clase_template = relationship("ClaseTemplate", back_populates="instancias")
+    profesor = relationship("Profesor", foreign_keys=[profesor_id])
     asistencias = relationship("Asistencia", back_populates="clase_instancia")
     pagos = relationship("Pago", back_populates="clase_instancia")
     reservas_suscripcion = relationship("SuscripcionReserva", back_populates="clase_instancia")

@@ -5,6 +5,7 @@ import { getProfesores, GetProfesoresParams } from "@/actions/profesores";
 import { Profesor } from "@/types/api";
 import ProfesoresTable from "@/components/ProfesoresTable";
 import AddProfesorDialog from "@/components/AddProfesorDialog";
+import LicenciasSection from "@/components/LicenciasSection";
 
 export default function ProfesoresPage() {
     const [profesores, setProfesores] = useState<Profesor[]>([]);
@@ -99,11 +100,14 @@ export default function ProfesoresPage() {
                     <p className="text-slate-400 text-sm">Cargando...</p>
                 </div>
             ) : (
-                <ProfesoresTable
-                    profesores={profesores}
-                    onSuccess={() => refresh(filters)}
-                    emptyMessage={hasActiveFilter ? "No se encontraron profesores con los filtros ingresados" : undefined}
-                />
+                <>
+                    <ProfesoresTable
+                        profesores={profesores}
+                        onSuccess={() => refresh(filters)}
+                        emptyMessage={hasActiveFilter ? "No se encontraron profesores con los filtros ingresados" : undefined}
+                    />
+                    <LicenciasSection profesores={profesores} />
+                </>
             )}
         </div>
     );

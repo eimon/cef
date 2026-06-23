@@ -29,4 +29,8 @@ class Profesor(Base):
 
     clase_templates = relationship("ClaseTemplate", back_populates="profesor")
     disciplinas = relationship("Disciplina", secondary="profesor_disciplinas", lazy="selectin")
-    licencias = relationship("Licencia", back_populates="profesor")
+    licencias = relationship(
+        "Licencia",
+        foreign_keys="Licencia.profesor_id",
+        back_populates="profesor",
+    )
