@@ -13,6 +13,7 @@ from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
 from models.suscripciones import Suscripcion, SuscripcionReserva
+from models.usuario import Usuario
 
 
 class SuscripcionRepository:
@@ -333,6 +334,28 @@ class SuscripcionRepository:
             )
         )
         return list(result.scalars().all())
+
+    async def get_renovables_proximos_a_vencer(self, target_fecha_pago: date) -> list[tuple]:
+        """Returns (suscripcion, usuario, clase_template) for RENOVABLE subs without paid payment
+        whose expiry date is target_fecha_pago + RENOVABLE_AFTER_DAYS + plazo_pago_dias.
+        Caller computes target_fecha_pago = today - RENOVABLE_AFTER_DAYS - plazo_pago_dias + dias_aviso."""
+        paid_subquery = (
+            select(Pago.suscripcion_id)
+            .where(Pago.estado == EstadoPago.PAGADO, Pago.activo == True)
+            .scalar_subquery()
+        )
+        result = await self.db.execute(
+            select(Suscripcion, Usuario, ClaseTemplate)
+            .join(Usuario, Suscripcion.usuario_id == Usuario.id)
+            .join(ClaseTemplate, Suscripcion.clase_template_id == ClaseTemplate.id)
+            .where(
+                Suscripcion.estado == EstadoSuscripcion.RENOVABLE,
+                Suscripcion.activo == True,
+                Suscripcion.fecha_pago == target_fecha_pago,
+                Suscripcion.id.not_in(paid_subquery),
+            )
+        )
+        return list(result.all())
 
     async def get_all_activas(self) -> list[Suscripcion]:
         result = await self.db.execute(

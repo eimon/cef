@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Play, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
-import { ejecutarCronRenovaciones } from "@/actions/simulaciones";
+import { ejecutarCronRenovaciones, ejecutarCronNotificaciones } from "@/actions/simulaciones";
 
 type ActionResult = {
     status: "idle" | "loading" | "success" | "error";
@@ -68,6 +68,7 @@ function CronCard({
 
 export default function SimulacionesView() {
     const [renovacionesResult, setRenovacionesResult] = useState<ActionResult>({ status: "idle" });
+    const [notificacionesResult, setNotificacionesResult] = useState<ActionResult>({ status: "idle" });
 
     async function runRenovaciones() {
         setRenovacionesResult({ status: "loading" });
@@ -76,6 +77,16 @@ export default function SimulacionesView() {
             setRenovacionesResult({ status: "error", error: res.error });
         } else {
             setRenovacionesResult({ status: "success", data: res.data });
+        }
+    }
+
+    async function runNotificaciones() {
+        setNotificacionesResult({ status: "loading" });
+        const res = await ejecutarCronNotificaciones();
+        if (res.error) {
+            setNotificacionesResult({ status: "error", error: res.error });
+        } else {
+            setNotificacionesResult({ status: "success", data: res.data });
         }
     }
 
@@ -92,6 +103,12 @@ export default function SimulacionesView() {
                     description="Procesa todas las suscripciones activas, avanza estados y crea los ciclos del mes siguiente para las vencidas."
                     onRun={runRenovaciones}
                     result={renovacionesResult}
+                />
+                <CronCard
+                    title="Notificar vencimientos próximos"
+                    description="Envía un email a los clientes cuya suscripción vence en la cantidad de días configurada como aviso."
+                    onRun={runNotificaciones}
+                    result={notificacionesResult}
                 />
             </div>
         </div>

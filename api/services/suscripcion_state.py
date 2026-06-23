@@ -16,7 +16,7 @@ class SuscripcionState(ABC):
     estado: EstadoSuscripcion
 
     @abstractmethod
-    def next_state(self, fecha_pago: date, today: date) -> EstadoSuscripcion:
+    def next_state(self, fecha_pago: date, today: date, renewal_window_days: int = RENEWAL_WINDOW_DAYS) -> EstadoSuscripcion:
         pass
 
     @abstractmethod
@@ -27,8 +27,8 @@ class SuscripcionState(ABC):
 class VigenteState(SuscripcionState):
     estado = EstadoSuscripcion.VIGENTE
 
-    def next_state(self, fecha_pago: date, today: date) -> EstadoSuscripcion:
-        if today > fecha_pago + timedelta(days=RENOVABLE_AFTER_DAYS + RENEWAL_WINDOW_DAYS):
+    def next_state(self, fecha_pago: date, today: date, renewal_window_days: int = RENEWAL_WINDOW_DAYS) -> EstadoSuscripcion:
+        if today > fecha_pago + timedelta(days=RENOVABLE_AFTER_DAYS + renewal_window_days):
             return EstadoSuscripcion.VENCIDA
         if today >= fecha_pago + timedelta(days=RENOVABLE_AFTER_DAYS):
             return EstadoSuscripcion.RENOVABLE
@@ -41,8 +41,8 @@ class VigenteState(SuscripcionState):
 class RenovableState(SuscripcionState):
     estado = EstadoSuscripcion.RENOVABLE
 
-    def next_state(self, fecha_pago: date, today: date) -> EstadoSuscripcion:
-        if today > fecha_pago + timedelta(days=RENOVABLE_AFTER_DAYS + RENEWAL_WINDOW_DAYS):
+    def next_state(self, fecha_pago: date, today: date, renewal_window_days: int = RENEWAL_WINDOW_DAYS) -> EstadoSuscripcion:
+        if today > fecha_pago + timedelta(days=RENOVABLE_AFTER_DAYS + renewal_window_days):
             return EstadoSuscripcion.VENCIDA
         return self.estado
 
@@ -71,7 +71,7 @@ def get_subscription_state(estado: EstadoSuscripcion) -> SuscripcionState:
     return _STATES[estado]
 
 
-def renewal_window(fecha_pago: date) -> tuple[date, date]:
+def renewal_window(fecha_pago: date, renewal_window_days: int = RENEWAL_WINDOW_DAYS) -> tuple[date, date]:
     desde = fecha_pago + timedelta(days=RENOVABLE_AFTER_DAYS)
-    hasta = desde + timedelta(days=RENEWAL_WINDOW_DAYS)
+    hasta = desde + timedelta(days=renewal_window_days)
     return desde, hasta
