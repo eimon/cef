@@ -14,9 +14,10 @@ from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, Cla
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, BadRequestException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
-from core.enums import DiaSemana, TipoInscripcion, EstadoSuscripcion, EstadoWaitlist
+from core.enums import DiaSemana, TipoInscripcion, EstadoSuscripcion, EstadoWaitlist, EstadoLicencia
 from models.asistencia import Asistencia
 from models.clase_template import ClaseTemplate
+from models.licencia import Licencia
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
 from models.waitlist_entry import WaitlistEntry
@@ -99,6 +100,25 @@ class ClaseTemplateService:
             raise BadRequestException(
                 f"El cupo de la clase ({capacidad_maxima}) no puede superar la capacidad de la sala ({sala.capacidad})"
             )
+
+    async def _get_replacement_profesor_for_date(
+        self, profesor_id: uuid.UUID, target_date: date
+    ) -> uuid.UUID | None:
+        """
+        Check if profesor has an approved license covering target_date.
+        If yes, return the replacement profesor_id. Otherwise return None.
+        """
+        result = await self.db.execute(
+            select(Licencia.profesor_reemplazo_id).where(
+                Licencia.profesor_id == profesor_id,
+                Licencia.estado == EstadoLicencia.APROBADA,
+                Licencia.fecha_inicio <= target_date,
+                Licencia.fecha_fin >= target_date,
+                Licencia.activo == True,
+            )
+        )
+        replacement = result.scalar()
+        return replacement
 
     async def create(self, data: ClaseTemplateCreate) -> ClaseTemplateResponse:
         disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(data.disciplina)
@@ -319,6 +339,25 @@ class ClaseTemplateService:
                 for s in user_subs
             )
 
+            # Check if profesor has active license covering this date
+            replacement_profesor_id = await self._get_replacement_profesor_for_date(
+                template.profesor_id, fecha_clase
+            )
+
+            if replacement_profesor_id:
+                # Use replacement profesor if license active for this date
+                profesor_id_to_use = replacement_profesor_id
+                # Fetch replacement profesor data for name
+                from repositories.profesor_repository import ProfesorRepository
+                profesor_to_use = await ProfesorRepository(self.db).get_by_id(replacement_profesor_id)
+            else:
+                # Use instance profesor override if exists, else template profesor
+                profesor_id_to_use = instancia.profesor_id if (instancia and instancia.profesor_id) else template.profesor_id
+                if instancia and instancia.profesor_id:
+                    profesor_to_use = instancia.profesor
+                else:
+                    profesor_to_use = template.profesor
+
             result.append(ClaseSemanaResponse(
                 id=template.id,
                 nombre=template.nombre,
@@ -330,11 +369,11 @@ class ClaseTemplateService:
                 capacidad_maxima=template.capacidad_maxima,
                 precio_individual=pi,
                 precio_suscripcion=ps,
-                profesor_id=template.profesor_id,
+                profesor_id=profesor_id_to_use,
                 sala_id=template.sala_id,
                 profesor_nombre=(
-                    f"{template.profesor.nombre} {template.profesor.apellido}"
-                    if template.profesor else None
+                    f"{profesor_to_use.nombre} {profesor_to_use.apellido}"
+                    if profesor_to_use else None
                 ),
                 sala_nombre=template.sala.nombre if template.sala else None,
                 fecha_en_semana=fecha_clase,

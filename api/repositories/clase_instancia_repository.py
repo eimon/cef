@@ -2,6 +2,7 @@ import uuid
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from models.clase_instancia import ClaseInstancia
 
@@ -14,7 +15,10 @@ class ClaseInstanciaRepository:
         if not fechas:
             return []
         result = await self.db.execute(
-            select(ClaseInstancia).where(
+            select(ClaseInstancia).options(
+                selectinload(ClaseInstancia.profesor),
+                selectinload(ClaseInstancia.clase_template),
+            ).where(
                 ClaseInstancia.fecha.in_(fechas),
                 ClaseInstancia.activo == True,
             )
