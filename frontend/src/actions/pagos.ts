@@ -69,6 +69,22 @@ export async function crearPreferenciaMP(
     }
 }
 
+export async function crearPreferenciaWaitlistMP(waitlistId: string): Promise<PreferenciaResult> {
+    try {
+        const res = await serverApi("/pagos/mp/preferencia-waitlist", {
+            method: "POST",
+            params: { waitlist_id: waitlistId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al iniciar el pago del cupo liberado" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
 export async function crearPreferenciaSuscripcionMP(
     claseTemplateId: string,
     monto: number,
@@ -197,6 +213,22 @@ export async function confirmarPagoMP(paymentId: string): Promise<ConfirmarPagoR
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             return { error: error.detail || "Error al confirmar el pago" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function confirmarWaitlistMP(paymentId: string): Promise<ConfirmarPagoResult> {
+    try {
+        const res = await serverApi("/pagos/mp/confirmar-waitlist", {
+            method: "POST",
+            params: { payment_id: paymentId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al confirmar el cupo liberado" };
         }
         return res.json();
     } catch {

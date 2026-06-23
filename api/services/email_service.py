@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from html import escape
 
 from core.config import settings
@@ -12,6 +13,48 @@ def _https_url(base: str) -> str:
 
 
 class EmailService:
+    async def send_waitlist_slot_available(
+        self,
+        to_email: str,
+        clase_nombre: str,
+        fecha: str,
+        expira_at: datetime,
+        nombre: str | None = None,
+    ) -> None:
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se envió aviso de lista de espera a %s", to_email)
+            return
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se envió aviso de lista de espera.")
+            return
+
+        frontend_url = _https_url(settings.FRONTEND_PUBLIC_URL)
+        mis_clases_url = f"{frontend_url}/mis-clases"
+        saludo = f"Hola {escape(nombre)}," if nombre else "Hola,"
+        clase_segura = escape(clase_nombre)
+        fecha_segura = escape(fecha)
+        vence_str = expira_at.strftime("%d/%m %H:%M")
+
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": f"Se liberó un cupo para {clase_segura}",
+            "html": (
+                f"<p>{saludo}</p>"
+                f"<p>Se liberó un cupo para <strong>{clase_segura}</strong> ({fecha_segura}).</p>"
+                f"<p>Tenés tiempo hasta <strong>{vence_str}</strong> para confirmar y pagar tu lugar.</p>"
+                f'<p>Ingresá a <a href="{mis_clases_url}">Mis Clases</a> para continuar.</p>'
+            ),
+        }
+
+        try:
+            resend.Emails.send(params)
+        except Exception:
+            logger.exception("Error enviando aviso de cupo liberado a %s", to_email)
+
     async def send_staff_credentials(
         self,
         to_email: str,

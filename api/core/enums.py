@@ -34,3 +34,11 @@ class DiaSemana(str, enum.Enum):
     DOMINGO = "domingo"
 
 
+class EstadoWaitlist(str, enum.Enum):
+    EN_ESPERA = "en_espera"
+    NOTIFICADO = "notificado"
+    CONFIRMADO_PAGADO = "confirmado_pagado"
+    EXPIRADO = "expirado"
+    CANCELADO = "cancelado"
+
+

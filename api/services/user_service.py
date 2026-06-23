@@ -5,6 +5,7 @@ from services.email_service import EmailService
 from exceptions.general import NotFoundException, BadRequestException, ConflictException, ForbiddenException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.enums import UserRole
+from services.waitlist_service import WaitlistService
 import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -91,11 +92,14 @@ class UserService:
                 raise ForbiddenException("No autorizado para esta accion")
 
         now = datetime.now(LOCAL_TZ)
-        await self.repo.cancel_pending_class_reservations(
+        released_slots = await self.repo.cancel_pending_class_reservations(
             usuario_id,
             now.date(),
             now.time(),
         )
+        waitlist_service = WaitlistService(self.db)
+        for clase_template_id, fecha in released_slots:
+            await waitlist_service.trigger_promotion_for_slot(clase_template_id, fecha)
 
         usuario = await self.repo.delete(usuario_id)
         if not usuario:

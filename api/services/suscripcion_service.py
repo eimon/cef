@@ -24,6 +24,7 @@ from schemas.suscripcion import (
     SuscripcionResponse,
 )
 from services.suscripcion_state import get_subscription_state, renewal_window, RENOVABLE_AFTER_DAYS
+from services.waitlist_service import WaitlistService
 
 
 async def _get_porcentaje_sena(db) -> float:
@@ -92,7 +93,10 @@ class SuscripcionService:
         if next_estado != suscripcion.estado:
             await self.repo.mark_subscription_state(suscripcion, next_estado)
             if next_estado == EstadoSuscripcion.VENCIDA:
-                await self.repo.release_future_reservas(suscripcion, today)
+                released_slots = await self.repo.release_future_reservas(suscripcion, today)
+                waitlist_service = WaitlistService(self.db)
+                for clase_template_id, fecha in released_slots:
+                    await waitlist_service.trigger_promotion_for_slot(clase_template_id, fecha)
                 await CuponDescuentoRepository(self.db).delete_unused_by_suscripcion(suscripcion.id)
 
     async def sync_template_subscriptions(self, clase_template_id: uuid.UUID) -> None:

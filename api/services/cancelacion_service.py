@@ -14,6 +14,7 @@ from repositories.cupon_descuento_repository import CuponDescuentoRepository
 from repositories.pago_repository import PagoRepository
 from repositories.suscripcion_repository import SuscripcionRepository
 from schemas.cancelacion import CancelacionResponse
+from services.waitlist_service import WaitlistService
 
 ART = timezone(timedelta(hours=-3))
 
@@ -65,6 +66,10 @@ class CancelacionService:
 
         await self.db.delete(asistencia)
         await self.db.flush()
+        await WaitlistService(self.db).trigger_promotion_for_slot(
+            instancia.clase_template_id,
+            instancia.fecha,
+        )
 
         if horas_restantes < 24:
             return CancelacionResponse(

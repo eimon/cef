@@ -108,7 +108,8 @@ class UserRepository:
         usuario_id: uuid.UUID,
         current_date: date,
         current_time: time,
-    ) -> None:
+    ) -> list[tuple[uuid.UUID, date]]:
+        released_slots: set[tuple[uuid.UUID, date]] = set()
         pending_class = or_(
             ClaseInstancia.fecha > current_date,
             and_(
@@ -137,6 +138,7 @@ class UserRepository:
         for reserva, instancia in reservation_rows:
             reserva.activa = False
             instancia.cupo += 1
+            released_slots.add((instancia.clase_template_id, instancia.fecha))
 
         if reservation_instance_ids:
             subscription_assistances = (
@@ -173,6 +175,7 @@ class UserRepository:
         for asistencia, instancia in individual_rows:
             asistencia.cancelo = True
             instancia.cupo += 1
+            released_slots.add((instancia.clase_template_id, instancia.fecha))
 
         active_subscriptions = (
             await self.db.execute(
@@ -186,6 +189,7 @@ class UserRepository:
             suscripcion.activo = False
 
         await self.db.flush()
+        return list(released_slots)
 
     async def has_active_enrollment(self, usuario_id: uuid.UUID) -> bool:
         result = await self.db.execute(
