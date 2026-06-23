@@ -295,7 +295,7 @@ export default function ClaseDetailDialog({
         if (!clase) return;
         setSuscripcionCheckLoading(true);
         setSuscripcionCheckError("");
-        const result = await checkElegibilidadSuscripcion(clase.id);
+        const result = await checkElegibilidadSuscripcion(clase.id, clase.fecha_en_semana);
         setSuscripcionCheckLoading(false);
         if (result.error) {
             setSuscripcionCheckError(result.error);
@@ -320,7 +320,7 @@ export default function ClaseDetailDialog({
         setMpError("");
 
         const result = step === "amount-suscripcion"
-            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto)
+            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto, clase.fecha_en_semana)
             : await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
 
         if (result.error) {

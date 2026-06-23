@@ -8,6 +8,7 @@ from core.enums import EstadoSuscripcion
 class SuscripcionCreate(BaseModel):
     clase_template_id: UUID4
     monto: Decimal = Field(..., gt=0, decimal_places=2)
+    fecha_inicio: date
 
 
 class SuscripcionCheckResponse(BaseModel):

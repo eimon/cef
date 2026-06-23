@@ -534,8 +534,9 @@ class PagoService:
         current_user: Usuario,
         clase_template_id: UUID,
         monto: float,
+        fecha_inicio: date,
     ) -> dict:
-        await SuscripcionService(self.db).check_elegibilidad(current_user, clase_template_id)
+        await SuscripcionService(self.db).check_elegibilidad(current_user, clase_template_id, fecha_inicio)
 
         repo = InscripcionRepository(self.db)
         template = await repo.get_template(clase_template_id)
@@ -555,8 +556,8 @@ class PagoService:
             title=f"Suscripción — {template.nombre} {dia}",
             monto=round(monto, 2),
             back_url_suffix="?tipo=suscripcion",
-            metadata={"clase_template_id": str(clase_template_id), "usuario_id": str(current_user.id), "tipo": "suscripcion"},
-            external_reference=f"suscripcion|{clase_template_id}|{current_user.id}",
+            metadata={"clase_template_id": str(clase_template_id), "usuario_id": str(current_user.id), "tipo": "suscripcion", "fecha_inicio": fecha_inicio.isoformat()},
+            external_reference=f"suscripcion|{clase_template_id}|{current_user.id}|{fecha_inicio.isoformat()}",
         )
 
         response = self.sdk.preference().create(pref_data)
@@ -680,10 +681,12 @@ class PagoService:
             if metadata.get("clase_template_id"):
                 clase_template_id = UUID(str(metadata["clase_template_id"]))
                 usuario_id = str(metadata["usuario_id"])
+                fecha_inicio = date.fromisoformat(str(metadata["fecha_inicio"]))
             else:
                 parts = external_ref.split("|")
                 clase_template_id = UUID(parts[1])
                 usuario_id = parts[2]
+                fecha_inicio = date.fromisoformat(parts[3])
         except (KeyError, ValueError, IndexError):
             raise BadRequestException("Metadatos del pago inválidos")
 
@@ -691,7 +694,7 @@ class PagoService:
             raise BadRequestException("Este pago no corresponde a tu usuario")
 
         monto = Decimal(str(payment["transaction_amount"]))
-        data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto)
+        data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto, fecha_inicio=fecha_inicio)
         result = await SuscripcionService(self.db).suscribirse(
             current_user, data, mp_payment_id=str(payment_id)
         )

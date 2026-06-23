@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -16,10 +17,11 @@ router = APIRouter(prefix="/suscripciones", tags=["suscripciones"])
 @router.get("/check", response_model=SuscripcionCheckResponse)
 async def check_elegibilidad(
     clase_template_id: UUID = Query(...),
+    fecha_inicio: date = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_CLIENT)),
 ):
-    return await SuscripcionService(db).check_elegibilidad(current_user, clase_template_id)
+    return await SuscripcionService(db).check_elegibilidad(current_user, clase_template_id, fecha_inicio)
 
 
 @router.post("/", response_model=SuscripcionResponse, status_code=201)

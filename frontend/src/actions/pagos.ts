@@ -72,11 +72,12 @@ export async function crearPreferenciaMP(
 export async function crearPreferenciaSuscripcionMP(
     claseTemplateId: string,
     monto: number,
+    fechaInicio: string,
 ): Promise<PreferenciaResult> {
     try {
         const res = await serverApi("/pagos/mp/preferencia-suscripcion", {
             method: "POST",
-            params: { clase_template_id: claseTemplateId, monto: monto.toString() },
+            params: { clase_template_id: claseTemplateId, monto: monto.toString(), fecha_inicio: fechaInicio },
         });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));

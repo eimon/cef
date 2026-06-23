@@ -19,7 +19,6 @@ from models.asistencia import Asistencia
 from models.clase_template import ClaseTemplate
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
-from core.timezone import LOCAL_TZ
 from services.suscripcion_service import SuscripcionService
 
 _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
@@ -41,23 +40,6 @@ _DIA_OFFSET: dict[DiaSemana, int] = {
     DiaSemana.VIERNES: 5,
     DiaSemana.SABADO: 6,
 }
-
-_DIA_TO_WEEKDAY: dict[DiaSemana, int] = {
-    DiaSemana.LUNES: 0,
-    DiaSemana.MARTES: 1,
-    DiaSemana.MIERCOLES: 2,
-    DiaSemana.JUEVES: 3,
-    DiaSemana.VIERNES: 4,
-    DiaSemana.SABADO: 5,
-    DiaSemana.DOMINGO: 6,
-}
-
-
-def _proxima_fecha(dia_semana: DiaSemana) -> date:
-    hoy = datetime.now(LOCAL_TZ).date()
-    dias = ((_DIA_TO_WEEKDAY[dia_semana] - hoy.weekday()) % 7) or 7
-    return hoy + timedelta(days=dias)
-
 
 def _calcular_fecha_fin(fecha_inicio: date) -> date:
     month = fecha_inicio.month + 1
@@ -219,7 +201,7 @@ class ClaseTemplateService:
         subscription_dates_by_template: dict[uuid.UUID, list[date]] = {}
         subscription_dates: set[date] = set()
         for template in templates:
-            fecha_inicio = _proxima_fecha(template.dia_semana)
+            fecha_inicio = week_start + timedelta(days=_DIA_OFFSET[template.dia_semana])
             fecha_fin = _calcular_fecha_fin(fecha_inicio)
             fechas_suscripcion = _calcular_fechas_clases(fecha_inicio, fecha_fin)
             subscription_dates_by_template[template.id] = fechas_suscripcion
