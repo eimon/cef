@@ -48,3 +48,11 @@ async def procesar_renovaciones_cron(
     current_user: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
     return await SuscripcionService(db).procesar_renovaciones_cron()
+
+
+@router.post("/cron/notificar-vencimientos", status_code=200)
+async def notificar_vencimientos(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
+):
+    return await SuscripcionService(db).notificar_vencimientos_proximos()

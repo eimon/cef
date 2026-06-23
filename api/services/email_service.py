@@ -251,6 +251,40 @@ class EmailService:
                 logger.exception("Error enviando aviso masivo a %s", email)
         return enviados
 
+    async def send_aviso_vencimiento_suscripcion(
+        self,
+        to_email: str,
+        nombre: str | None,
+        clase_nombre: str,
+        fecha_vencimiento: str,
+    ) -> None:
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se envió aviso de vencimiento a %s", to_email)
+            return
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se envió aviso de vencimiento.")
+            return
+
+        greeting = f"Hola {escape(nombre)}," if nombre else "Hola,"
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": f"Tu suscripción a {escape(clase_nombre)} está por vencer — CEF",
+            "html": (
+                f"<p>{greeting}</p>"
+                f"<p>Tu suscripción a <strong>{escape(clase_nombre)}</strong> vence el <strong>{escape(fecha_vencimiento)}</strong>.</p>"
+                "<p>Para no perder tu lugar, renová antes de esa fecha.</p>"
+                "<p>Saludos,<br>El equipo de CEF</p>"
+            ),
+        }
+        try:
+            resend.Emails.send(params)
+        except Exception:
+            logger.exception("Error enviando aviso de vencimiento a %s", to_email)
+
     async def send_password_reset(self, to_email: str, token: str) -> None:
         verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/reset-password?token={token}"
 

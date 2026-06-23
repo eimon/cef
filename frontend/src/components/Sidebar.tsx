@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/context/SidebarContext";
-import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown, Building2, Layers, ReceiptText, QrCode, UserCheck, Megaphone, BarChart3 } from "lucide-react";
+import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserRound, DollarSign, ChevronDown, Building2, Layers, ReceiptText, QrCode, UserCheck, Megaphone, BarChart3, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
@@ -43,7 +43,8 @@ const navigation: NavItem[] = [
     { name: "Disciplinas",   href: "/disciplinas",    icon: Layers,     adminOnly: true, clientOnly: false, staffOnly: false },
     { name: "Precios",       href: "/precios",        icon: DollarSign, adminOnly: true, clientOnly: false, staffOnly: false },
     { name: "Aviso Masivo",  href: "/aviso-masivo",   icon: Megaphone,  adminOnly: true, clientOnly: false, staffOnly: false },
-    { name: "Reportes",      href: "/reportes",       icon: BarChart3,  adminOnly: true, clientOnly: false, staffOnly: false },
+    { name: "Reportes",       href: "/reportes",       icon: BarChart3,     adminOnly: true, clientOnly: false, staffOnly: false },
+    { name: "Simulaciones",   href: "/simulaciones",   icon: FlaskConical,  adminOnly: true, clientOnly: false, staffOnly: false },
 ];
 
 function getActiveGroup(pathname: string) {

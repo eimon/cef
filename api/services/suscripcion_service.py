@@ -14,6 +14,8 @@ from repositories.pago_repository import PagoRepository
 from repositories.suscripcion_repository import SuscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
 from repositories.configuracion_repository import ConfiguracionRepository
+from services.configuracion_service import ConfiguracionService
+from services.email_service import EmailService
 from schemas.suscripcion import (
     RenovacionIniciadaResponse,
     RenovacionSuscripcionPendienteResponse,
@@ -21,7 +23,7 @@ from schemas.suscripcion import (
     SuscripcionCheckResponse,
     SuscripcionResponse,
 )
-from services.suscripcion_state import get_subscription_state, renewal_window
+from services.suscripcion_state import get_subscription_state, renewal_window, RENOVABLE_AFTER_DAYS
 from services.waitlist_service import WaitlistService
 
 
@@ -67,19 +69,26 @@ def _calcular_fechas_clases(fecha_inicio: date, fecha_fin: date) -> list[date]:
     return fechas
 
 
-def _ventana_renovacion(suscripcion) -> tuple[date, date]:
-    return renewal_window(suscripcion.fecha_pago)
+def _ventana_renovacion(suscripcion, renewal_window_days: int) -> tuple[date, date]:
+    return renewal_window(suscripcion.fecha_pago, renewal_window_days)
 
 
 class SuscripcionService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = SuscripcionRepository(db)
+        self._renewal_window_days: int | None = None
+
+    async def _get_renewal_window_days(self) -> int:
+        if self._renewal_window_days is None:
+            self._renewal_window_days = await ConfiguracionService(self.db).get_plazo_pago_dias_value()
+        return self._renewal_window_days
 
     async def sync_suscripcion_state(self, suscripcion) -> None:
         today = datetime.now(LOCAL_TZ).date()
+        rwd = await self._get_renewal_window_days()
         current_state = get_subscription_state(suscripcion.estado)
-        next_estado = current_state.next_state(suscripcion.fecha_pago, today)
+        next_estado = current_state.next_state(suscripcion.fecha_pago, today, rwd)
 
         if next_estado != suscripcion.estado:
             await self.repo.mark_subscription_state(suscripcion, next_estado)
@@ -118,7 +127,8 @@ class SuscripcionService:
         if today <= suscripcion.fecha_fin:
             return None
 
-        disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion)
+        rwd = await self._get_renewal_window_days()
+        disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion, rwd)
         if not (disponible_desde <= today <= disponible_hasta):
             return None
 
@@ -271,6 +281,7 @@ class SuscripcionService:
             disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
             if not disciplina_obj:
                 raise BadRequestException("No hay precio configurado para esta disciplina")
+            rwd = await self._get_renewal_window_days()
             return (
                 suscripcion,
                 template,
@@ -279,10 +290,11 @@ class SuscripcionService:
                 fechas_clases,
                 Decimal(str(disciplina_obj.precio_suscripcion)),
                 hoy,
-                hoy + timedelta(days=10),
+                hoy + timedelta(days=rwd),
             )
 
-        disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion)
+        rwd = await self._get_renewal_window_days()
+        disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion, rwd)
         state = get_subscription_state(suscripcion.estado)
         if not state.can_renew():
             if suscripcion.estado == EstadoSuscripcion.VENCIDA:
@@ -326,6 +338,7 @@ class SuscripcionService:
             latest_by_template.setdefault(suscripcion.clase_template_id, suscripcion)
 
         hoy = datetime.now(LOCAL_TZ).date()
+        rwd = await self._get_renewal_window_days()
         pendientes = []
         for suscripcion in latest_by_template.values():
             if not suscripcion.clase_template:
@@ -335,7 +348,7 @@ class SuscripcionService:
             if await self.repo.has_paid_payment(suscripcion.id):
                 continue
 
-            disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion)
+            disponible_desde, disponible_hasta = _ventana_renovacion(suscripcion, rwd)
             if not (disponible_desde <= hoy <= disponible_hasta):
                 continue
 
@@ -392,7 +405,7 @@ class SuscripcionService:
                 fecha_inicio=suscripcion.fecha_inicio,
                 fecha_fin=suscripcion.fecha_fin,
                 renovacion_disponible_desde=hoy,
-                renovacion_disponible_hasta=hoy + timedelta(days=10),
+                renovacion_disponible_hasta=hoy + timedelta(days=rwd),
                 nueva_fecha_inicio=suscripcion.fecha_inicio,
                 nueva_fecha_fin=suscripcion.fecha_fin,
                 cantidad_clases=cantidad_clases,
@@ -526,6 +539,32 @@ class SuscripcionService:
                 errores += 1
 
         return {"procesadas": procesadas, "creadas": creadas, "errores": errores}
+
+    async def notificar_vencimientos_proximos(self) -> dict:
+        today = datetime.now(LOCAL_TZ).date()
+        config_service = ConfiguracionService(self.db)
+        rwd = await config_service.get_plazo_pago_dias_value()
+        dias_aviso = await config_service.get_dias_aviso_value()
+
+        # fecha_pago de las suscripciones cuyo vencimiento cae en `dias_aviso` días
+        target_fecha_pago = today - timedelta(days=RENOVABLE_AFTER_DAYS + rwd - dias_aviso)
+
+        rows = await self.repo.get_renovables_proximos_a_vencer(target_fecha_pago)
+        fecha_vencimiento = (today + timedelta(days=dias_aviso)).strftime("%d/%m/%Y")
+
+        email_service = EmailService()
+        enviados = 0
+        for suscripcion, usuario, template in rows:
+            nombre = f"{usuario.nombre or ''} {usuario.apellido or ''}".strip() or None
+            await email_service.send_aviso_vencimiento_suscripcion(
+                to_email=usuario.email,
+                nombre=nombre,
+                clase_nombre=template.nombre,
+                fecha_vencimiento=fecha_vencimiento,
+            )
+            enviados += 1
+
+        return {"enviados": enviados, "fecha_vencimiento": fecha_vencimiento}
 
     async def procesar_renovaciones_cron(self) -> dict:
         suscripciones = await self.repo.get_all_activas()
