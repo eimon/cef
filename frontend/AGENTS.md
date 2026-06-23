@@ -245,3 +245,19 @@ Muestra bienvenida con nombre del usuario y rol. Links a las secciones disponibl
 JWT_SECRET_KEY=      # mismo valor que SECRET_KEY del backend
 NEXT_PUBLIC_API_URL= # ej: http://localhost:8000
 ```
+
+## Reglas de Dominio — IMPORTANTE
+
+### Cupo disponible en la vista de clases
+
+El campo `cupo_disponible` que devuelve el backend en `ClaseSemanaResponse` ya viene calculado correctamente:
+- Si existe instancia para esa fecha: refleja `instancia.cupo` (slots reales restantes)
+- Si **no** existe instancia: refleja `capacidad_maxima − suscripciones_activas` del template
+
+**No recalcular el cupo en el frontend.** Mostrar siempre el valor que devuelve la API. Una clase sin instancia todavía puede estar llena si todas las suscripciones activas copan la capacidad.
+
+### Cancelación de clases
+
+- Solo clases próximas con `asistencia_id` pueden cancelarse (el usuario está inscripto)
+- El backend retorna `CancelacionResult` con `reintegro: "none" | "mp" | "cupon"` y `mensaje` listo para mostrar
+- Implementado en `MisClasesView.tsx` → `CancelDialog`

@@ -50,7 +50,6 @@ class MisClasesService:
         return result
 
     async def get_suscripciones(self, usuario_id: uuid.UUID) -> list[MiSuscripcionResponse]:
-        await SuscripcionService(self.db).sync_user_subscriptions(usuario_id)
         suscripciones = await self.repo.get_suscripciones(usuario_id)
         result = []
         for s in suscripciones:
@@ -60,6 +59,9 @@ class MisClasesService:
             )
             if not instancias:
                 continue
+            asistencia_ids = await self.repo.get_asistencia_ids_for_instancias(
+                usuario_id, [i.id for i in instancias]
+            )
             result.append(MiSuscripcionResponse(
                 id=s.id,
                 clase_template_id=t.id,
@@ -82,6 +84,7 @@ class MisClasesService:
                         instancia_id=i.id,
                         fecha=i.fecha,
                         cancelada=i.cancelada,
+                        asistencia_id=asistencia_ids.get(i.id),
                     )
                     for i in instancias
                 ],

@@ -30,6 +30,7 @@ class Suscripcion(Base):
     clase_template = relationship("ClaseTemplate", backref="suscripciones")
     pagos = relationship("Pago", back_populates="suscripcion")
     reservas = relationship("SuscripcionReserva", back_populates="suscripcion")
+    cupones = relationship("CuponDescuento", back_populates="suscripcion")
 
 
 class SuscripcionReserva(Base):

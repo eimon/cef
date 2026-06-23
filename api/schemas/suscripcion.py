@@ -8,6 +8,7 @@ from core.enums import EstadoSuscripcion
 class SuscripcionCreate(BaseModel):
     clase_template_id: UUID4
     monto: Decimal = Field(..., gt=0, decimal_places=2)
+    fecha_inicio: date
 
 
 class SuscripcionCheckResponse(BaseModel):
@@ -32,6 +33,14 @@ class SuscripcionResponse(BaseModel):
     activo: bool
 
 
+class RenovacionIniciadaResponse(BaseModel):
+    siguiente_suscripcion_id: UUID4
+    clase_nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    precio_total: float
+
+
 class RenovacionSuscripcionPendienteResponse(BaseModel):
     suscripcion_id: UUID4
     clase_template_id: UUID4
@@ -45,3 +54,10 @@ class RenovacionSuscripcionPendienteResponse(BaseModel):
     nueva_fecha_fin: date
     cantidad_clases: int
     precio_total: float
+
+
+class PreviewRenovacionResponse(BaseModel):
+    precio_base: float
+    descuento_porcentaje: float
+    precio_total: float
+    clases_canceladas: int

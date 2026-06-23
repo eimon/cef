@@ -15,6 +15,7 @@ interface UsersTableProps {
     emptyMessage?: string;
     onSuccess?: () => void;
     currentUserId?: string;
+    showRoleColumn?: boolean;
 }
 
 const roleBadgeClass: Record<string, string> = {
@@ -31,6 +32,12 @@ const roleLabels: Record<string, string> = {
 
 function displayValue(value: string | null | undefined): string {
     return value?.trim() ?? "";
+}
+
+function statusBadgeClass(isActive: boolean): string {
+    return isActive
+        ? "bg-cef-success/10 text-cef-success"
+        : "border border-cef-danger/20 bg-cef-danger/[0.08] text-cef-danger/80";
 }
 
 function UserCardMenu({
@@ -78,14 +85,21 @@ function UserCardMenu({
             {open && (
                 <div className="absolute right-0 top-8 z-30 w-40 glass-modal rounded-xl overflow-hidden py-1">
                     {item("Editar", onEdit, "text-cef-primary", editDisabled)}
-                    {item("Eliminar", onDelete, "text-cef-danger", isDeleting)}
+                    {item("Dar de baja", onDelete, "text-cef-danger", isDeleting)}
                 </div>
             )}
         </div>
     );
 }
 
-export default function UsersTable({ users, allowedRoles, emptyMessage, onSuccess, currentUserId }: UsersTableProps) {
+export default function UsersTable({
+    users,
+    allowedRoles,
+    emptyMessage,
+    onSuccess,
+    currentUserId,
+    showRoleColumn = true,
+}: UsersTableProps) {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const { showError, showSuccess } = useToast();
@@ -93,14 +107,14 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
     const { refresh } = useRouter();
 
     const handleDelete = async (user: User) => {
-        if (!await confirm(`¿Estás seguro de que deseas eliminar al usuario ${user.email}? Esta acción no se puede deshacer.`)) return;
+        if (!await confirm(`¿Estás seguro de que deseas dar de baja al usuario ${user.email}? El usuario quedará inactivo y se cancelarán sus clases pendientes.`)) return;
 
         setIsDeleting(user.id);
         const result = await deleteUser(user.id);
         setIsDeleting(null);
 
         if (result.error) { showError(result.error); return; }
-        showSuccess("Usuario eliminado correctamente");
+        showSuccess("Usuario dado de baja correctamente");
         onSuccess?.();
         refresh();
     };
@@ -115,23 +129,28 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
 
     return (
         <>
-            {/* ── Mobile: cards ── */}
+            {/* Mobile: cards */}
             <div className="flex flex-col gap-3 md:hidden">
                 {users.map((user) => (
-                    <div key={user.id} className="glass rounded-xl px-4 py-3.5">
+                    <div
+                        key={user.id}
+                        className={`glass rounded-xl px-4 py-3.5 ${user.activo
+                            ? ""
+                            : "border-cef-danger/20 bg-cef-danger/[0.035]"
+                            }`}
+                    >
                         {/* Row 1: name + badges + menu */}
                         <div className="flex items-start justify-between gap-2 mb-1.5">
                             <div className="flex items-center flex-wrap gap-1.5 min-w-0">
                                 <span className="text-sm font-semibold text-slate-700">
-                                    {[displayValue(user.nombre), displayValue(user.apellido)].filter(Boolean).join(" ") || "—"}
+                                    {[displayValue(user.nombre), displayValue(user.apellido)].filter(Boolean).join(" ") || "-"}
                                 </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
-                                    {roleLabels[user.role] ?? user.role}
-                                </span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${user.activo
-                                    ? "bg-cef-success/10 text-cef-success"
-                                    : "bg-slate-100 text-slate-400"
-                                    }`}>
+                                {showRoleColumn && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
+                                        {roleLabels[user.role] ?? user.role}
+                                    </span>
+                                )}
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusBadgeClass(user.activo)}`}>
                                     {user.activo ? "Activo" : "Inactivo"}
                                 </span>
                             </div>
@@ -165,7 +184,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                 ))}
             </div>
 
-            {/* ── Desktop: table ── */}
+            {/* Desktop: table */}
             <div className="hidden md:block glass rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-slate-100">
@@ -186,9 +205,11 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Teléfono
                                 </th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Rol
-                                </th>
+                                {showRoleColumn && (
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                        Rol
+                                    </th>
+                                )}
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Estado
                                 </th>
@@ -199,9 +220,15 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {users.map((user) => (
-                                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                                <tr
+                                    key={user.id}
+                                    className={`transition-colors ${user.activo
+                                        ? "hover:bg-slate-50"
+                                        : "bg-cef-danger/[0.035] hover:bg-cef-danger/[0.055]"
+                                        }`}
+                                >
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
-                                        {displayValue(user.nombre) || "—"}
+                                        {displayValue(user.nombre) || "-"}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {displayValue(user.apellido)}
@@ -213,18 +240,17 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                         {user.dni || "-"}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                                        {user.telefono || "—"}
+                                        {user.telefono || "-"}
                                     </td>
+                                    {showRoleColumn && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
+                                                {roleLabels[user.role] ?? user.role}
+                                            </span>
+                                        </td>
+                                    )}
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${roleBadgeClass[user.role] ?? "bg-slate-100 text-slate-500"}`}>
-                                            {roleLabels[user.role] ?? user.role}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.activo
-                                            ? "bg-cef-success/10 text-cef-success"
-                                            : "bg-slate-100 text-slate-400"
-                                            }`}>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(user.activo)}`}>
                                             {user.activo ? "Activo" : "Inactivo"}
                                         </span>
                                     </td>
@@ -243,7 +269,7 @@ export default function UsersTable({ users, allowedRoles, emptyMessage, onSucces
                                                     onClick={() => handleDelete(user)}
                                                     disabled={isDeleting === user.id}
                                                     className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
-                                                    title="Eliminar"
+                                                    title="Dar de baja"
                                                 >
                                                     <Trash2 size={15} />
                                                 </button>

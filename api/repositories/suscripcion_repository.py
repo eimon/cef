@@ -13,6 +13,7 @@ from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
 from models.suscripciones import Suscripcion, SuscripcionReserva
+from models.usuario import Usuario
 
 
 class SuscripcionRepository:
@@ -300,12 +301,20 @@ class SuscripcionRepository:
         await self.db.flush()
         return suscripcion
 
-    async def release_future_reservas(self, suscripcion: Suscripcion, from_date: date) -> None:
+    async def release_future_reservas(
+        self,
+        suscripcion: Suscripcion,
+        from_date: date,
+    ) -> list[tuple[uuid.UUID, date]]:
+        released_slots: set[tuple[uuid.UUID, date]] = set()
         reservas = await self.get_active_future_reservas(suscripcion.id, from_date)
         for reserva in reservas:
             reserva.activa = False
             if reserva.clase_instancia:
                 reserva.clase_instancia.cupo += 1
+                released_slots.add(
+                    (reserva.clase_instancia.clase_template_id, reserva.clase_instancia.fecha)
+                )
 
             asistencia = (await self.db.execute(
                 select(Asistencia).where(
@@ -316,8 +325,74 @@ class SuscripcionRepository:
                 )
             )).scalars().first()
             if asistencia:
-                asistencia.cancelo = True
+                if asistencia.asistio:
+                    # Keep attended classes — they represent an unpaid debt
+                    pass
+                else:
+                    await self.db.delete(asistencia)
         await self.db.flush()
+        return list(released_slots)
+
+    async def get_activas_con_clases_finalizadas(self, before_date: date) -> list[Suscripcion]:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(
+                Suscripcion.activo == True,
+                Suscripcion.fecha_fin < before_date,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def get_renovables_proximos_a_vencer(self, target_fecha_pago: date) -> list[tuple]:
+        """Returns (suscripcion, usuario, clase_template) for RENOVABLE subs without paid payment
+        whose expiry date is target_fecha_pago + RENOVABLE_AFTER_DAYS + plazo_pago_dias.
+        Caller computes target_fecha_pago = today - RENOVABLE_AFTER_DAYS - plazo_pago_dias + dias_aviso."""
+        paid_subquery = (
+            select(Pago.suscripcion_id)
+            .where(Pago.estado == EstadoPago.PAGADO, Pago.activo == True)
+            .scalar_subquery()
+        )
+        result = await self.db.execute(
+            select(Suscripcion, Usuario, ClaseTemplate)
+            .join(Usuario, Suscripcion.usuario_id == Usuario.id)
+            .join(ClaseTemplate, Suscripcion.clase_template_id == ClaseTemplate.id)
+            .where(
+                Suscripcion.estado == EstadoSuscripcion.RENOVABLE,
+                Suscripcion.activo == True,
+                Suscripcion.fecha_pago == target_fecha_pago,
+                Suscripcion.id.not_in(paid_subquery),
+            )
+        )
+        return list(result.all())
+
+    async def get_all_activas(self) -> list[Suscripcion]:
+        result = await self.db.execute(
+            select(Suscripcion)
+            .options(selectinload(Suscripcion.clase_template))
+            .where(Suscripcion.activo == True)
+        )
+        return list(result.scalars().all())
+
+    async def get_reserva_by_instancia_and_usuario(
+        self, instancia_id: uuid.UUID, usuario_id: uuid.UUID
+    ) -> SuscripcionReserva | None:
+        result = await self.db.execute(
+            select(SuscripcionReserva)
+            .join(Suscripcion, SuscripcionReserva.suscripcion_id == Suscripcion.id)
+            .where(
+                SuscripcionReserva.clase_instancia_id == instancia_id,
+                SuscripcionReserva.activa == True,
+                Suscripcion.usuario_id == usuario_id,
+            )
+        )
+        return result.scalars().first()
+
+    async def count_reservas_by_suscripcion(self, suscripcion_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count()).where(SuscripcionReserva.suscripcion_id == suscripcion_id)
+        )
+        return result.scalar() or 0
 
     async def create_suscripcion(
         self,
@@ -350,13 +425,14 @@ class SuscripcionRepository:
         suscripcion_id: uuid.UUID,
         monto: Decimal,
         mp_payment_id: str = "mock",
+        estado: EstadoPago = EstadoPago.PAGADO,
     ) -> Pago:
         pago = Pago(
             usuario_id=usuario_id,
             suscripcion_id=suscripcion_id,
             monto=monto,
             fecha_pago=datetime.now(timezone.utc),
-            estado=EstadoPago.PAGADO,
+            estado=estado,
             mp_payment_id=mp_payment_id,
             descripcion="Pago suscripción" if mp_payment_id != "mock" else "Pago suscripción mock",
             activo=True,

@@ -14,6 +14,7 @@ from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
 from models.pagos import Pago
 from models.usuario import Usuario
+from repositories.cupon_descuento_repository import CuponDescuentoRepository
 from repositories.pago_repository import PagoRepository
 from repositories.inscripcion_repository import InscripcionRepository
 from repositories.disciplina_repository import DisciplinaRepository
@@ -23,6 +24,7 @@ from schemas.pago import DeudaPendienteResponse, MiPagoResponse
 from schemas.suscripcion import SuscripcionCreate
 from services.inscripcion_service import InscripcionService
 from services.suscripcion_service import SuscripcionService
+from services.waitlist_service import WaitlistService
 
 
 async def _get_porcentaje_sena(db) -> float:
@@ -77,6 +79,7 @@ class PagoService:
                 tipo=tipo,
                 clase_nombre=clase_template.nombre if clase_template else None,
                 disciplina=clase_template.disciplina if clase_template else None,
+                suscripcion_id=pago.suscripcion_id if pago.suscripcion else None,
             ))
 
         return historial
@@ -185,6 +188,7 @@ class PagoService:
 
         rows = (await self.db.execute(stmt)).all()
         released_any = False
+        released_slots: set[tuple[UUID, date]] = set()
         for asistencia, instancia, template, monto_pagado_raw, precio_total_raw in rows:
             monto_pagado = Decimal(str(monto_pagado_raw or 0))
             precio_total = Decimal(str(precio_total_raw or 0))
@@ -197,9 +201,13 @@ class PagoService:
 
             self._release_partial_debt_reservation(asistencia, instancia)
             released_any = True
+            released_slots.add((instancia.clase_template_id, instancia.fecha))
 
         if released_any:
             await self.db.flush()
+            waitlist_service = WaitlistService(self.db)
+            for clase_template_id, fecha in released_slots:
+                await waitlist_service.trigger_promotion_for_slot(clase_template_id, fecha)
 
     def _release_partial_debt_reservation(self, asistencia: Asistencia, instancia) -> None:
         asistencia.cancelo = True
@@ -510,6 +518,10 @@ class PagoService:
         if not _deuda_saldable(instancia.fecha, template.hora_inicio):
             self._release_partial_debt_reservation(asistencia, instancia)
             await self.db.flush()
+            await WaitlistService(self.db).trigger_promotion_for_slot(
+                instancia.clase_template_id,
+                instancia.fecha,
+            )
             raise BadRequestException("Ya no puedes completar el pago faltando menos de 24hs")
 
         pago = Pago(
@@ -527,13 +539,120 @@ class PagoService:
 
         return {"status": "approved", "pago_id": str(pago.id)}
 
+    async def crear_preferencia_waitlist_mp(
+        self,
+        current_user: Usuario,
+        waitlist_id: UUID,
+    ) -> dict:
+        waitlist_service = WaitlistService(self.db)
+        entry, template = await waitlist_service.get_entry_for_payment(current_user, waitlist_id)
+
+        precio_disc = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not precio_disc:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+
+        monto = float(precio_disc.precio_individual)
+        dia = template.dia_semana.value.capitalize()
+        hora = template.hora_inicio.strftime("%H:%M")
+        pref_data = self._make_preference(
+            title=f"Cupo liberado — {template.nombre} {dia} {hora}",
+            monto=monto,
+            back_url_suffix="?tipo=waitlist",
+            metadata={
+                "waitlist_id": str(entry.id),
+                "usuario_id": str(current_user.id),
+                "tipo": "waitlist",
+            },
+            external_reference=f"waitlist|{entry.id}|{current_user.id}",
+        )
+
+        response = self.sdk.preference().create(pref_data)
+        if response["status"] not in (200, 201):
+            raise BadRequestException("Error al conectar con MercadoPago")
+
+        pref = response["response"]
+        return {
+            "init_point": self._init_point_from_response(pref),
+            "preference_id": pref["id"],
+            "monto": monto,
+        }
+
+    async def confirmar_waitlist_mp(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+    ) -> dict:
+        payment_response = self.sdk.payment().get(payment_id)
+        if payment_response["status"] != 200:
+            raise NotFoundException("Pago no encontrado en MercadoPago")
+
+        payment = payment_response["response"]
+        if payment.get("status") == "pending":
+            return {"status": "pending"}
+
+        if payment.get("status") != "approved":
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Pago waitlist no completado",
+            )
+            return {"status": payment.get("status")}
+
+        existing = await self.db.execute(
+            select(Pago).where(Pago.mp_payment_id == str(payment_id))
+        )
+        if existing.scalars().first():
+            return {"status": "approved", "already_processed": True}
+
+        metadata = payment.get("metadata", {})
+        external_ref = payment.get("external_reference", "")
+        try:
+            if metadata.get("waitlist_id"):
+                waitlist_id = UUID(str(metadata["waitlist_id"]))
+                usuario_id = str(metadata["usuario_id"])
+            else:
+                parts = external_ref.split("|")
+                waitlist_id = UUID(parts[1])
+                usuario_id = parts[2]
+        except (KeyError, ValueError, IndexError):
+            raise BadRequestException("Metadatos del pago inválidos")
+
+        if str(current_user.id) != usuario_id:
+            raise BadRequestException("Este pago no corresponde a tu usuario")
+
+        waitlist_service = WaitlistService(self.db)
+        entry, _template = await waitlist_service.get_entry_for_payment(current_user, waitlist_id)
+
+        monto = Decimal(str(payment["transaction_amount"]))
+        data = InscripcionIndividualCreate(
+            clase_template_id=entry.clase_template_id,
+            fecha=entry.fecha,
+            monto=monto,
+        )
+
+        result = await InscripcionService(self.db).inscribir_individual(
+            current_user,
+            data,
+            mp_payment_id=str(payment_id),
+        )
+
+        confirmed_entry = await waitlist_service.mark_confirmed_paid(waitlist_id)
+        await waitlist_service.trigger_promotion_for_slot(
+            confirmed_entry.clase_template_id,
+            confirmed_entry.fecha,
+        )
+
+        return {"status": "approved", **result.model_dump()}
+
     async def crear_preferencia_suscripcion_mp(
         self,
         current_user: Usuario,
         clase_template_id: UUID,
         monto: float,
+        fecha_inicio: date,
     ) -> dict:
-        await SuscripcionService(self.db).check_elegibilidad(current_user, clase_template_id)
+        await SuscripcionService(self.db).check_elegibilidad(current_user, clase_template_id, fecha_inicio)
 
         repo = InscripcionRepository(self.db)
         template = await repo.get_template(clase_template_id)
@@ -553,8 +672,8 @@ class PagoService:
             title=f"Suscripción — {template.nombre} {dia}",
             monto=round(monto, 2),
             back_url_suffix="?tipo=suscripcion",
-            metadata={"clase_template_id": str(clase_template_id), "usuario_id": str(current_user.id), "tipo": "suscripcion"},
-            external_reference=f"suscripcion|{clase_template_id}|{current_user.id}",
+            metadata={"clase_template_id": str(clase_template_id), "usuario_id": str(current_user.id), "tipo": "suscripcion", "fecha_inicio": fecha_inicio.isoformat()},
+            external_reference=f"suscripcion|{clase_template_id}|{current_user.id}|{fecha_inicio.isoformat()}",
         )
 
         response = self.sdk.preference().create(pref_data)
@@ -565,6 +684,37 @@ class PagoService:
         return {
             "init_point": self._init_point_from_response(pref),
             "preference_id": pref["id"],
+        }
+
+    async def preview_renovacion_suscripcion(
+        self,
+        current_user: Usuario,
+        suscripcion_id: UUID,
+    ) -> dict:
+        (
+            _suscripcion,
+            template,
+            _fecha_inicio,
+            _fecha_fin,
+            _fechas_clases,
+            precio,
+            _disponible_desde,
+            _disponible_hasta,
+        ) = await SuscripcionService(self.db)._validar_renovacion(current_user, suscripcion_id)
+
+        cupones = await CuponDescuentoRepository(self.db).list_unused_for_renewal(
+            current_user.id, template.id
+        )
+        descuento_total = sum(float(c.descuento_porcentaje) for c in cupones)
+        precio_base = float(precio)
+        precio_total = round(precio_base * (1 - descuento_total / 100), 2)
+        precio_total = max(precio_total, 0.01)
+
+        return {
+            "precio_base": precio_base,
+            "descuento_porcentaje": descuento_total,
+            "precio_total": precio_total,
+            "clases_canceladas": len(cupones),
         }
 
     async def crear_preferencia_renovacion_suscripcion_mp(
@@ -583,10 +733,17 @@ class PagoService:
             _disponible_hasta,
         ) = await SuscripcionService(self.db)._validar_renovacion(current_user, suscripcion_id)
 
+        cupones = await CuponDescuentoRepository(self.db).list_unused_for_renewal(
+            current_user.id, template.id
+        )
+        descuento_total = sum(float(c.descuento_porcentaje) for c in cupones)
+        precio_final = round(float(precio) * (1 - descuento_total / 100), 2)
+        precio_final = max(precio_final, 0.01)
+
         dia = template.dia_semana.value.capitalize()
         pref_data = self._make_preference(
             title=f"Renovación suscripción — {template.nombre} {dia}",
-            monto=round(float(precio), 2),
+            monto=precio_final,
             back_url_suffix="?tipo=renovacion-suscripcion",
             metadata={
                 "suscripcion_id": str(suscripcion_id),
@@ -640,10 +797,12 @@ class PagoService:
             if metadata.get("clase_template_id"):
                 clase_template_id = UUID(str(metadata["clase_template_id"]))
                 usuario_id = str(metadata["usuario_id"])
+                fecha_inicio = date.fromisoformat(str(metadata["fecha_inicio"]))
             else:
                 parts = external_ref.split("|")
                 clase_template_id = UUID(parts[1])
                 usuario_id = parts[2]
+                fecha_inicio = date.fromisoformat(parts[3])
         except (KeyError, ValueError, IndexError):
             raise BadRequestException("Metadatos del pago inválidos")
 
@@ -651,7 +810,7 @@ class PagoService:
             raise BadRequestException("Este pago no corresponde a tu usuario")
 
         monto = Decimal(str(payment["transaction_amount"]))
-        data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto)
+        data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto, fecha_inicio=fecha_inicio)
         result = await SuscripcionService(self.db).suscribirse(
             current_user, data, mp_payment_id=str(payment_id)
         )

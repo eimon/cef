@@ -17,6 +17,49 @@ export interface User {
     activo: boolean;
     created_at: string;
 }
+
+export interface UserRegistrationsPoint {
+    period: string;
+    total_count: number;
+}
+
+export interface UserRegistrationsReport {
+    points: UserRegistrationsPoint[];
+}
+
+export interface ActiveUsersByActivityPoint {
+    activity: string;
+    total_count: number;
+}
+
+export interface ActiveUsersByActivityReport {
+    points: ActiveUsersByActivityPoint[];
+}
+
+export interface BillingReport {
+    total_revenue: number;
+    message: string | null;
+}
+
+export interface ReportClassOption {
+    id: string;
+    nombre: string;
+    disciplina: string;
+    dia_semana: string;
+    hora_inicio: string;
+    hora_fin: string;
+}
+
+export interface ClassCancellationsPoint {
+    class_date: string;
+    total_count: number;
+}
+
+export interface ClassCancellationsReport {
+    clase: ReportClassOption;
+    points: ClassCancellationsPoint[];
+}
+
 export interface Profesor {
     id: string;
     dni: string;
@@ -155,6 +198,35 @@ export interface InscripcionResponse {
     clase_instancia_id: string;
 }
 
+export enum EstadoWaitlist {
+    EN_ESPERA = "en_espera",
+    NOTIFICADO = "notificado",
+    CONFIRMADO_PAGADO = "confirmado_pagado",
+    EXPIRADO = "expirado",
+    CANCELADO = "cancelado",
+}
+
+export interface WaitlistJoinResponse {
+    waitlist_id: string;
+    posicion: number;
+    estado: EstadoWaitlist;
+    clase_template_id: string;
+    fecha: string;
+}
+
+export interface WaitlistEntry {
+    id: string;
+    clase_template_id: string;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    fecha: string;
+    posicion: number;
+    estado: EstadoWaitlist;
+    notificado_at: string | null;
+    expira_at: string | null;
+    created_at: string;
+}
+
 export enum EstadoPago {
     PENDIENTE = "pendiente",
     PAGADO = "pagado",
@@ -171,6 +243,7 @@ export interface MiPago {
     tipo: string;
     clase_nombre: string | null;
     disciplina: Disciplina | null;
+    suscripcion_id: string | null;
 }
 
 export interface RenovacionSuscripcionPendiente {
@@ -186,6 +259,13 @@ export interface RenovacionSuscripcionPendiente {
     nueva_fecha_fin: string;
     cantidad_clases: number;
     precio_total: number;
+}
+
+export interface PreviewRenovacion {
+    precio_base: number;
+    descuento_porcentaje: number;
+    precio_total: number;
+    clases_canceladas: number;
 }
 
 export interface DeudaPendiente {
@@ -220,6 +300,23 @@ export interface InstanciaEnSuscripcion {
     instancia_id: string;
     fecha: string;
     cancelada: boolean;
+    asistencia_id: string | null;
+}
+
+export interface RenovacionIniciada {
+    siguiente_suscripcion_id: string;
+    clase_nombre: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    precio_total: number;
+}
+
+export interface CancelacionResult {
+    reintegro: "none" | "mp" | "cupon";
+    mensaje: string;
+    monto_reintegrado?: number;
+    descuento_porcentaje?: number;
+    refund_error: boolean;
 }
 
 export interface MiSuscripcion {
@@ -320,6 +417,8 @@ export interface ClaseSemana {
     fecha_en_semana: string;
     cupo_disponible: number;
     cupo_suscripcion_disponible: boolean;
+    waitlist_disponible: boolean;
+    waitlist_total: number;
     instancia: InstanciaSemana | null;
     inscrito: boolean;
     suscrito: boolean;

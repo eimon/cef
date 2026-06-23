@@ -46,5 +46,11 @@ class EstadoLicencia(str, enum.Enum):
     PENDIENTE = "pendiente"
     APROBADA = "aprobada"
     RECHAZADA = "rechazada"
+class EstadoWaitlist(str, enum.Enum):
+    EN_ESPERA = "en_espera"
+    NOTIFICADO = "notificado"
+    CONFIRMADO_PAGADO = "confirmado_pagado"
+    EXPIRADO = "expirado"
+    CANCELADO = "cancelado"
 
 

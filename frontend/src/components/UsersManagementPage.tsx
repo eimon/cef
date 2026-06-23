@@ -16,6 +16,7 @@ interface UsersManagementPageProps {
     showDniFilter?: boolean;
     showAddButton?: boolean;
     currentUserId?: string;
+    showRoleColumn?: boolean;
 }
 
 export default function UsersManagementPage({
@@ -28,6 +29,7 @@ export default function UsersManagementPage({
     showDniFilter = true,
     showAddButton = true,
     currentUserId,
+    showRoleColumn = true,
 }: UsersManagementPageProps) {
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -160,6 +162,7 @@ export default function UsersManagementPage({
                     emptyMessage={hasActiveFilter ? filteredEmptyMessage : emptyMessage}
                     onSuccess={() => refresh(filters)}
                     currentUserId={currentUserId}
+                    showRoleColumn={showRoleColumn}
                 />
             )}
         </div>

@@ -251,6 +251,11 @@ export default function ClasesGrid({ clases, userRole, senaMinima }: { clases: C
                                                         Cancelada
                                                     </span>
                                                 )}
+                                                {!clase.instancia?.cancelada && clase.cupo_disponible <= 0 && clase.waitlist_disponible && (
+                                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-cef-warning bg-cef-warning/10 px-1.5 py-0.5 rounded-full">
+                                                        En espera{clase.waitlist_total > 0 ? ` · ${clase.waitlist_total}` : ""}
+                                                    </span>
+                                                )}
                                             </div>
                                         </button>
 

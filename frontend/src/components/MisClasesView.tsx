@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, CalendarDays, X, Info, CreditCard } from "lucide-react";
-import { MiClaseIndividual, MiSuscripcion, Disciplina } from "@/types/api";
+import { useState, useTransition } from "react";
+import { Clock, CalendarDays, X, Info, CreditCard, Ban } from "lucide-react";
+import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
+import { cancelarClase } from "@/actions/mis_clases";
+import { cancelarWaitlist } from "@/actions/inscripciones";
+import { crearPreferenciaWaitlistMP } from "@/actions/pagos";
 
 // ─── Unified item ─────────────────────────────────────────────────────────────
 
@@ -49,7 +52,7 @@ function buildItems(
         })),
         ...suscripciones.flatMap(s =>
             s.instancias.map((inst): MisClasesItem => ({
-                key: inst.instancia_id,
+                key: inst.asistencia_id ?? inst.instancia_id,
                 tipo: "suscripcion",
                 clase_nombre: s.clase_nombre,
                 disciplina: s.disciplina,
@@ -59,6 +62,7 @@ function buildItems(
                 profesor_nombre: s.profesor_nombre,
                 cancelada: inst.cancelada,
                 deuda_vencida: false,
+                asistencia_id: inst.asistencia_id ?? undefined,
             }))
         ),
     ];
@@ -110,6 +114,127 @@ function getBlockedDebtMessage(item: MisClasesItem): string {
         return "La clase ya paso. La deuda no se puede completar desde la app.";
     }
     return "Ya no se puede completar el pago desde la app porque faltan menos de 24 horas para la clase.";
+}
+
+function CancelDialog({
+    item,
+    onClose,
+}: {
+    item: MisClasesItem;
+    onClose: () => void;
+}) {
+    const [isPending, startTransition] = useTransition();
+    const [result, setResult] = useState<CancelacionResult | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const hoursLeft = (getClassStart(item.fecha, item.hora_inicio).getTime() - Date.now()) / 3_600_000;
+    const hasRefund = hoursLeft >= 24;
+
+    function handleConfirm() {
+        if (!item.asistencia_id) return;
+        startTransition(async () => {
+            const res = await cancelarClase(item.asistencia_id!);
+            if (res.error) setError(res.error);
+            else setResult(res.data!);
+        });
+    }
+
+    const refundHint =
+        !hasRefund
+            ? "Como faltan menos de 24 horas, no se realizará ningún reintegro."
+            : item.tipo === "individual"
+            ? "Se reintegrará el importe abonado a tu cuenta de MercadoPago."
+            : "Si aplica, se generará un cupón de descuento para tu próxima renovación.";
+
+    if (result) {
+        return (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+                <div className="glass-modal w-full max-w-md rounded-2xl p-5 shadow-2xl">
+                    <div className="flex items-start gap-3">
+                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border ${
+                            result.refund_error
+                                ? "border-cef-warning/20 bg-cef-warning/10 text-cef-warning"
+                                : "border-cef-success/20 bg-cef-success/10 text-cef-success"
+                        }`}>
+                            <Info size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Clase cancelada</h3>
+                            <p className="mt-1 text-sm text-slate-600">{result.mensaje}</p>
+                        </div>
+                    </div>
+                    <div className="mt-5 flex justify-end">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-lg bg-cef-primary px-4 py-2 text-sm font-semibold text-white hover:bg-cef-primary/90"
+                        >
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+            <div className="glass-modal w-full max-w-md rounded-2xl p-5 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-cef-danger/20 bg-cef-danger/10 text-cef-danger">
+                            <Ban size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Cancelar clase</h3>
+                            <p className="mt-1 text-sm text-slate-500">{item.clase_nombre}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                    <div className={`rounded-xl border p-3 text-sm ${
+                        hasRefund
+                            ? "border-cef-success/20 bg-cef-success/10 text-slate-700"
+                            : "border-cef-warning/20 bg-cef-warning/10 text-slate-700"
+                    }`}>
+                        {refundHint}
+                    </div>
+                    {error && (
+                        <p className="text-sm text-cef-danger">{error}</p>
+                    )}
+                </div>
+
+                <div className="mt-5 flex justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                    >
+                        Volver
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={isPending}
+                        className="rounded-lg bg-cef-danger px-4 py-2 text-sm font-semibold text-white hover:bg-cef-danger/90 disabled:opacity-60"
+                    >
+                        {isPending ? "Cancelando..." : "Confirmar cancelación"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 }
 
 function DebtDialog({
@@ -201,6 +326,7 @@ function DebtDialog({
 
 function MiClaseRow({ item }: { item: MisClasesItem }) {
     const [debtOpen, setDebtOpen] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
 
     const upcoming = isUpcoming(item.fecha, item.hora_inicio);
     const montoRestante =
@@ -273,6 +399,19 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                         Ver deuda
                     </button>
                 )}
+
+                {/* Cancelar */}
+                {upcoming && !item.cancelada && item.asistencia_id && (
+                    <button
+                        type="button"
+                        onClick={() => setCancelOpen(true)}
+                        className="mt-3 flex w-full flex-shrink-0 items-center justify-center gap-1 rounded-lg border border-cef-danger/20 bg-cef-danger/10 px-2.5 py-2 text-[11px] font-semibold text-cef-danger transition-colors hover:bg-cef-danger/20 sm:mt-0 sm:w-auto sm:py-1"
+                    >
+                        <Ban size={11} />
+                        Cancelar
+                    </button>
+                )}
+
             </div>
         </div>
 
@@ -281,6 +420,12 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                 item={item}
                 montoRestante={montoRestante}
                 onClose={() => setDebtOpen(false)}
+            />
+        )}
+        {cancelOpen && (
+            <CancelDialog
+                item={item}
+                onClose={() => setCancelOpen(false)}
             />
         )}
         </>
@@ -324,9 +469,11 @@ type TipoFiltro = "todas" | "individual" | "suscripcion";
 export default function MisClasesView({
     individuales,
     suscripciones,
+    waitlistEntries,
 }: {
     individuales: MiClaseIndividual[];
     suscripciones: MiSuscripcion[];
+    waitlistEntries: WaitlistEntry[];
 }) {
     const [tiempoTab, setTiempoTab] = useState<TiempoTab>("proximas");
     const [tipoFiltro, setTipoFiltro] = useState<TipoFiltro>("todas");
@@ -343,8 +490,20 @@ export default function MisClasesView({
 
     const sorted = [...filtered].sort((a, b) => {
         const cmp = a.fecha.localeCompare(b.fecha) || a.hora_inicio.localeCompare(b.hora_inicio);
-        return tiempoTab === "proximas" ? cmp : -cmp;
+        return cmp;
     });
+
+    async function handleCancelarEspera(waitlistId: string) {
+        await cancelarWaitlist(waitlistId);
+        window.location.reload();
+    }
+
+    async function handleConfirmarEspera(waitlistId: string) {
+        const result = await crearPreferenciaWaitlistMP(waitlistId);
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
+    }
 
     // Group by date
     const grouped = new Map<string, MisClasesItem[]>();
@@ -356,6 +515,45 @@ export default function MisClasesView({
 
     return (
         <div className="space-y-6">
+            {waitlistEntries.length > 0 && (
+                <div className="glass rounded-2xl p-4">
+                    <h2 className="text-sm font-bold text-slate-800">Mis Esperas ({waitlistEntries.length})</h2>
+                    <div className="mt-3 space-y-2">
+                        {waitlistEntries.map((entry) => (
+                            <div key={entry.id} className="rounded-xl border border-slate-200 bg-white/60 p-3">
+                                <p className="text-sm font-semibold text-slate-800">{entry.clase_nombre}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {entry.fecha} · Posición #{entry.posicion}
+                                </p>
+                                <p className={`text-xs mt-1 ${entry.estado === EstadoWaitlist.NOTIFICADO ? "text-cef-warning" : "text-slate-500"}`}>
+                                    {entry.estado === EstadoWaitlist.NOTIFICADO
+                                        ? "¡Se liberó un cupo! Confirmá y pagá dentro de la ventana disponible."
+                                        : "En espera"}
+                                </p>
+                                <div className="mt-2 flex gap-2">
+                                    {entry.estado === EstadoWaitlist.NOTIFICADO && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleConfirmarEspera(entry.id)}
+                                            className="rounded-lg bg-cef-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-cef-primary/90"
+                                        >
+                                            Confirmar y pagar
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCancelarEspera(entry.id)}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                    >
+                                        Cancelar espera
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3">
                 <PillTabs

@@ -1,10 +1,12 @@
 import { getMisClasesIndividuales, getMisSuscripciones } from "@/actions/mis_clases";
+import { getMisWaitlist } from "@/actions/inscripciones";
 import MisClasesView from "@/components/MisClasesView";
 
 export default async function MisClasesPage() {
-    const [individuales, suscripciones] = await Promise.all([
+    const [individuales, suscripciones, waitlistEntries] = await Promise.all([
         getMisClasesIndividuales(),
         getMisSuscripciones(),
+        getMisWaitlist(),
     ]);
 
     return (
@@ -14,7 +16,11 @@ export default async function MisClasesPage() {
                 <p className="text-sm text-slate-400 mt-1">Tus inscripciones individuales y suscripciones.</p>
             </div>
 
-            <MisClasesView individuales={individuales} suscripciones={suscripciones} />
+            <MisClasesView
+                individuales={individuales}
+                suscripciones={suscripciones}
+                waitlistEntries={waitlistEntries}
+            />
         </div>
     );
 }

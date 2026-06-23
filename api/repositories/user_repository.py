@@ -1,14 +1,17 @@
 import unicodedata
 import uuid
+from datetime import date, time
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models.usuario import Usuario
 from models.asistencia import Asistencia
-from models.suscripciones import Suscripcion
+from models.clase_instancia import ClaseInstancia
+from models.clase_template import ClaseTemplate
+from models.suscripciones import Suscripcion, SuscripcionReserva
 from schemas.usuario import UsuarioCreate, UsuarioUpdate, PublicSignupRequest
-from core.enums import UserRole
+from core.enums import TipoInscripcion, UserRole
 from core.security import get_password_hash
 
 
@@ -43,6 +46,15 @@ class UserRepository:
         result = await self.db.execute(select(Usuario).where(Usuario.dni == dni))
         return result.scalars().first()
 
+    async def get_all_clientes(self) -> list[Usuario]:
+        result = await self.db.execute(
+            select(Usuario).where(
+                Usuario.activo == True,
+                Usuario.role == UserRole.CLIENTE,
+            )
+        )
+        return list(result.scalars().all())
+
     async def get_all(
         self,
         skip: int = 0,
@@ -51,7 +63,7 @@ class UserRepository:
         nombre: str | None = None,
         apellido: str | None = None,
     ) -> list[Usuario]:
-        query = select(Usuario).where(Usuario.activo == True)
+        query = select(Usuario)
 
         dni = dni.strip() if dni else None
         nombre = _normalize_text_search(nombre)
@@ -63,6 +75,8 @@ class UserRepository:
             query = query.where(func.unaccent(Usuario.nombre).ilike(f"%{nombre}%"))
         if apellido:
             query = query.where(func.unaccent(Usuario.apellido).ilike(f"%{apellido}%"))
+
+        query = query.order_by(Usuario.activo.desc(), Usuario.created_at.desc())
 
         result = await self.db.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
@@ -84,8 +98,98 @@ class UserRepository:
         usuario = await self.get_by_id(usuario_id)
         if not usuario:
             return None
-        await self.db.delete(usuario)
+        usuario.activo = False
+        await self.db.flush()
+        await self.db.refresh(usuario)
         return usuario
+
+    async def cancel_pending_class_reservations(
+        self,
+        usuario_id: uuid.UUID,
+        current_date: date,
+        current_time: time,
+    ) -> list[tuple[uuid.UUID, date]]:
+        released_slots: set[tuple[uuid.UUID, date]] = set()
+        pending_class = or_(
+            ClaseInstancia.fecha > current_date,
+            and_(
+                ClaseInstancia.fecha == current_date,
+                ClaseTemplate.hora_inicio > current_time,
+            ),
+        )
+
+        reservation_rows = (
+            await self.db.execute(
+                select(SuscripcionReserva, ClaseInstancia)
+                .join(Suscripcion, SuscripcionReserva.suscripcion_id == Suscripcion.id)
+                .join(ClaseInstancia, SuscripcionReserva.clase_instancia_id == ClaseInstancia.id)
+                .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+                .where(
+                    Suscripcion.usuario_id == usuario_id,
+                    SuscripcionReserva.activa == True,
+                    ClaseInstancia.activo == True,
+                    ClaseInstancia.cancelada == False,
+                    pending_class,
+                )
+            )
+        ).all()
+
+        reservation_instance_ids = [reserva.clase_instancia_id for reserva, _ in reservation_rows]
+        for reserva, instancia in reservation_rows:
+            reserva.activa = False
+            instancia.cupo += 1
+            released_slots.add((instancia.clase_template_id, instancia.fecha))
+
+        if reservation_instance_ids:
+            subscription_assistances = (
+                await self.db.execute(
+                    select(Asistencia).where(
+                        Asistencia.usuario_id == usuario_id,
+                        Asistencia.clase_instancia_id.in_(reservation_instance_ids),
+                        Asistencia.tipo == TipoInscripcion.SUSCRIPCION,
+                        Asistencia.asistio == False,
+                        Asistencia.cancelo == False,
+                    )
+                )
+            ).scalars().all()
+            for asistencia in subscription_assistances:
+                asistencia.cancelo = True
+
+        individual_rows = (
+            await self.db.execute(
+                select(Asistencia, ClaseInstancia)
+                .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+                .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+                .where(
+                    Asistencia.usuario_id == usuario_id,
+                    Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                    Asistencia.asistio == False,
+                    Asistencia.cancelo == False,
+                    ClaseInstancia.activo == True,
+                    ClaseInstancia.cancelada == False,
+                    pending_class,
+                )
+            )
+        ).all()
+
+        for asistencia, instancia in individual_rows:
+            asistencia.cancelo = True
+            instancia.cupo += 1
+            released_slots.add((instancia.clase_template_id, instancia.fecha))
+
+        active_subscriptions = (
+            await self.db.execute(
+                select(Suscripcion).where(
+                    Suscripcion.usuario_id == usuario_id,
+                    Suscripcion.activo == True,
+                )
+            )
+        ).scalars().all()
+        for suscripcion in active_subscriptions:
+            suscripcion.activo = False
+
+        await self.db.flush()
+        return list(released_slots)
 
     async def has_active_enrollment(self, usuario_id: uuid.UUID) -> bool:
         result = await self.db.execute(

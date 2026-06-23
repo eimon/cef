@@ -90,6 +90,22 @@ class MisClasesRepository:
         )
         return list(result.scalars().all())
 
+    async def get_asistencia_ids_for_instancias(
+        self, usuario_id: uuid.UUID, instancia_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        if not instancia_ids:
+            return {}
+        result = await self.db.execute(
+            select(Asistencia.clase_instancia_id, Asistencia.id)
+            .where(
+                Asistencia.usuario_id == usuario_id,
+                Asistencia.clase_instancia_id.in_(instancia_ids),
+                Asistencia.tipo == TipoInscripcion.SUSCRIPCION,
+                Asistencia.cancelo == False,
+            )
+        )
+        return {row[0]: row[1] for row in result.all()}
+
     async def get_instancias_de_suscripcion(
         self, suscripcion_id: uuid.UUID, clase_template_id: uuid.UUID, fecha_inicio, fecha_fin
     ) -> list[ClaseInstancia]:

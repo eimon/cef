@@ -1,7 +1,7 @@
 "use server";
 
 import { serverApi } from "@/lib/server-api";
-import { DeudaPendiente, MiPago, RenovacionSuscripcionPendiente } from "@/types/api";
+import { DeudaPendiente, MiPago, PreviewRenovacion, RenovacionSuscripcionPendiente } from "@/types/api";
 
 export type PreferenciaResult = {
     init_point?: string;
@@ -69,18 +69,52 @@ export async function crearPreferenciaMP(
     }
 }
 
+export async function crearPreferenciaWaitlistMP(waitlistId: string): Promise<PreferenciaResult> {
+    try {
+        const res = await serverApi("/pagos/mp/preferencia-waitlist", {
+            method: "POST",
+            params: { waitlist_id: waitlistId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al iniciar el pago del cupo liberado" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
 export async function crearPreferenciaSuscripcionMP(
     claseTemplateId: string,
     monto: number,
+    fechaInicio: string,
 ): Promise<PreferenciaResult> {
     try {
         const res = await serverApi("/pagos/mp/preferencia-suscripcion", {
             method: "POST",
-            params: { clase_template_id: claseTemplateId, monto: monto.toString() },
+            params: { clase_template_id: claseTemplateId, monto: monto.toString(), fecha_inicio: fechaInicio },
         });
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             return { error: error.detail || "Error al iniciar el pago de suscripción" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function previewRenovacionSuscripcion(
+    suscripcionId: string,
+): Promise<PreviewRenovacion | { error: string }> {
+    try {
+        const res = await serverApi("/pagos/preview-renovacion-suscripcion", {
+            params: { suscripcion_id: suscripcionId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al obtener el precio" };
         }
         return res.json();
     } catch {
@@ -179,6 +213,22 @@ export async function confirmarPagoMP(paymentId: string): Promise<ConfirmarPagoR
         if (!res.ok) {
             const error = await res.json().catch(() => ({}));
             return { error: error.detail || "Error al confirmar el pago" };
+        }
+        return res.json();
+    } catch {
+        return { error: "Error al conectar con el servidor" };
+    }
+}
+
+export async function confirmarWaitlistMP(paymentId: string): Promise<ConfirmarPagoResult> {
+    try {
+        const res = await serverApi("/pagos/mp/confirmar-waitlist", {
+            method: "POST",
+            params: { payment_id: paymentId },
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            return { error: error.detail || "Error al confirmar el cupo liberado" };
         }
         return res.json();
     } catch {

@@ -14,6 +14,8 @@ from models.password_reset_token import PasswordResetToken
 from models.configuracion import Configuracion
 from models.disciplina import Disciplina
 from models.licencia import Licencia
+from models.cupon_descuento import CuponDescuento
+from models.waitlist_entry import WaitlistEntry
 
 __all__ = [
     "Usuario",
@@ -33,4 +35,6 @@ __all__ = [
     "Configuracion",
     "Disciplina",
     "Licencia",
+    "CuponDescuento",
+    "WaitlistEntry",
 ]

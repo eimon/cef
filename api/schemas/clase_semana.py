@@ -33,6 +33,8 @@ class ClaseSemanaResponse(BaseModel):
     fecha_en_semana: date
     cupo_disponible: int
     cupo_suscripcion_disponible: bool = True
+    waitlist_disponible: bool = True
+    waitlist_total: int = 0
     instancia: Optional[InstanciaSemanaResponse] = None
     inscrito: bool = False
     suscrito: bool = False

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from html import escape
 
 from core.config import settings
@@ -12,6 +13,48 @@ def _https_url(base: str) -> str:
 
 
 class EmailService:
+    async def send_waitlist_slot_available(
+        self,
+        to_email: str,
+        clase_nombre: str,
+        fecha: str,
+        expira_at: datetime,
+        nombre: str | None = None,
+    ) -> None:
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se envió aviso de lista de espera a %s", to_email)
+            return
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se envió aviso de lista de espera.")
+            return
+
+        frontend_url = _https_url(settings.FRONTEND_PUBLIC_URL)
+        mis_clases_url = f"{frontend_url}/mis-clases"
+        saludo = f"Hola {escape(nombre)}," if nombre else "Hola,"
+        clase_segura = escape(clase_nombre)
+        fecha_segura = escape(fecha)
+        vence_str = expira_at.strftime("%d/%m %H:%M")
+
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": f"Se liberó un cupo para {clase_segura}",
+            "html": (
+                f"<p>{saludo}</p>"
+                f"<p>Se liberó un cupo para <strong>{clase_segura}</strong> ({fecha_segura}).</p>"
+                f"<p>Tenés tiempo hasta <strong>{vence_str}</strong> para confirmar y pagar tu lugar.</p>"
+                f'<p>Ingresá a <a href="{mis_clases_url}">Mis Clases</a> para continuar.</p>'
+            ),
+        }
+
+        try:
+            resend.Emails.send(params)
+        except Exception:
+            logger.exception("Error enviando aviso de cupo liberado a %s", to_email)
+
     async def send_staff_credentials(
         self,
         to_email: str,
@@ -175,6 +218,72 @@ class EmailService:
                 resend.Emails.send(params)
             except Exception:
                 logger.exception("Error enviando notificación de cambio de clase a %s", email)
+
+    async def send_aviso_masivo(self, emails: list[str], mensaje: str) -> int:
+        if not emails:
+            return 0
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se enviaron avisos masivos.")
+            return 0
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se enviaron avisos masivos.")
+            return 0
+
+        resend.api_key = settings.RESEND_API_KEY
+        enviados = 0
+        for email in emails:
+            try:
+                params: resend.Emails.SendParams = {
+                    "from": settings.RESEND_FROM_EMAIL,
+                    "to": [email],
+                    "subject": "Aviso de CEF",
+                    "html": (
+                        "<p>Hola,</p>"
+                        f"<p>{mensaje}</p>"
+                        "<p>Saludos,<br>El equipo de CEF</p>"
+                    ),
+                }
+                resend.Emails.send(params)
+                enviados += 1
+            except Exception:
+                logger.exception("Error enviando aviso masivo a %s", email)
+        return enviados
+
+    async def send_aviso_vencimiento_suscripcion(
+        self,
+        to_email: str,
+        nombre: str | None,
+        clase_nombre: str,
+        fecha_vencimiento: str,
+    ) -> None:
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se envió aviso de vencimiento a %s", to_email)
+            return
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se envió aviso de vencimiento.")
+            return
+
+        greeting = f"Hola {escape(nombre)}," if nombre else "Hola,"
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": f"Tu suscripción a {escape(clase_nombre)} está por vencer — CEF",
+            "html": (
+                f"<p>{greeting}</p>"
+                f"<p>Tu suscripción a <strong>{escape(clase_nombre)}</strong> vence el <strong>{escape(fecha_vencimiento)}</strong>.</p>"
+                "<p>Para no perder tu lugar, renová antes de esa fecha.</p>"
+                "<p>Saludos,<br>El equipo de CEF</p>"
+            ),
+        }
+        try:
+            resend.Emails.send(params)
+        except Exception:
+            logger.exception("Error enviando aviso de vencimiento a %s", to_email)
 
     async def send_password_reset(self, to_email: str, token: str) -> None:
         verification_url = f"{_https_url(settings.FRONTEND_PUBLIC_URL)}/auth/reset-password?token={token}"

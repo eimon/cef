@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2, CheckCircle2 } from "lucide-react";
-import { ClaseSemana, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
-import { checkElegibilidadIndividual } from "@/actions/inscripciones";
+import { ClaseSemana, EstadoWaitlist, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
+import { anotarseWaitlist, cancelarWaitlist, checkElegibilidadIndividual, getMisWaitlist, getWaitlistStatus } from "@/actions/inscripciones";
 import { checkElegibilidadSuscripcion } from "@/actions/suscripciones";
 import { getAsistenciasClase } from "@/actions/asistencias";
-import { crearPreferenciaMP, crearPreferenciaSuscripcionMP } from "@/actions/pagos";
+import { crearPreferenciaMP, crearPreferenciaSuscripcionMP, crearPreferenciaWaitlistMP } from "@/actions/pagos";
 
 const DIA_LABELS: Record<string, string> = {
     lunes: "Lunes",
@@ -212,6 +212,7 @@ export default function ClaseDetailDialog({
     userRole: string | null;
     senaMinima?: string;
 }) {
+    // All hooks must be called unconditionally at the top level
     const porcentajeSena = parseFloat(senaMinima) || 50;
     const [step, setStep] = useState<Step>("detail");
     const [paymentType, setPaymentType] = useState<"full" | "partial">("full");
@@ -231,6 +232,66 @@ export default function ClaseDetailDialog({
     const [asistenciasLoading, setAsistenciasLoading] = useState(false);
     const [asistenciasError, setAsistenciasError] = useState("");
 
+    const [waitlistLoading, setWaitlistLoading] = useState(false);
+    const [waitlistError, setWaitlistError] = useState("");
+    const [waitlistEntryId, setWaitlistEntryId] = useState<string | null>(null);
+    const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
+    const [waitlistEstado, setWaitlistEstado] = useState<EstadoWaitlist | null>(null);
+    const [waitlistExpiraAt, setWaitlistExpiraAt] = useState<string | null>(null);
+
+    // Load waitlist entries on open
+    useEffect(() => {
+        let mounted = true;
+
+        async function loadMyWaitlist() {
+            if (!isOpen || !clase || userRole !== "cliente") return;
+            const entries = await getMisWaitlist();
+            if (!mounted) return;
+
+            const current = entries.find(
+                (entry) =>
+                    entry.clase_template_id === clase.id &&
+                    entry.fecha === clase.fecha_en_semana,
+            );
+
+            setWaitlistEntryId(current?.id ?? null);
+            setWaitlistPosition(current?.posicion ?? null);
+            setWaitlistEstado(current?.estado ?? null);
+            setWaitlistExpiraAt(current?.expira_at ?? null);
+            setWaitlistError("");
+        }
+
+        loadMyWaitlist();
+        return () => {
+            mounted = false;
+        };
+    }, [isOpen, clase, userRole]);
+
+    // Poll waitlist status every 30 seconds
+    useEffect(() => {
+        if (!isOpen || !waitlistEntryId) return;
+
+        const refreshStatus = async () => {
+            const status = await getWaitlistStatus(waitlistEntryId);
+            if (!status) return;
+            setWaitlistEstado(status.estado);
+            setWaitlistPosition(status.posicion);
+            setWaitlistExpiraAt(status.expira_at);
+            if (status.estado === EstadoWaitlist.EXPIRADO) {
+                setWaitlistError("Tu aviso de cupo expiró. Podés volver a anotarte en espera.");
+                setWaitlistEntryId(null);
+                setWaitlistEstado(null);
+                setWaitlistExpiraAt(null);
+                setWaitlistPosition(null);
+            }
+        };
+
+        refreshStatus();
+        const interval = setInterval(refreshStatus, 30000);
+        return () => clearInterval(interval);
+    }, [isOpen, waitlistEntryId]);
+
+    // Early return after all hooks
     if (!isOpen || !clase) return null;
 
     const canEnroll =
@@ -238,6 +299,8 @@ export default function ClaseDetailDialog({
         !hasClaseEmpezado(clase.fecha_en_semana, clase.hora_inicio);
     const canEnrollIndividual = canEnroll && clase.cupo_disponible > 0;
     const canSubscribe = clase.cupo_suscripcion_disponible;
+    const hasWaitlistEntry = waitlistEntryId !== null;
+    const waitlistNotificado = waitlistEstado === EstadoWaitlist.NOTIFICADO;
 
     const precioActual = step === "amount-suscripcion"
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
@@ -273,6 +336,12 @@ export default function ClaseDetailDialog({
         setAsistencias([]);
         setAsistenciasLoading(false);
         setAsistenciasError("");
+        setWaitlistLoading(false);
+        setWaitlistError("");
+        setWaitlistEntryId(null);
+        setWaitlistPosition(null);
+        setWaitlistEstado(null);
+        setWaitlistExpiraAt(null);
         onClose();
     }
 
@@ -295,7 +364,7 @@ export default function ClaseDetailDialog({
         if (!clase) return;
         setSuscripcionCheckLoading(true);
         setSuscripcionCheckError("");
-        const result = await checkElegibilidadSuscripcion(clase.id);
+        const result = await checkElegibilidadSuscripcion(clase.id, clase.fecha_en_semana);
         setSuscripcionCheckLoading(false);
         if (result.error) {
             setSuscripcionCheckError(result.error);
@@ -320,7 +389,7 @@ export default function ClaseDetailDialog({
         setMpError("");
 
         const result = step === "amount-suscripcion"
-            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto)
+            ? await crearPreferenciaSuscripcionMP(clase.id, selectedMonto, clase.fecha_en_semana)
             : await crearPreferenciaMP(clase.id, clase.fecha_en_semana, selectedMonto);
 
         if (result.error) {
@@ -345,6 +414,74 @@ export default function ClaseDetailDialog({
         }
         setAsistencias(result.data);
         setStep("asistencias");
+    }
+
+    async function handleAnotarseWaitlist() {
+        if (!clase) return;
+        setWaitlistLoading(true);
+        setWaitlistError("");
+
+        const result = await anotarseWaitlist(clase.id, clase.fecha_en_semana);
+        setWaitlistLoading(false);
+
+        if (result.error || !result.data) {
+            setWaitlistError(result.error || "No se pudo completar la espera");
+            return;
+        }
+
+        setWaitlistEntryId(result.data.waitlist_id);
+        setWaitlistPosition(result.data.posicion);
+        setWaitlistEstado(result.data.estado);
+        setWaitlistExpiraAt(null);
+    }
+
+    async function handleCancelarWaitlist() {
+        if (!waitlistEntryId) return;
+        setWaitlistLoading(true);
+        setWaitlistError("");
+
+        const result = await cancelarWaitlist(waitlistEntryId);
+        setWaitlistLoading(false);
+
+        if (result.error) {
+            setWaitlistError(result.error);
+            return;
+        }
+
+        setWaitlistEntryId(null);
+        setWaitlistPosition(null);
+        setWaitlistEstado(null);
+        setWaitlistExpiraAt(null);
+    }
+
+    async function handleConfirmarWaitlistPago() {
+        if (!waitlistEntryId) return;
+        setWaitlistLoading(true);
+        setWaitlistError("");
+
+        const result = await crearPreferenciaWaitlistMP(waitlistEntryId);
+        setWaitlistLoading(false);
+
+        if (result.error) {
+            setWaitlistError(result.error);
+            return;
+        }
+
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
+    }
+
+    function renderVencimiento() {
+        if (!waitlistExpiraAt) return null;
+        const expireDate = new Date(waitlistExpiraAt);
+        const diffMs = expireDate.getTime() - Date.now();
+        if (diffMs <= 0) return "Expirando";
+        const mins = Math.floor(diffMs / 60000);
+        if (mins < 60) return `Expira en ${mins} min`;
+        const hours = Math.floor(mins / 60);
+        const remMins = mins % 60;
+        return `Expira en ${hours}h ${remMins}m`;
     }
 
     return createPortal(
@@ -494,13 +631,61 @@ export default function ClaseDetailDialog({
                                                 )}
                                             </div>
                                         ) : canEnroll ? (
-                                            <button
-                                                type="button"
-                                                disabled
-                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-center leading-tight"
-                                            >
-                                                Entrar a lista de espera para esta clase
-                                            </button>
+                                            <div className="space-y-2">
+                                                {hasWaitlistEntry ? (
+                                                    <>
+                                                        <div className={`w-full py-2.5 px-3 rounded-lg border text-xs font-semibold text-center leading-tight ${
+                                                            waitlistNotificado
+                                                                ? "bg-cef-warning/10 border-cef-warning/20 text-cef-warning"
+                                                                : "bg-cef-success/10 border-cef-success/20 text-cef-success"
+                                                        }`}>
+                                                            {waitlistNotificado
+                                                                ? `¡Se liberó tu cupo! ${renderVencimiento() ?? "Confirmá tu lugar"}`
+                                                                : `Estás en lista de espera${waitlistPosition ? ` · Posición #${waitlistPosition}` : ""}`}
+                                                        </div>
+                                                        {waitlistNotificado && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleConfirmarWaitlistPago}
+                                                                disabled={waitlistLoading}
+                                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                            >
+                                                                {waitlistLoading ? "Redirigiendo..." : "Confirmar e ir a pagar"}
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleCancelarWaitlist}
+                                                            disabled={waitlistLoading}
+                                                            className="w-full py-2.5 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                        >
+                                                            {waitlistLoading ? "Cancelando..." : "Cancelar espera"}
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAnotarseWaitlist}
+                                                        disabled={waitlistLoading || !clase.waitlist_disponible}
+                                                        className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    >
+                                                        {waitlistLoading ? "Anotando..." : "Anotarme en lista de espera"}
+                                                    </button>
+                                                )}
+                                                <p className="text-[11px] text-slate-400 text-center">
+                                                    {waitlistNotificado
+                                                        ? "Tu lugar se asegura únicamente con pago aprobado"
+                                                        : clase.waitlist_total > 0
+                                                        ? `${clase.waitlist_total} persona${clase.waitlist_total === 1 ? "" : "s"} en espera`
+                                                        : "Todavía no hay personas en espera"}
+                                                </p>
+                                                {waitlistError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{waitlistError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         ) : (
                                             <button
                                                 type="button"
