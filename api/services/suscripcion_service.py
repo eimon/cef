@@ -43,12 +43,6 @@ _DIA_TO_WEEKDAY = {
 }
 
 
-def _proxima_fecha(dia_semana: DiaSemana) -> date:
-    hoy = datetime.now(LOCAL_TZ).date()
-    dias = ((_DIA_TO_WEEKDAY[dia_semana] - hoy.weekday()) % 7) or 7
-    return hoy + timedelta(days=dias)
-
-
 def _primera_clase_en_periodo(dia_semana: DiaSemana, desde: date) -> date:
     dias = (_DIA_TO_WEEKDAY[dia_semana] - desde.weekday()) % 7
     return desde + timedelta(days=dias)
@@ -163,7 +157,7 @@ class SuscripcionService:
         return pending
 
     async def _validar_elegibilidad(
-        self, current_user: Usuario, clase_template_id: uuid.UUID
+        self, current_user: Usuario, clase_template_id: uuid.UUID, fecha_inicio: date
     ) -> tuple:
         template = await self.repo.get_template(clase_template_id)
         if not template:
@@ -171,7 +165,6 @@ class SuscripcionService:
 
         await self.sync_template_subscriptions(clase_template_id)
 
-        fecha_inicio = _proxima_fecha(template.dia_semana)
         fecha_fin = _calcular_fecha_fin(fecha_inicio)
         fechas_clases = _calcular_fechas_clases(fecha_inicio, fecha_fin)
 
@@ -214,10 +207,10 @@ class SuscripcionService:
         return template, fecha_inicio, fecha_fin, fechas_clases
 
     async def check_elegibilidad(
-        self, current_user: Usuario, clase_template_id: uuid.UUID
+        self, current_user: Usuario, clase_template_id: uuid.UUID, fecha_inicio: date
     ) -> SuscripcionCheckResponse:
         template, fecha_inicio, fecha_fin, fechas_clases = await self._validar_elegibilidad(
-            current_user, clase_template_id
+            current_user, clase_template_id, fecha_inicio
         )
         disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
         if not disciplina_obj:
@@ -604,7 +597,7 @@ class SuscripcionService:
     ) -> SuscripcionResponse:
         clase_template_id = uuid.UUID(str(data.clase_template_id))
         template, fecha_inicio, fecha_fin, fechas_clases = await self._validar_elegibilidad(
-            current_user, clase_template_id
+            current_user, clase_template_id, data.fecha_inicio
         )
 
         disciplina_obj = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)

@@ -81,10 +81,11 @@ async def confirmar_deuda_mp(
 async def crear_preferencia_suscripcion_mp(
     clase_template_id: UUID = Query(...),
     monto: float = Query(..., gt=0),
+    fecha_inicio: date = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    return await PagoService(db).crear_preferencia_suscripcion_mp(current_user, clase_template_id, monto)
+    return await PagoService(db).crear_preferencia_suscripcion_mp(current_user, clase_template_id, monto, fecha_inicio)
 
 
 @router.post("/mp/confirmar-suscripcion")

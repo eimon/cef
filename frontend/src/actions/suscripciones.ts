@@ -24,9 +24,10 @@ export type SuscripcionState = {
 
 export async function checkElegibilidadSuscripcion(
     claseTemplateId: string,
+    fechaInicio: string,
 ): Promise<SuscripcionCheckState> {
     const res = await serverApi("/suscripciones/check", {
-        params: { clase_template_id: claseTemplateId },
+        params: { clase_template_id: claseTemplateId, fecha_inicio: fechaInicio },
     });
 
     if (!res.ok) {
@@ -41,10 +42,11 @@ export async function checkElegibilidadSuscripcion(
 export async function suscribirse(
     claseTemplateId: string,
     monto: number,
+    fechaInicio: string,
 ): Promise<SuscripcionState> {
     const res = await serverApi("/suscripciones/", {
         method: "POST",
-        body: JSON.stringify({ clase_template_id: claseTemplateId, monto }),
+        body: JSON.stringify({ clase_template_id: claseTemplateId, monto, fecha_inicio: fechaInicio }),
     });
 
     if (!res.ok) {

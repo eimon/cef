@@ -69,6 +69,16 @@ export default function WeekNavigation({ weekStart, canNavigatePast = false }: {
 
     return (
         <div className="flex items-center gap-2">
+            {!isCurrentWeek && (
+                <button
+                    type="button"
+                    onClick={() => navigate(currentWeekStart)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition-all"
+                >
+                    Hoy
+                </button>
+            )}
+
             <button
                 type="button"
                 onClick={() => navigate(addDays(weekStart, -7))}
@@ -100,15 +110,6 @@ export default function WeekNavigation({ weekStart, canNavigatePast = false }: {
                 <ChevronRight size={18} />
             </button>
 
-            {!isCurrentWeek && (
-                <button
-                    type="button"
-                    onClick={() => navigate(currentWeekStart)}
-                    className="ml-1 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 transition-all"
-                >
-                    Hoy
-                </button>
-            )}
         </div>
     );
 }
