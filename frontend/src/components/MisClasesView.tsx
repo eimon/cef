@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { Clock, CalendarDays, X, Info, CreditCard, Ban } from "lucide-react";
-import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult } from "@/types/api";
+import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
 import { cancelarClase } from "@/actions/mis_clases";
+import { cancelarWaitlist } from "@/actions/inscripciones";
+import { crearPreferenciaWaitlistMP } from "@/actions/pagos";
 
 // ─── Unified item ─────────────────────────────────────────────────────────────
 
@@ -467,9 +469,11 @@ type TipoFiltro = "todas" | "individual" | "suscripcion";
 export default function MisClasesView({
     individuales,
     suscripciones,
+    waitlistEntries,
 }: {
     individuales: MiClaseIndividual[];
     suscripciones: MiSuscripcion[];
+    waitlistEntries: WaitlistEntry[];
 }) {
     const [tiempoTab, setTiempoTab] = useState<TiempoTab>("proximas");
     const [tipoFiltro, setTipoFiltro] = useState<TipoFiltro>("todas");
@@ -489,6 +493,18 @@ export default function MisClasesView({
         return cmp;
     });
 
+    async function handleCancelarEspera(waitlistId: string) {
+        await cancelarWaitlist(waitlistId);
+        window.location.reload();
+    }
+
+    async function handleConfirmarEspera(waitlistId: string) {
+        const result = await crearPreferenciaWaitlistMP(waitlistId);
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
+    }
+
     // Group by date
     const grouped = new Map<string, MisClasesItem[]>();
     for (const item of sorted) {
@@ -499,6 +515,45 @@ export default function MisClasesView({
 
     return (
         <div className="space-y-6">
+            {waitlistEntries.length > 0 && (
+                <div className="glass rounded-2xl p-4">
+                    <h2 className="text-sm font-bold text-slate-800">Mis Esperas ({waitlistEntries.length})</h2>
+                    <div className="mt-3 space-y-2">
+                        {waitlistEntries.map((entry) => (
+                            <div key={entry.id} className="rounded-xl border border-slate-200 bg-white/60 p-3">
+                                <p className="text-sm font-semibold text-slate-800">{entry.clase_nombre}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {entry.fecha} · Posición #{entry.posicion}
+                                </p>
+                                <p className={`text-xs mt-1 ${entry.estado === EstadoWaitlist.NOTIFICADO ? "text-cef-warning" : "text-slate-500"}`}>
+                                    {entry.estado === EstadoWaitlist.NOTIFICADO
+                                        ? "¡Se liberó un cupo! Confirmá y pagá dentro de la ventana disponible."
+                                        : "En espera"}
+                                </p>
+                                <div className="mt-2 flex gap-2">
+                                    {entry.estado === EstadoWaitlist.NOTIFICADO && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleConfirmarEspera(entry.id)}
+                                            className="rounded-lg bg-cef-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-cef-primary/90"
+                                        >
+                                            Confirmar y pagar
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCancelarEspera(entry.id)}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                    >
+                                        Cancelar espera
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3">
                 <PillTabs

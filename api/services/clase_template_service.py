@@ -14,11 +14,12 @@ from schemas.clase_template import ClaseTemplateCreate, ClaseTemplateUpdate, Cla
 from schemas.clase_semana import ClaseSemanaResponse, InstanciaSemanaResponse
 from exceptions.general import NotFoundException, BadRequestException, SalaOcupadaException, ProfesorOcupadoException, ClaseConInscriptosException
 from services.email_service import EmailService
-from core.enums import DiaSemana, TipoInscripcion, EstadoSuscripcion
+from core.enums import DiaSemana, TipoInscripcion, EstadoSuscripcion, EstadoWaitlist
 from models.asistencia import Asistencia
 from models.clase_template import ClaseTemplate
 from models.suscripciones import Suscripcion
 from models.usuario import Usuario
+from models.waitlist_entry import WaitlistEntry
 from services.suscripcion_service import SuscripcionService
 
 _WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
@@ -231,6 +232,7 @@ class ClaseTemplateService:
 
         instancia_ids = [i.id for i in instancias]
         asistencia_counts: dict[uuid.UUID, int] = {}
+        waitlist_counts: dict[tuple[uuid.UUID, date], int] = {}
         if instancia_ids:
             asistencia_result = await self.db.execute(
                 select(Asistencia.clase_instancia_id, func.count()).where(
@@ -239,6 +241,25 @@ class ClaseTemplateService:
                 ).group_by(Asistencia.clase_instancia_id)
             )
             asistencia_counts = {row[0]: row[1] for row in asistencia_result.all()}
+
+            waitlist_result = await self.db.execute(
+                select(
+                    WaitlistEntry.clase_template_id,
+                    WaitlistEntry.fecha,
+                    func.count(),
+                ).where(
+                    WaitlistEntry.activo == True,
+                    WaitlistEntry.estado.in_((EstadoWaitlist.EN_ESPERA, EstadoWaitlist.NOTIFICADO)),
+                    WaitlistEntry.fecha.in_(fechas),
+                ).group_by(
+                    WaitlistEntry.clase_template_id,
+                    WaitlistEntry.fecha,
+                )
+            )
+            waitlist_counts = {
+                (row[0], row[1]): int(row[2])
+                for row in waitlist_result.all()
+            }
 
         def cupo_disponible_for(template, target_date: date) -> int:
             instancia = instancia_map.get((template.id, target_date))
@@ -319,6 +340,8 @@ class ClaseTemplateService:
                 fecha_en_semana=fecha_clase,
                 cupo_disponible=cupo_disponible,
                 cupo_suscripcion_disponible=cupo_suscripcion_disponible(template),
+                    waitlist_disponible=True,
+                    waitlist_total=waitlist_counts.get((template.id, fecha_clase), 0),
                 instancia=InstanciaSemanaResponse(
                     id=instancia.id,
                     fecha=instancia.fecha,

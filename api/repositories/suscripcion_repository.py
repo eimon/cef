@@ -300,12 +300,20 @@ class SuscripcionRepository:
         await self.db.flush()
         return suscripcion
 
-    async def release_future_reservas(self, suscripcion: Suscripcion, from_date: date) -> None:
+    async def release_future_reservas(
+        self,
+        suscripcion: Suscripcion,
+        from_date: date,
+    ) -> list[tuple[uuid.UUID, date]]:
+        released_slots: set[tuple[uuid.UUID, date]] = set()
         reservas = await self.get_active_future_reservas(suscripcion.id, from_date)
         for reserva in reservas:
             reserva.activa = False
             if reserva.clase_instancia:
                 reserva.clase_instancia.cupo += 1
+                released_slots.add(
+                    (reserva.clase_instancia.clase_template_id, reserva.clase_instancia.fecha)
+                )
 
             asistencia = (await self.db.execute(
                 select(Asistencia).where(
@@ -322,6 +330,7 @@ class SuscripcionRepository:
                 else:
                     await self.db.delete(asistencia)
         await self.db.flush()
+        return list(released_slots)
 
     async def get_activas_con_clases_finalizadas(self, before_date: date) -> list[Suscripcion]:
         result = await self.db.execute(

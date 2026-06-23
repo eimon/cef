@@ -198,6 +198,35 @@ export interface InscripcionResponse {
     clase_instancia_id: string;
 }
 
+export enum EstadoWaitlist {
+    EN_ESPERA = "en_espera",
+    NOTIFICADO = "notificado",
+    CONFIRMADO_PAGADO = "confirmado_pagado",
+    EXPIRADO = "expirado",
+    CANCELADO = "cancelado",
+}
+
+export interface WaitlistJoinResponse {
+    waitlist_id: string;
+    posicion: number;
+    estado: EstadoWaitlist;
+    clase_template_id: string;
+    fecha: string;
+}
+
+export interface WaitlistEntry {
+    id: string;
+    clase_template_id: string;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    fecha: string;
+    posicion: number;
+    estado: EstadoWaitlist;
+    notificado_at: string | null;
+    expira_at: string | null;
+    created_at: string;
+}
+
 export enum EstadoPago {
     PENDIENTE = "pendiente",
     PAGADO = "pagado",
@@ -388,6 +417,8 @@ export interface ClaseSemana {
     fecha_en_semana: string;
     cupo_disponible: number;
     cupo_suscripcion_disponible: boolean;
+    waitlist_disponible: boolean;
+    waitlist_total: number;
     instancia: InstanciaSemana | null;
     inscrito: boolean;
     suscrito: boolean;
