@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { buildLoginUrlWithRedirect } from "@/lib/redirect";
 
 const cookieBase = {
     secure: process.env.NODE_ENV === "production",
@@ -52,7 +53,8 @@ export async function middleware(request: NextRequest) {
     }
 
     const redirectToLogin = () => {
-        const res = NextResponse.redirect(new URL(`/auth/login`, request.url));
+        const loginPath = buildLoginUrlWithRedirect(pathname, request.nextUrl.search);
+        const res = NextResponse.redirect(new URL(loginPath, request.url));
         res.cookies.delete("access_token");
         res.cookies.delete("refresh_token");
         return res;

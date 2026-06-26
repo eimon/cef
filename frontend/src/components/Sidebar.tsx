@@ -6,7 +6,11 @@ import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserR
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
+import { getMisWaitlist } from "@/actions/inscripciones";
+import { EstadoWaitlist } from "@/types/api";
 import type { LucideIcon } from "lucide-react";
+
+const PENDING_WAITLIST_POLL_MS = 60_000;
 
 type NavChild = { name: string; href: string; adminOnly?: boolean };
 
@@ -55,6 +59,7 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
     const { isOpen, close } = useSidebar();
     const pathname = usePathname();
     const [openGroup, setOpenGroup] = useState<string | null>(() => getActiveGroup(pathname));
+    const [hasPendingWaitlist, setHasPendingWaitlist] = useState(false);
 
     useEffect(() => {
         const activeGroup = getActiveGroup(pathname);
@@ -62,6 +67,25 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
         const timeoutId = window.setTimeout(() => setOpenGroup(activeGroup), 0);
         return () => window.clearTimeout(timeoutId);
     }, [pathname]);
+
+    useEffect(() => {
+        if (userRole !== "cliente") return;
+
+        let cancelled = false;
+        async function checkPendingWaitlist() {
+            const entries = await getMisWaitlist();
+            if (!cancelled) {
+                setHasPendingWaitlist(entries.some((entry) => entry.estado === EstadoWaitlist.NOTIFICADO));
+            }
+        }
+
+        checkPendingWaitlist();
+        const intervalId = window.setInterval(checkPendingWaitlist, PENDING_WAITLIST_POLL_MS);
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+        };
+    }, [userRole]);
 
     const visibleNavigation = navigation.filter(item =>
         (!item.adminOnly || userRole === "admin") &&
@@ -178,6 +202,7 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
                             }
 
                             const isActive = pathname.startsWith(item.href!);
+                            const showPendingBadge = item.href === "/mis-clases" && hasPendingWaitlist && !isActive;
                             return (
                                 <Link
                                     key={item.href}
@@ -188,7 +213,15 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
                                         : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                     }`}
                                 >
-                                    <item.icon className={`mr-3 flex-shrink-0 h-5 w-5 transition-colors ${isActive ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                    <span className="relative mr-3 flex-shrink-0">
+                                        <item.icon className={`h-5 w-5 transition-colors ${isActive ? "text-cef-primary" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                        {showPendingBadge && (
+                                            <span
+                                                className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-cef-danger"
+                                                title="Tenés un cupo liberado pendiente de confirmar"
+                                            />
+                                        )}
+                                    </span>
                                     {item.name}
                                 </Link>
                             );

@@ -2,8 +2,13 @@ import { getMisClasesIndividuales, getMisSuscripciones } from "@/actions/mis_cla
 import { getMisWaitlist } from "@/actions/inscripciones";
 import MisClasesView from "@/components/MisClasesView";
 
-export default async function MisClasesPage() {
-    const [individuales, suscripciones, waitlistEntries] = await Promise.all([
+export default async function MisClasesPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ waitlist?: string }>;
+}) {
+    const [params, individuales, suscripciones, waitlistEntries] = await Promise.all([
+        searchParams,
         getMisClasesIndividuales(),
         getMisSuscripciones(),
         getMisWaitlist(),
@@ -20,6 +25,7 @@ export default async function MisClasesPage() {
                 individuales={individuales}
                 suscripciones={suscripciones}
                 waitlistEntries={waitlistEntries}
+                highlightWaitlistId={params.waitlist || null}
             />
         </div>
     );

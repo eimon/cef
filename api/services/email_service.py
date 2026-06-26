@@ -19,6 +19,7 @@ class EmailService:
         clase_nombre: str,
         fecha: str,
         expira_at: datetime,
+        waitlist_id: str,
         nombre: str | None = None,
     ) -> None:
         if not settings.RESEND_API_KEY:
@@ -31,7 +32,7 @@ class EmailService:
             return
 
         frontend_url = _https_url(settings.FRONTEND_PUBLIC_URL)
-        mis_clases_url = f"{frontend_url}/mis-clases"
+        mis_clases_url = f"{frontend_url}/mis-clases?waitlist={waitlist_id}"
         saludo = f"Hola {escape(nombre)}," if nombre else "Hola,"
         clase_segura = escape(clase_nombre)
         fecha_segura = escape(fecha)

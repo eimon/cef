@@ -480,8 +480,13 @@ export default function ClaseDetailDialog({
         const mins = Math.floor(diffMs / 60000);
         if (mins < 60) return `Expira en ${mins} min`;
         const hours = Math.floor(mins / 60);
-        const remMins = mins % 60;
-        return `Expira en ${hours}h ${remMins}m`;
+        if (hours < 24) {
+            const remMins = mins % 60;
+            return `Expira en ${hours}h ${remMins}m`;
+        }
+        const days = Math.floor(hours / 24);
+        const remHours = hours % 24;
+        return `Expira en ${days}d ${remHours}h`;
     }
 
     return createPortal(
@@ -650,7 +655,7 @@ export default function ClaseDetailDialog({
                                                                 disabled={waitlistLoading}
                                                                 className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                                                             >
-                                                                {waitlistLoading ? "Redirigiendo..." : "Confirmar e ir a pagar"}
+                                                                {waitlistLoading ? "Redirigiendo..." : "Confirmar Lugar"}
                                                             </button>
                                                         )}
                                                         <button
