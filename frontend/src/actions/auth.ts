@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { serverApi, SERVER_API_URL } from "@/lib/server-api";
+import { sanitizeRedirectTarget } from "@/lib/redirect";
 
 const loginSchema = z.object({
     email: z.string().email("Email invalido"),
@@ -280,7 +281,8 @@ export async function login(prevState: LoginState, formData: FormData): Promise<
         return { error: "No pudimos iniciar sesion. Intentalo nuevamente." };
     }
 
-    redirect("/");
+    const redirectTarget = sanitizeRedirectTarget(String(formData.get("redirect") || "")) ?? "/";
+    redirect(redirectTarget);
 }
 
 export async function signup(prevState: SignupState, formData: FormData): Promise<SignupState> {

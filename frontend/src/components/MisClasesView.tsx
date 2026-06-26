@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Clock, CalendarDays, X, Info, CreditCard, Ban } from "lucide-react";
 import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
 import { cancelarClase } from "@/actions/mis_clases";
@@ -470,13 +470,22 @@ export default function MisClasesView({
     individuales,
     suscripciones,
     waitlistEntries,
+    highlightWaitlistId,
 }: {
     individuales: MiClaseIndividual[];
     suscripciones: MiSuscripcion[];
     waitlistEntries: WaitlistEntry[];
+    highlightWaitlistId?: string | null;
 }) {
     const [tiempoTab, setTiempoTab] = useState<TiempoTab>("proximas");
     const [tipoFiltro, setTipoFiltro] = useState<TipoFiltro>("todas");
+    const highlightRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (highlightWaitlistId && highlightRef.current) {
+            highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }, [highlightWaitlistId]);
 
     const allItems = buildItems(individuales, suscripciones);
 
@@ -519,8 +528,18 @@ export default function MisClasesView({
                 <div className="glass rounded-2xl p-4">
                     <h2 className="text-sm font-bold text-slate-800">Mis Esperas ({waitlistEntries.length})</h2>
                     <div className="mt-3 space-y-2">
-                        {waitlistEntries.map((entry) => (
-                            <div key={entry.id} className="rounded-xl border border-slate-200 bg-white/60 p-3">
+                        {waitlistEntries.map((entry) => {
+                            const isHighlighted = entry.id === highlightWaitlistId;
+                            return (
+                            <div
+                                key={entry.id}
+                                ref={isHighlighted ? highlightRef : undefined}
+                                className={`rounded-xl border p-3 ${
+                                    isHighlighted
+                                        ? "border-cef-primary ring-2 ring-cef-primary/30 bg-cef-primary/5"
+                                        : "border-slate-200 bg-white/60"
+                                }`}
+                            >
                                 <p className="text-sm font-semibold text-slate-800">{entry.clase_nombre}</p>
                                 <p className="text-xs text-slate-500 mt-0.5">
                                     {entry.fecha} · Posición #{entry.posicion}
@@ -537,7 +556,7 @@ export default function MisClasesView({
                                             onClick={() => handleConfirmarEspera(entry.id)}
                                             className="rounded-lg bg-cef-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-cef-primary/90"
                                         >
-                                            Confirmar y pagar
+                                            Confirmar Lugar
                                         </button>
                                     )}
                                     <button
@@ -549,7 +568,8 @@ export default function MisClasesView({
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,9 +17,6 @@ from schemas.inscripcion import (
     WaitlistStatusResponse,
 )
 from services.email_service import EmailService
-
-
-WAITLIST_NOTIFICATION_WINDOW_HOURS = 6
 
 
 class WaitlistService:
@@ -65,20 +62,23 @@ class WaitlistService:
         if not entry:
             return
 
-        now = datetime.now(LOCAL_TZ)
+        template = await self.repo.get_template(clase_template_id)
+        if not template:
+            return
+
         entry.estado = EstadoWaitlist.NOTIFICADO
-        entry.notificado_at = now
-        entry.expira_at = now + timedelta(hours=WAITLIST_NOTIFICATION_WINDOW_HOURS)
+        entry.notificado_at = datetime.now(LOCAL_TZ)
+        entry.expira_at = datetime.combine(fecha, template.hora_fin, tzinfo=LOCAL_TZ)
         await self.db.flush()
 
-        template = await self.repo.get_template(clase_template_id)
         usuario = await self.repo.get_usuario(entry.usuario_id)
-        if template and usuario and usuario.email:
+        if usuario and usuario.email:
             await EmailService().send_waitlist_slot_available(
                 to_email=usuario.email,
                 clase_nombre=template.nombre,
                 fecha=entry.fecha.isoformat(),
                 expira_at=entry.expira_at,
+                waitlist_id=str(entry.id),
                 nombre=usuario.nombre,
             )
 
