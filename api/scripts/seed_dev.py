@@ -271,7 +271,7 @@ async def _seed_ficha_medica_cliente(session) -> None:
     "telefono": "1100000099"
   },
   "antecedentes_medicos": {
-    "afecciones": ["Ninguna"],
+    "afecciones": ["Ninguno"],
     "especifique_otros": ""
   },
   "informacion_adicional_salud": {
