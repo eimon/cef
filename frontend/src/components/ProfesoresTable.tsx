@@ -5,8 +5,30 @@ import { Pencil, Trash2, X } from "lucide-react";
 import { Profesor } from "@/types/api";
 import EditProfesorDialog from "@/components/EditProfesorDialog";
 import DeleteProfesorDialog from "@/components/DeleteProfesorDialog";
+import MarcarActivoProfesorDialog from "@/components/MarcarActivoProfesorDialog";
+import MarcarInactivoProfesorDialog from "@/components/MarcarInactivoProfesorDialog";
+import LicenciaActivaInfoDialog from "@/components/LicenciaActivaInfoDialog";
 
 const DISCIPLINAS_VISIBLE = 2;
+
+function statusBadgeClass(disponible: boolean): string {
+    return disponible
+        ? "bg-cef-success/10 text-cef-success"
+        : "border border-cef-danger/20 bg-cef-danger/[0.08] text-cef-danger/80";
+}
+
+function EstadoBadge({ profesor, onClick }: { profesor: Profesor; onClick: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={profesor.disponible ? "Marcar como inactivo" : "Marcar como activo"}
+            className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-70 ${statusBadgeClass(profesor.disponible)}`}
+        >
+            {profesor.disponible ? "Activo" : "Inactivo"}
+        </button>
+    );
+}
 
 interface ProfesoresTableProps {
     profesores: Profesor[];
@@ -88,6 +110,9 @@ function DisciplinasCell({ disciplinas, onShowAll }: { disciplinas: string[]; on
 export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }: ProfesoresTableProps) {
     const [profesorToEdit, setProfesorToEdit] = useState<Profesor | null>(null);
     const [profesorToDelete, setProfesorToDelete] = useState<Profesor | null>(null);
+    const [profesorToMarcarActivo, setProfesorToMarcarActivo] = useState<Profesor | null>(null);
+    const [profesorToMarcarInactivo, setProfesorToMarcarInactivo] = useState<Profesor | null>(null);
+    const [profesorConLicencia, setProfesorConLicencia] = useState<Profesor | null>(null);
     const [profesorDisciplinas, setProfesorDisciplinas] = useState<Profesor | null>(null);
 
     if (profesores.length === 0) {
@@ -98,12 +123,25 @@ export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }:
         );
     }
 
+    function handleEstadoClick(profesor: Profesor) {
+        if (profesor.disponible) {
+            setProfesorToMarcarInactivo(profesor);
+        } else if (profesor.licencia_activa) {
+            setProfesorConLicencia(profesor);
+        } else {
+            setProfesorToMarcarActivo(profesor);
+        }
+    }
+
     return (
         <>
             {/* ── Mobile: cards ── */}
             <div className="flex flex-col gap-3 md:hidden">
                 {profesores.map((profesor) => (
-                    <div key={profesor.id} className="glass rounded-xl px-4 py-3.5">
+                    <div
+                        key={profesor.id}
+                        className={`glass rounded-xl px-4 py-3.5 ${!profesor.disponible ? "bg-cef-danger/[0.035]" : ""}`}
+                    >
                         <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center flex-wrap gap-1.5 mb-1.5">
@@ -113,6 +151,7 @@ export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }:
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500 capitalize">
                                         {profesor.genero ?? "—"}
                                     </span>
+                                    <EstadoBadge profesor={profesor} onClick={() => handleEstadoClick(profesor)} />
                                 </div>
                                 <div className="flex items-center gap-3 text-xs text-slate-400 mb-1.5">
                                     <span>DNI: {profesor.dni}</span>
@@ -168,12 +207,18 @@ export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }:
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
                                     Disciplinas
                                 </th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">
+                                    Estado
+                                </th>
                                 <th scope="col" className="px-6 py-3" />
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {profesores.map((profesor) => (
-                                <tr key={profesor.id} className="hover:bg-slate-50 transition-colors">
+                                <tr
+                                    key={profesor.id}
+                                    className={`transition-colors ${!profesor.disponible ? "bg-cef-danger/[0.035] hover:bg-cef-danger/[0.06]" : "hover:bg-slate-50"}`}
+                                >
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-700">
                                         {profesor.nombre}
                                     </td>
@@ -191,6 +236,9 @@ export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }:
                                             disciplinas={profesor.disciplinas ?? []}
                                             onShowAll={() => setProfesorDisciplinas(profesor)}
                                         />
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <EstadoBadge profesor={profesor} onClick={() => handleEstadoClick(profesor)} />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right">
                                         <div className="flex items-center justify-end gap-1">
@@ -239,6 +287,36 @@ export default function ProfesoresTable({ profesores, onSuccess, emptyMessage }:
                     isOpen={true}
                     onClose={() => setProfesorToDelete(null)}
                     onSuccess={() => { setProfesorToDelete(null); onSuccess(); }}
+                />
+            )}
+
+            {profesorToMarcarActivo && (
+                <MarcarActivoProfesorDialog
+                    key={profesorToMarcarActivo.id}
+                    profesor={profesorToMarcarActivo}
+                    isOpen={true}
+                    onClose={() => setProfesorToMarcarActivo(null)}
+                    onSuccess={() => { setProfesorToMarcarActivo(null); onSuccess(); }}
+                />
+            )}
+
+            {profesorToMarcarInactivo && (
+                <MarcarInactivoProfesorDialog
+                    key={profesorToMarcarInactivo.id}
+                    profesor={profesorToMarcarInactivo}
+                    isOpen={true}
+                    onClose={() => setProfesorToMarcarInactivo(null)}
+                    onSuccess={() => { setProfesorToMarcarInactivo(null); onSuccess(); }}
+                />
+            )}
+
+            {profesorConLicencia && (
+                <LicenciaActivaInfoDialog
+                    key={profesorConLicencia.id}
+                    profesor={profesorConLicencia}
+                    isOpen={true}
+                    onClose={() => setProfesorConLicencia(null)}
+                    onSuccess={() => { setProfesorConLicencia(null); onSuccess(); }}
                 />
             )}
         </>

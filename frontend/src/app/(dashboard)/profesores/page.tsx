@@ -17,7 +17,7 @@ export default function ProfesoresPage() {
     const refresh = useCallback(async (params: GetProfesoresParams = {}) => {
         setIsLoading(true);
         try {
-            const data = await getProfesores(params);
+            const data = await getProfesores({ ...params, incluirInactivos: true });
             setProfesores(data);
         } catch {
             setProfesores([]);
@@ -106,7 +106,7 @@ export default function ProfesoresPage() {
                         onSuccess={() => refresh(filters)}
                         emptyMessage={hasActiveFilter ? "No se encontraron profesores con los filtros ingresados" : undefined}
                     />
-                    <LicenciasSection profesores={profesores} />
+                    <LicenciasSection profesores={profesores} onProfesorChange={() => refresh(filters)} />
                 </>
             )}
         </div>

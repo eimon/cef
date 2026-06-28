@@ -24,6 +24,14 @@ class Profesor(Base):
     telefono = Column(String(50), nullable=True)
     genero = Column(String(50), nullable=True)
     activo = Column(Boolean, default=True)
+    disponible = Column(Boolean, default=True, nullable=False)
+    licencia_activa_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("licencias.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    motivo_inactividad = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -34,3 +42,4 @@ class Profesor(Base):
         foreign_keys="Licencia.profesor_id",
         back_populates="profesor",
     )
+    licencia_activa = relationship("Licencia", foreign_keys=[licencia_activa_id])

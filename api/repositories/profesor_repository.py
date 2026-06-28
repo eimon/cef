@@ -1,7 +1,10 @@
+from datetime import date as date_type
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from models.profesor import Profesor
+from models.licencia import Licencia
 from models.disciplina import Disciplina
 from schemas.profesor import ProfesorCreate, ProfesorUpdate
 import uuid
@@ -14,7 +17,7 @@ class ProfesorRepository:
     async def get_by_id(self, profesor_id: uuid.UUID) -> Profesor | None:
         result = await self.db.execute(
             select(Profesor)
-            .options(selectinload(Profesor.disciplinas))
+            .options(selectinload(Profesor.disciplinas), selectinload(Profesor.licencia_activa))
             .where(Profesor.id == profesor_id)
         )
         return result.scalars().first()
@@ -34,20 +37,48 @@ class ProfesorRepository:
         dni: str | None = None,
         nombre: str | None = None,
         apellido: str | None = None,
+        incluir_inactivos: bool = False,
     ) -> list[Profesor]:
         query = (
             select(Profesor)
-            .options(selectinload(Profesor.disciplinas))
+            .options(selectinload(Profesor.disciplinas), selectinload(Profesor.licencia_activa))
             .where(Profesor.activo == True)
         )
+        if not incluir_inactivos:
+            query = query.where(Profesor.disponible == True)
         if dni:
             query = query.where(Profesor.dni.ilike(f"%{dni}%"))
         if nombre:
             query = query.where(Profesor.nombre.ilike(f"%{nombre}%"))
         if apellido:
             query = query.where(Profesor.apellido.ilike(f"%{apellido}%"))
+        query = query.order_by(Profesor.disponible.desc(), Profesor.apellido.asc(), Profesor.nombre.asc())
         query = query.offset(skip).limit(limit)
         result = await self.db.execute(query)
+        return list(result.scalars().all())
+
+    async def set_disponibilidad(
+        self, profesor_id: uuid.UUID, disponible: bool, motivo: str | None = None
+    ) -> Profesor | None:
+        profesor = await self.get_by_id(profesor_id)
+        if not profesor:
+            return None
+        profesor.disponible = disponible
+        profesor.licencia_activa = None
+        profesor.motivo_inactividad = None if disponible else motivo
+        await self.db.flush()
+        return await self.get_by_id(profesor_id)
+
+    async def get_con_licencia_vencida(self, today: date_type) -> list[Profesor]:
+        result = await self.db.execute(
+            select(Profesor)
+            .options(selectinload(Profesor.disciplinas), selectinload(Profesor.licencia_activa))
+            .join(Licencia, Profesor.licencia_activa_id == Licencia.id)
+            .where(
+                Profesor.licencia_activa_id.is_not(None),
+                Licencia.fecha_fin < today,
+            )
+        )
         return list(result.scalars().all())
 
     async def _get_disciplinas_by_nombres(self, nombres: list[str]) -> list[Disciplina]:
