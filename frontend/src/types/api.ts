@@ -96,6 +96,13 @@ export interface Profesor {
     email: string | null;
     telefono: string | null;
     activo: boolean;
+    disponible: boolean;
+    licencia_activa: {
+        tipo: TipoLicencia;
+        motivo: string | null;
+        fecha_fin: string;
+    } | null;
+    motivo_inactividad: string | null;
     disciplinas: string[];
     created_at: string;
     updated_at: string | null;

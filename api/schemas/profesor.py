@@ -1,7 +1,9 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List
 from uuid import UUID
-from datetime import datetime
+from datetime import date, datetime
+
+from core.enums import TipoLicencia
 
 
 class ProfesorBase(BaseModel):
@@ -27,9 +29,26 @@ class ProfesorUpdate(BaseModel):
     disciplinas: Optional[List[str]] = None
 
 
+class ProfesorEstadoUpdate(BaseModel):
+    disponible: bool
+    motivo: Optional[str] = Field(None, max_length=500)
+
+
+class LicenciaActivaInfo(BaseModel):
+    tipo: TipoLicencia
+    motivo: Optional[str] = None
+    fecha_fin: date
+
+    class Config:
+        from_attributes = True
+
+
 class ProfesorResponse(ProfesorBase):
     id: UUID
     activo: bool
+    disponible: bool
+    licencia_activa: Optional[LicenciaActivaInfo] = None
+    motivo_inactividad: Optional[str] = None
     genero: Optional[str] = None
     disciplinas: List[str] = []
     created_at: datetime

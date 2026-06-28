@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
 
-from schemas.profesor import ProfesorCreate, ProfesorUpdate, ProfesorResponse
+from schemas.profesor import ProfesorCreate, ProfesorUpdate, ProfesorResponse, ProfesorEstadoUpdate
 from services.profesor_service import ProfesorService
 from core.database import get_db
 from dependencies.auth import has_role
@@ -20,10 +20,11 @@ async def list_profesores(
     dni: Optional[str] = Query(None),
     nombre: Optional[str] = Query(None),
     apellido: Optional[str] = Query(None),
+    incluir_inactivos: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(has_role(Role.ROLE_PROFESOR_LIST)),
 ):
-    return await ProfesorService(db).list(skip, limit, dni, nombre, apellido)
+    return await ProfesorService(db).list(skip, limit, dni, nombre, apellido, incluir_inactivos)
 
 
 @router.get("/{profesor_id}", response_model=ProfesorResponse)
@@ -70,3 +71,13 @@ async def delete_profesor(
     current_user: Usuario = Depends(has_role(Role.ROLE_PROFESOR_DELETE)),
 ):
     await ProfesorService(db).delete(profesor_id)
+
+
+@router.patch("/{profesor_id}/estado", response_model=ProfesorResponse)
+async def set_estado_profesor(
+    profesor_id: UUID,
+    data: ProfesorEstadoUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(has_role(Role.ROLE_PROFESOR_UPDATE)),
+):
+    return await ProfesorService(db).set_disponibilidad(profesor_id, data.disponible, data.motivo)

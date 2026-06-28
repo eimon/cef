@@ -55,6 +55,26 @@ class LicenciaRepository:
         result = await self.db.execute(query.offset(skip).limit(limit))
         return list(result.scalars().all())
 
+    async def get_vigentes_hoy(self, today: date) -> list[Licencia]:
+        result = await self.db.execute(
+            select(Licencia)
+            .options(selectinload(Licencia.profesor))
+            .where(
+                Licencia.activo == True,
+                Licencia.estado == EstadoLicencia.APROBADA,
+                Licencia.disponibilidad_anulada == False,
+                Licencia.fecha_inicio <= today,
+                Licencia.fecha_fin >= today,
+            )
+        )
+        return list(result.scalars().all())
+
+    async def mark_disponibilidad_anulada(self, licencia_id: uuid.UUID) -> None:
+        licencia = await self.get_by_id(licencia_id)
+        if licencia:
+            licencia.disponibilidad_anulada = True
+            await self.db.flush()
+
     async def get_overlapping(
         self,
         profesor_id: uuid.UUID,

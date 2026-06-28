@@ -17,6 +17,7 @@ import { EstadoLicencia, Licencia, Profesor, TipoLicencia } from "@/types/api";
 
 interface LicenciasSectionProps {
     profesores: Profesor[];
+    onProfesorChange?: () => void;
 }
 
 const initialState: LicenciaFormState = {};
@@ -37,7 +38,7 @@ const badgeByEstado: Record<EstadoLicencia, string> = {
     [EstadoLicencia.RECHAZADA]: "bg-cef-danger/10 text-cef-danger",
 };
 
-export default function LicenciasSection({ profesores }: LicenciasSectionProps) {
+export default function LicenciasSection({ profesores, onProfesorChange }: LicenciasSectionProps) {
     const [licencias, setLicencias] = useState<Licencia[]>([]);
     const [estadoFilter, setEstadoFilter] = useState<string>("");
     const [profesorSeleccionado, setProfesorSeleccionado] = useState<string>("");
@@ -119,6 +120,7 @@ export default function LicenciasSection({ profesores }: LicenciasSectionProps) 
         showSuccess(decisionMode === "approve" ? "Licencia aprobada" : "Licencia rechazada");
         setDecisionTarget(null);
         refresh();
+        onProfesorChange?.();
     };
 
     const handleEdit = (licencia: Licencia) => {

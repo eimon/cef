@@ -34,6 +34,7 @@ export type GetProfesoresParams = {
     dni?: string;
     nombre?: string;
     apellido?: string;
+    incluirInactivos?: boolean;
 };
 
 export async function getProfesorByDni(dni: string): Promise<Profesor | null> {
@@ -54,6 +55,7 @@ export async function getProfesores(params: GetProfesoresParams = {}): Promise<P
         if (params.dni?.trim()) searchParams.append("dni", params.dni.trim());
         if (params.nombre?.trim()) searchParams.append("nombre", params.nombre.trim());
         if (params.apellido?.trim()) searchParams.append("apellido", params.apellido.trim());
+        if (params.incluirInactivos) searchParams.append("incluir_inactivos", "true");
 
         const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
         const res = await serverApi(`/profesores/${query}`);
@@ -158,6 +160,30 @@ export async function deleteProfesor(
         }
     } catch (error) {
         console.error("Delete Profesor Error:", error);
+        return { error: "Something went wrong" };
+    }
+
+    revalidatePath("/profesores");
+    return { success: true };
+}
+
+export async function setProfesorEstado(
+    profesorId: string,
+    disponible: boolean,
+    motivo?: string
+): Promise<{ success?: boolean; error?: string }> {
+    try {
+        const res = await serverApi(`/profesores/${profesorId}/estado`, {
+            method: "PATCH",
+            body: JSON.stringify({ disponible, motivo }),
+        });
+
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            return { error: errorData.detail || "Error al actualizar el estado del profesor" };
+        }
+    } catch (error) {
+        console.error("Set Profesor Estado Error:", error);
         return { error: "Something went wrong" };
     }
 
