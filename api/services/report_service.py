@@ -9,10 +9,12 @@ from core.enums import UserRole
 from exceptions.general import BadRequestException, NotFoundException
 from repositories.report_repository import ReportRepository
 from schemas.report import (
+    ClassCancellationRankingItem,
     ActiveUsersByActivityPoint,
     ActiveUsersByActivityReportResponse,
     BillingReportPoint,
     BillingReportResponse,
+    ClassCancellationsRankingResponse,
     ClassCancellationsPoint,
     ClassCancellationsReportResponse,
     ReportClassOption,
@@ -132,6 +134,27 @@ class ReportService:
     async def list_report_classes(self) -> list[ReportClassOption]:
         classes = await self.repo.list_available_classes()
         return [self._class_option(clase) for clase in classes]
+
+    async def get_class_cancellations_ranking_report(
+        self,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> ClassCancellationsRankingResponse:
+        start_date, end_date = self._resolve_period(start_date, end_date)
+        ranking = await self.repo.count_class_cancellations_ranking(start_date, end_date)
+
+        return ClassCancellationsRankingResponse(
+            start_date=start_date,
+            end_date=end_date,
+            total_count=sum(total_count for _, total_count in ranking),
+            items=[
+                ClassCancellationRankingItem(
+                    clase=self._class_option(clase),
+                    total_count=total_count,
+                )
+                for clase, total_count in ranking
+            ],
+        )
 
     async def get_class_cancellations_report(
         self,

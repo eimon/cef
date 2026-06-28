@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from decimal import Decimal
 from html import escape
 
 from core.config import settings
@@ -13,6 +14,54 @@ def _https_url(base: str) -> str:
 
 
 class EmailService:
+    async def send_payment_notification(
+        self,
+        to_email: str,
+        nombre: str | None,
+        monto: Decimal,
+        descripcion: str,
+        payment_id: str | None = None,
+        fecha_pago: datetime | None = None,
+    ) -> None:
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY no configurada. No se envio aviso de pago a %s", to_email)
+            return
+        try:
+            import resend
+        except ImportError:
+            logger.warning("Paquete resend no instalado. No se envio aviso de pago.")
+            return
+
+        monto_str = f"${float(monto):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        fecha_str = (fecha_pago or datetime.now()).strftime("%d/%m/%Y %H:%M")
+        greeting = f"Hola {escape(nombre)}," if nombre else "Hola,"
+        payment_detail = (
+            f"<p>Operacion MercadoPago: <strong>{escape(payment_id)}</strong></p>"
+            if payment_id
+            else ""
+        )
+
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.RESEND_FROM_EMAIL,
+            "to": [to_email],
+            "subject": "Aviso de pago recibido - CEF",
+            "html": (
+                f"<p>{greeting}</p>"
+                "<p>Registramos correctamente tu pago en CEF.</p>"
+                f"<p>Concepto: <strong>{escape(descripcion)}</strong></p>"
+                f"<p>Monto: <strong>{monto_str}</strong></p>"
+                f"<p>Fecha: <strong>{fecha_str}</strong></p>"
+                f"{payment_detail}"
+                "<p>Saludos,<br>El equipo de CEF</p>"
+            ),
+        }
+
+        try:
+            resend.Emails.send(params)
+        except Exception:
+            logger.exception("Error enviando aviso de pago a %s", to_email)
+
     async def send_waitlist_slot_available(
         self,
         to_email: str,

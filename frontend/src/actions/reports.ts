@@ -4,8 +4,7 @@ import { serverApi } from "@/lib/server-api";
 import {
     ActiveUsersByActivityReport,
     BillingReport,
-    ClassCancellationsReport,
-    ReportClassOption,
+    ClassCancellationsRankingReport,
     UserRegistrationsReport,
 } from "@/types/api";
 
@@ -92,24 +91,12 @@ export async function getBillingReport(
     }
 }
 
-export async function getReportClasses(): Promise<ReportClassOption[]> {
-    try {
-        const res = await serverApi("/reports/classes");
-        if (!res.ok) return [];
-        return res.json();
-    } catch (error) {
-        console.error("Get Report Classes Error:", error);
-        return [];
-    }
-}
-
 export async function getClassCancellationsReport(
-    classId: string,
     startDate?: string,
     endDate?: string,
-): Promise<ClassCancellationsReport | null> {
+): Promise<ClassCancellationsRankingReport | null> {
     try {
-        const res = await serverApi(`/reports/class-cancellations/${classId}`, {
+        const res = await serverApi("/reports/class-cancellations", {
             params: periodParams(startDate, endDate),
         });
         if (!res.ok) return null;

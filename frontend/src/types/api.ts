@@ -75,6 +75,18 @@ export interface ClassCancellationsReport {
     points: ClassCancellationsPoint[];
 }
 
+export interface ClassCancellationRankingItem {
+    clase: ReportClassOption;
+    total_count: number;
+}
+
+export interface ClassCancellationsRankingReport {
+    start_date: string;
+    end_date: string;
+    total_count: number;
+    items: ClassCancellationRankingItem[];
+}
+
 export interface Profesor {
     id: string;
     dni: string;

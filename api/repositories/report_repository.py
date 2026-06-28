@@ -214,3 +214,36 @@ class ReportRepository:
         )
 
         return [(row.fecha, int(row.total_count)) for row in result.all()]
+
+    async def count_class_cancellations_ranking(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> list[tuple[ClaseTemplate, int]]:
+        total_count = func.count(Asistencia.id).label("total_count")
+
+        result = await self.db.execute(
+            select(ClaseTemplate, total_count)
+            .select_from(ClaseTemplate)
+            .outerjoin(
+                ClaseInstancia,
+                and_(
+                    ClaseInstancia.clase_template_id == ClaseTemplate.id,
+                    ClaseInstancia.fecha >= start_date,
+                    ClaseInstancia.fecha <= end_date,
+                    ClaseInstancia.activo.is_(True),
+                ),
+            )
+            .outerjoin(
+                Asistencia,
+                and_(
+                    Asistencia.clase_instancia_id == ClaseInstancia.id,
+                    Asistencia.cancelo.is_(True),
+                ),
+            )
+            .where(ClaseTemplate.activo.is_(True))
+            .group_by(ClaseTemplate.id)
+            .order_by(total_count.desc(), ClaseTemplate.disciplina, ClaseTemplate.dia_semana, ClaseTemplate.hora_inicio)
+        )
+
+        return [(row[0], int(row.total_count)) for row in result.all()]

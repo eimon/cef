@@ -1271,7 +1271,7 @@ async def _seed_cliente_deudas(session) -> None:
         session,
         cliente=cliente,
         clase=clase_activa,
-        fecha_clase=_next_weekday_at_least(today, clase_activa.dia_semana),
+        fecha_clase=_previous_weekday_before(today, clase_activa.dia_semana),
         mp_payment_id="seed-cliente-deuda-activa",
         descripcion="Inscripcion con deuda activa cliente seed dev",
         vencida=False,

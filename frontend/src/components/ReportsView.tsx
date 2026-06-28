@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, CalendarX, DollarSign, Loader2, UserX, Users, X } from "lucide-react";
+import { BarChart3, CalendarDays, CalendarX, ChevronLeft, ChevronRight, DollarSign, Loader2, UserX, Users, X } from "lucide-react";
 import {
     Bar,
     BarChart,
@@ -21,19 +21,21 @@ import {
     getClassCancellationsReport,
     getClientRegistrationsReport,
     getDeletedUsersReport,
-    getReportClasses,
     getStaffRegistrationsReport,
 } from "@/actions/reports";
 import {
     ActiveUsersByActivityReport,
     BillingReport,
-    ClassCancellationsReport,
+    ClassCancellationsRankingReport,
     ReportClassOption,
     UserRegistrationsReport,
 } from "@/types/api";
 
 type ReportKind = "clients" | "staff" | "activeByActivity" | "billing" | "classCancellations" | "deletedUsers";
-type ReportData = UserRegistrationsReport | ActiveUsersByActivityReport | BillingReport | ClassCancellationsReport;
+type ReportData = UserRegistrationsReport | ActiveUsersByActivityReport | BillingReport | ClassCancellationsRankingReport;
+
+const DATE_INPUT_CLASS = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cef-primary";
+const ARGENTINE_WEEKDAYS = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
 
 type ReportDefinition = {
     kind: ReportKind;
@@ -57,9 +59,9 @@ const reportDefinitions: ReportDefinition[] = [
     },
     {
         kind: "deletedUsers",
-        title: "Usuarios eliminados",
-        modalTitle: "Usuarios eliminados",
-        chartLabel: "Usuarios eliminados",
+        title: "Usuarios dados de baja",
+        modalTitle: "Usuarios dados de baja",
+        chartLabel: "Usuarios dados de baja",
     },
     {
         kind: "activeByActivity",
@@ -69,8 +71,8 @@ const reportDefinitions: ReportDefinition[] = [
     },
     {
         kind: "billing",
-        title: "Facturación por período",
-        modalTitle: "Facturación por período",
+        title: "Facturación",
+        modalTitle: "Facturación",
         chartLabel: "Facturación",
     },
     {
@@ -83,18 +85,21 @@ const reportDefinitions: ReportDefinition[] = [
 
 function formatPeriod(period: string, granularity: string): string {
     if (granularity === "weekly") {
-        return formatClassDate(period);
+        return formatWeekPeriod(period);
     }
     if (granularity === "quarterly") {
-        return period.replace("-Q", " T");
+        const [year, quarter] = period.split("-Q");
+        return `Trimestre ${quarter} ${year}`;
     }
     if (granularity === "semester") {
-        return period.replace("-S", " S");
+        const [year, semester] = period.split("-S");
+        return `Semestre ${semester} ${year}`;
     }
 
     const [year, month] = period.split("-");
     const date = new Date(Number(year), Number(month) - 1, 1);
-    return new Intl.DateTimeFormat("es-AR", { month: "short", year: "2-digit" }).format(date);
+    const monthLabel = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(date);
+    return `Mes ${monthLabel}`;
 }
 
 function formatClassDate(value: string): string {
@@ -102,6 +107,22 @@ function formatClassDate(value: string): string {
     const [year, month, day] = value.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     return new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short" }).format(date);
+}
+
+function formatShortDate(value: Date): string {
+    return new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "2-digit" }).format(value);
+}
+
+function formatWeekPeriod(period: string): string {
+    if (!isValidIsoDate(period)) {
+        return period;
+    }
+
+    const [year, month, day] = period.split("-").map(Number);
+    const weekStart = new Date(year, month - 1, day);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    return `Semana ${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)}`;
 }
 
 function formatCurrency(value: number): string {
@@ -117,6 +138,57 @@ function formatInputDate(date: Date): string {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+}
+
+function formatArgentineInputDate(value: string): string {
+    if (!isValidIsoDate(value)) return value;
+    const [year, month, day] = value.split("-");
+    return `${day}/${month}/${year}`;
+}
+
+function isoDateToLocalDate(value: string): Date | null {
+    if (!isValidIsoDate(value)) return null;
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function firstDayOfMonth(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date: Date, months: number): Date {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function calendarDaysForMonth(monthDate: Date): Array<Date | null> {
+    const firstDay = firstDayOfMonth(monthDate);
+    const offset = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(firstDay.getFullYear(), firstDay.getMonth() + 1, 0).getDate();
+    const days: Array<Date | null> = Array.from({ length: offset }, () => null);
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+        days.push(new Date(firstDay.getFullYear(), firstDay.getMonth(), day));
+    }
+
+    return days;
+}
+
+function normalizeArgentineDateInput(value: string): string {
+    if (isValidIsoDate(value)) return formatArgentineInputDate(value);
+
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function parseArgentineInputDate(value: string): string | null {
+    const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!match) return null;
+
+    const [, day, month, year] = match;
+    const isoDate = `${year}-${month}-${day}`;
+    return isValidIsoDate(isoDate) ? isoDate : null;
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -144,6 +216,110 @@ function validatePeriod(startDate: string, endDate: string): string | null {
         return "La fecha de inicio no puede ser posterior a la fecha de fin";
     }
     return null;
+}
+
+function ArgentineDateInput({
+    id,
+    value,
+    onChange,
+}: {
+    id: string;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const selectedDate = isoDateToLocalDate(value);
+    const [isOpen, setIsOpen] = useState(false);
+    const [visibleMonth, setVisibleMonth] = useState(() => firstDayOfMonth(selectedDate ?? new Date()));
+    const calendarDays = useMemo(() => calendarDaysForMonth(visibleMonth), [visibleMonth]);
+    const monthLabel = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(visibleMonth);
+
+    return (
+        <div className="relative">
+            <div className="flex rounded-lg border border-slate-200 bg-white focus-within:border-cef-primary">
+                <input
+                    id={id}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="dd/mm/aaaa"
+                    value={formatArgentineInputDate(value)}
+                    onChange={(event) => {
+                        const formatted = normalizeArgentineDateInput(event.target.value);
+                        onChange(parseArgentineInputDate(formatted) ?? formatted);
+                    }}
+                    required
+                    className={`${DATE_INPUT_CLASS} border-0 focus:border-transparent`}
+                />
+                <button
+                    type="button"
+                    onClick={() => {
+                        setVisibleMonth(firstDayOfMonth(selectedDate ?? new Date()));
+                        setIsOpen((current) => !current);
+                    }}
+                    className="inline-flex w-10 shrink-0 items-center justify-center rounded-r-lg text-slate-500 transition hover:bg-slate-100 hover:text-cef-primary"
+                    aria-label="Abrir calendario"
+                >
+                    <CalendarDays size={16} />
+                </button>
+            </div>
+
+            {isOpen && (
+                <div className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                    <div className="mb-3 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
+                            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-cef-primary"
+                            aria-label="Mes anterior"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <p className="text-sm font-semibold capitalize text-slate-800">{monthLabel}</p>
+                        <button
+                            type="button"
+                            onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
+                            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-cef-primary"
+                            aria-label="Mes siguiente"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                        {ARGENTINE_WEEKDAYS.map((day) => (
+                            <span key={day} className="py-1 text-[11px] font-bold uppercase text-slate-400">
+                                {day}
+                            </span>
+                        ))}
+                        {calendarDays.map((date, index) => {
+                            if (!date) {
+                                return <span key={`empty-${index}`} className="h-8" />;
+                            }
+
+                            const dateValue = formatInputDate(date);
+                            const isSelected = dateValue === value;
+                            return (
+                                <button
+                                    key={dateValue}
+                                    type="button"
+                                    onClick={() => {
+                                        onChange(dateValue);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`h-8 rounded-lg text-sm font-semibold transition ${
+                                        isSelected
+                                            ? "bg-cef-primary text-white"
+                                            : "text-slate-700 hover:bg-cef-primary/10 hover:text-cef-primary"
+                                    }`}
+                                >
+                                    {date.getDate()}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
 
 function getDefaultPeriod(kind: ReportKind): { startDate: string; endDate: string } {
@@ -184,26 +360,22 @@ function PeriodFilterPanel({
     return (
         <form onSubmit={onSubmit} className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                <label className="space-y-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Inicio</span>
-                    <input
-                        type="date"
+                <div className="space-y-1.5">
+                    <label htmlFor="report-start-date" className="text-xs font-semibold uppercase tracking-wider text-slate-500">Inicio</label>
+                    <ArgentineDateInput
+                        id="report-start-date"
                         value={startDate}
-                        onChange={(event) => onStartDateChange(event.target.value)}
-                        required
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition focus:border-cef-primary"
+                        onChange={onStartDateChange}
                     />
-                </label>
-                <label className="space-y-1.5">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Fin</span>
-                    <input
-                        type="date"
+                </div>
+                <div className="space-y-1.5">
+                    <label htmlFor="report-end-date" className="text-xs font-semibold uppercase tracking-wider text-slate-500">Fin</label>
+                    <ArgentineDateInput
+                        id="report-end-date"
                         value={endDate}
-                        onChange={(event) => onEndDateChange(event.target.value)}
-                        required
-                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition focus:border-cef-primary"
+                        onChange={onEndDateChange}
                     />
-                </label>
+                </div>
                 <button
                     type="submit"
                     disabled={isLoading}
@@ -253,32 +425,26 @@ function UsersChart({
     activeLineColor?: string;
 }) {
     const chartData = useMemo(
-        () =>
-            report.points.map((point) => ({
+        () => {
+            if (report.points.length === 0) {
+                return [{ period: "Sin datos", total: 0 }];
+            }
+
+            return report.points.map((point) => ({
                 period: formatPeriod(point.period, report.granularity),
                 total: point.total_count,
-            })),
+            }));
+        },
         [report.granularity, report.points]
     );
 
     const yTicks = useMemo(() => {
-        const maxTotal = Math.max(...report.points.map((point) => point.total_count), 0);
+        const maxTotal = Math.max(...chartData.map((point) => point.total), 0);
         return Array.from({ length: maxTotal + 2 }, (_, index) => index);
-    }, [report.points]);
-
-    if (report.points.length === 0) {
-        return (
-            <div className="h-64 rounded-xl border border-slate-200 bg-slate-50 grid place-items-center">
-                <p className="text-sm font-medium text-slate-600">Sin datos para el periodo.</p>
-            </div>
-        );
-    }
+    }, [chartData]);
 
     return (
-        <div className="space-y-2">
-            <p className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Vista {report.granularity_label.toLowerCase()}
-            </p>
+        <div>
         <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white px-3 pb-2 pt-4" aria-label={title}>
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 20, right: 28, bottom: 6, left: 0 }}>
@@ -344,11 +510,18 @@ function ActivityUsersBarChart({
     seriesLabel: string;
 }) {
     const activities = useMemo(
-        () => Array.from(new Set(report.points.map((point) => point.activity))).sort(),
-        [report.points]
+        () => {
+            const values = Array.from(new Set(report.points.map((point) => point.activity))).sort();
+            return values.length > 0 ? values : [seriesLabel];
+        },
+        [report.points, seriesLabel]
     );
     const chartData = useMemo(() => {
         const periods = Array.from(new Set(report.points.map((point) => point.period)));
+        if (periods.length === 0) {
+            return [{ period: "Sin datos", [seriesLabel]: 0 }];
+        }
+
         return periods.map((period) => {
             const item: Record<string, string | number> = {
                 period: formatPeriod(period, report.granularity),
@@ -361,7 +534,7 @@ function ActivityUsersBarChart({
             }
             return item;
         });
-    }, [activities, report.granularity, report.points]);
+    }, [activities, report.granularity, report.points, seriesLabel]);
 
     const yTicks = useMemo(() => {
         const maxTotal = Math.max(
@@ -373,19 +546,8 @@ function ActivityUsersBarChart({
         return Array.from({ length: maxTotal + 2 }, (_, index) => index);
     }, [activities, chartData]);
 
-    if (report.points.length === 0) {
-        return (
-            <div className="h-64 rounded-xl border border-slate-200 bg-slate-50 grid place-items-center">
-                <p className="text-sm font-medium text-slate-600">Sin reservas pagadas en el periodo.</p>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-2">
-            <p className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Vista {report.granularity_label.toLowerCase()}
-            </p>
+        <div>
         <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white px-3 pb-2 pt-4" aria-label={title}>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 28, bottom: 12, left: 0 }}>
@@ -423,7 +585,16 @@ function ActivityUsersBarChart({
                             fill={activityColors[index % activityColors.length]}
                             radius={index === activities.length - 1 ? [10, 10, 0, 0] : [0, 0, 0, 0]}
                             isAnimationActive={false}
-                        />
+                        >
+                            <LabelList
+                                dataKey={activity}
+                                position="top"
+                                offset={6}
+                                fill="#0f172a"
+                                fontSize={12}
+                                fontWeight={800}
+                            />
+                        </Bar>
                     ))}
                 </BarChart>
             </ResponsiveContainer>
@@ -432,93 +603,25 @@ function ActivityUsersBarChart({
     );
 }
 
-function ClassSelectionPanel({
-    classes,
-    isLoading,
-    onSelect,
-}: {
-    classes: ReportClassOption[];
-    isLoading: boolean;
-    onSelect: (classId: string) => void;
-}) {
-    if (isLoading) {
-        return (
-            <div className="grid h-80 place-items-center">
-                <Loader2 className="h-8 w-8 animate-spin text-cef-primary" />
-            </div>
-        );
-    }
-
-    if (classes.length === 0) {
-        return (
-            <div className="grid h-80 place-items-center rounded-xl border border-slate-200 bg-slate-50">
-                <p className="text-sm font-medium text-slate-600">No hay clases disponibles para reportar.</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="grid max-h-[62vh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
-            {classes.map((clase) => (
-                <button
-                    key={clase.id}
-                    type="button"
-                    onClick={() => onSelect(clase.id)}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-cef-primary/40 hover:bg-cef-primary/5"
-                >
-                    <div className="flex items-start gap-3">
-                        <div className="rounded-xl bg-cef-primary/15 p-2.5 text-cef-primary">
-                            <CalendarX size={20} />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-800">{clase.disciplina}</p>
-                            <p className="mt-1 text-xs font-medium text-slate-500">{classSubtitle(clase)}</p>
-                            <p className="mt-2 text-xs text-slate-400">{clase.nombre}</p>
-                        </div>
-                    </div>
-                </button>
-            ))}
-        </div>
-    );
-}
-
-function ClassCancellationsChart({
+function ClassCancellationsRankingPanel({
     report,
-    seriesLabel,
     startDate,
     endDate,
     error,
     isLoading,
-    onBack,
     onStartDateChange,
     onEndDateChange,
     onSubmit,
 }: {
-    report: ClassCancellationsReport;
-    seriesLabel: string;
+    report: ClassCancellationsRankingReport | null;
     startDate: string;
     endDate: string;
     error: string | null;
     isLoading: boolean;
-    onBack: () => void;
     onStartDateChange: (value: string) => void;
     onEndDateChange: (value: string) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-    const chartData = useMemo(
-        () =>
-            report.points.map((point) => ({
-                period: formatPeriod(point.period, report.granularity),
-                total: point.total_count,
-            })),
-        [report.granularity, report.points]
-    );
-
-    const yTicks = useMemo(() => {
-        const maxTotal = Math.max(...report.points.map((point) => point.total_count), 0);
-        return Array.from({ length: maxTotal + 2 }, (_, index) => index);
-    }, [report.points]);
-
     return (
         <div className="space-y-3">
             <PeriodFilterPanel
@@ -530,77 +633,62 @@ function ClassCancellationsChart({
                 onEndDateChange={onEndDateChange}
                 onSubmit={onSubmit}
             />
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div>
-                    <p className="text-sm font-semibold text-slate-800">{report.clase.disciplina}</p>
-                    <p className="mt-0.5 text-xs font-medium text-slate-500">{classSubtitle(report.clase)}</p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-cef-primary">
-                        {formatClassDate(startDate)} - {formatClassDate(endDate)}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Vista {report.granularity_label.toLowerCase()}
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={onBack}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-cef-primary/5 hover:text-cef-primary"
-                >
-                    <ArrowLeft size={14} />
-                    Elegir otra clase
-                </button>
-            </div>
 
-            {report.points.length === 0 ? (
-                <div className="grid h-64 place-items-center rounded-xl border border-slate-200 bg-slate-50">
-                    <p className="text-sm font-medium text-slate-600">No hubo ocurrencias de esta clase en el período.</p>
+            {isLoading ? (
+                <div className="grid h-80 place-items-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-cef-primary" />
+                </div>
+            ) : report ? (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-800">Ranking de clases</p>
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-cef-primary">
+                                {formatClassDate(startDate)} - {formatClassDate(endDate)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg bg-cef-danger/10 px-3 py-2 text-right">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-cef-danger">Total</p>
+                            <p className="text-lg font-black text-slate-900">{report.total_count}</p>
+                        </div>
+                    </div>
+                    <div className="max-h-[58vh] overflow-auto">
+                        <table className="w-full min-w-[720px] border-collapse text-left">
+                            <thead className="sticky top-0 z-10 bg-white">
+                                <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    <th className="w-20 px-4 py-3">Puesto</th>
+                                    <th className="px-4 py-3">Clase</th>
+                                    <th className="px-4 py-3">Horario</th>
+                                    <th className="px-4 py-3 text-right">Cancelaciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {report.items.map((item, index) => (
+                                    <tr key={item.clase.id} className="border-b border-slate-100 last:border-0">
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-100 px-2 text-sm font-black text-slate-700">
+                                                {index + 1}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <p className="text-sm font-semibold text-slate-900">{item.clase.disciplina}</p>
+                                            <p className="mt-1 text-xs text-slate-500">{item.clase.nombre}</p>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                                            {classSubtitle(item.clase)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <span className="text-lg font-black text-slate-950">{item.total_count}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             ) : (
-                <div className="h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white px-3 pb-2 pt-4">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 20, right: 28, bottom: 12, left: 0 }}>
-                            <CartesianGrid stroke="rgba(15, 23, 42, 0.12)" vertical={false} />
-                            <XAxis
-                                dataKey="period"
-                                tick={{ fill: "#064e3b", fontSize: 13, fontWeight: 700 }}
-                                tickLine={false}
-                                axisLine={{ stroke: "#0f766e" }}
-                            />
-                            <YAxis
-                                domain={[0, Math.max(...yTicks)]}
-                                ticks={yTicks}
-                                allowDecimals={false}
-                                tick={{ fill: "#0f172a", fontSize: 13, fontWeight: 700 }}
-                                tickLine={false}
-                                axisLine={{ stroke: "#0f766e" }}
-                            />
-                            <Tooltip
-                                formatter={(value) => [value, seriesLabel]}
-                                labelStyle={{ color: "#0f172a", fontWeight: 700 }}
-                                contentStyle={{
-                                    borderRadius: 10,
-                                    border: "1px solid rgba(15, 118, 110, 0.28)",
-                                    color: "#0f172a",
-                                }}
-                            />
-                            <Bar
-                                name={seriesLabel}
-                                dataKey="total"
-                                fill="#be123c"
-                                radius={[10, 10, 0, 0]}
-                                isAnimationActive={false}
-                            >
-                                <LabelList
-                                    dataKey="total"
-                                    position="top"
-                                    offset={8}
-                                    fill="#0f172a"
-                                    fontSize={18}
-                                    fontWeight={800}
-                                />
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
+                <div className="grid h-80 place-items-center">
+                    <p className="text-sm text-cef-danger">No se pudo cargar el reporte.</p>
                 </div>
             )}
         </div>
@@ -627,67 +715,35 @@ function BillingReportPanel({
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
     const chartData = useMemo(
-        () =>
-            report?.points.map((point) => ({
+        () => {
+            if (!report || report.points.length === 0) {
+                return [{ period: "Sin datos", total: 0 }];
+            }
+
+            return report.points.map((point) => ({
                 period: formatPeriod(point.period, report.granularity),
                 total: point.total_revenue,
-            })) ?? [],
+            }));
+        },
         [report]
     );
 
     return (
         <div className="mx-auto w-full max-w-4xl space-y-4">
-            <form onSubmit={onSubmit} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                    <label className="space-y-1.5">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Inicio</span>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(event) => onStartDateChange(event.target.value)}
-                            required
-                            className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm font-medium outline-none transition focus:border-cef-primary"
-                        />
-                    </label>
-                    <label className="space-y-1.5">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Fin</span>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(event) => onEndDateChange(event.target.value)}
-                            required
-                            className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2 text-sm font-medium outline-none transition focus:border-cef-primary"
-                        />
-                    </label>
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="inline-flex h-10 items-center justify-center rounded-lg bg-cef-primary px-4 text-sm font-semibold text-white transition hover:bg-cef-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Consultar"}
-                    </button>
-                </div>
-            </form>
+            <PeriodFilterPanel
+                startDate={startDate}
+                endDate={endDate}
+                error={error}
+                isLoading={isLoading}
+                onStartDateChange={onStartDateChange}
+                onEndDateChange={onEndDateChange}
+                onSubmit={onSubmit}
+            />
 
-            {error && (
-                <div className="rounded-xl border border-cef-danger/30 bg-cef-danger/10 p-4">
-                    <p className="text-sm font-semibold text-cef-danger">{error}</p>
-                </div>
-            )}
-
-            {report && (
+            {report ? (
                 <div className="rounded-xl border border-slate-200 bg-white p-5">
-                    {report.message ? (
-                        <p className="text-base font-semibold text-slate-900">{report.message}</p>
-                    ) : (
-                        <>
-                            <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Ganancia total</p>
-                            <p className="mt-2 text-3xl font-black text-slate-950">{formatCurrency(report.total_revenue)}</p>
-                        </>
-                    )}
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        Vista {report.granularity_label.toLowerCase()}
-                    </p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Ganancia total</p>
+                    <p className="mt-2 text-3xl font-black text-slate-950">{formatCurrency(report.total_revenue)}</p>
                     <div className="mt-3 h-[360px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 pb-2 pt-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData} margin={{ top: 20, right: 28, bottom: 12, left: 0 }}>
@@ -720,12 +776,21 @@ function BillingReportPanel({
                                     fill="#0f766e"
                                     radius={[10, 10, 0, 0]}
                                     isAnimationActive={false}
-                                />
+                                >
+                                    <LabelList
+                                        dataKey="total"
+                                        position="top"
+                                        offset={8}
+                                        fill="#0f172a"
+                                        fontSize={14}
+                                        fontWeight={800}
+                                    />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }
@@ -733,28 +798,22 @@ function BillingReportPanel({
 function ReportModal({
     definition,
     report,
-    reportClasses,
     isLoading,
     billingError,
     billingStartDate,
     billingEndDate,
     onClose,
-    onClassSelect,
-    onClassBack,
     onBillingStartDateChange,
     onBillingEndDateChange,
     onBillingSubmit,
 }: {
     definition: ReportDefinition;
     report: ReportData | null;
-    reportClasses: ReportClassOption[];
     isLoading: boolean;
     billingError: string | null;
     billingStartDate: string;
     billingEndDate: string;
     onClose: () => void;
-    onClassSelect: (classId: string) => void;
-    onClassBack: () => void;
     onBillingStartDateChange: (value: string) => void;
     onBillingEndDateChange: (value: string) => void;
     onBillingSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -791,26 +850,16 @@ function ReportModal({
                             onSubmit={onBillingSubmit}
                         />
                     ) : definition.kind === "classCancellations" ? (
-                        report ? (
-                            <ClassCancellationsChart
-                                report={report as ClassCancellationsReport}
-                                seriesLabel={definition.chartLabel}
-                                startDate={billingStartDate}
-                                endDate={billingEndDate}
-                                error={billingError}
-                                isLoading={isLoading}
-                                onBack={onClassBack}
-                                onStartDateChange={onBillingStartDateChange}
-                                onEndDateChange={onBillingEndDateChange}
-                                onSubmit={onBillingSubmit}
-                            />
-                        ) : (
-                            <ClassSelectionPanel
-                                classes={reportClasses}
-                                isLoading={isLoading}
-                                onSelect={onClassSelect}
-                            />
-                        )
+                        <ClassCancellationsRankingPanel
+                            report={report as ClassCancellationsRankingReport | null}
+                            startDate={billingStartDate}
+                            endDate={billingEndDate}
+                            error={billingError}
+                            isLoading={isLoading}
+                            onStartDateChange={onBillingStartDateChange}
+                            onEndDateChange={onBillingEndDateChange}
+                            onSubmit={onBillingSubmit}
+                        />
                     ) : (
                         <>
                             <PeriodFilterPanel
@@ -857,18 +906,15 @@ export default function ReportsView() {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [report, setReport] = useState<ReportData | null>(null);
-    const [reportClasses, setReportClasses] = useState<ReportClassOption[]>([]);
     const [activeReport, setActiveReport] = useState<ReportDefinition>(reportDefinitions[0]);
     const [billingStartDate, setBillingStartDate] = useState("");
     const [billingEndDate, setBillingEndDate] = useState("");
     const [billingError, setBillingError] = useState<string | null>(null);
-    const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
     const loadReportData = async (
         definition: ReportDefinition,
         startDate: string,
         endDate: string,
-        classId: string | null = selectedClassId,
     ) => {
         const periodError = validatePeriod(startDate, endDate);
         if (periodError) {
@@ -893,11 +939,7 @@ export default function ReportsView() {
         }
 
         if (definition.kind === "classCancellations") {
-            if (!classId) {
-                setIsLoading(false);
-                return;
-            }
-            const data = await getClassCancellationsReport(classId, startDate, endDate);
+            const data = await getClassCancellationsReport(startDate, endDate);
             setReport(data);
             setIsLoading(false);
             return;
@@ -920,33 +962,15 @@ export default function ReportsView() {
         setIsOpen(true);
         setReport(null);
         setBillingError(null);
-        setSelectedClassId(null);
         setBillingStartDate(defaultPeriod.startDate);
         setBillingEndDate(defaultPeriod.endDate);
 
         if (definition.kind === "billing") {
-            await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate, null);
+            await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate);
             return;
         }
 
-        if (definition.kind === "classCancellations") {
-            setIsLoading(true);
-            setReportClasses(await getReportClasses());
-            setIsLoading(false);
-            return;
-        }
-
-        await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate, null);
-    };
-
-    const handleClassSelect = async (classId: string) => {
-        setSelectedClassId(classId);
-        await loadReportData(activeReport, billingStartDate, billingEndDate, classId);
-    };
-
-    const handleClassBack = () => {
-        setSelectedClassId(null);
-        setReport(null);
+        await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate);
     };
 
     const handleBillingSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -998,14 +1022,11 @@ export default function ReportsView() {
                 <ReportModal
                     definition={activeReport}
                     report={report}
-                    reportClasses={reportClasses}
                     isLoading={isLoading}
                     billingError={billingError}
                     billingStartDate={billingStartDate}
                     billingEndDate={billingEndDate}
                     onClose={() => setIsOpen(false)}
-                    onClassSelect={handleClassSelect}
-                    onClassBack={handleClassBack}
                     onBillingStartDateChange={setBillingStartDate}
                     onBillingEndDateChange={setBillingEndDate}
                     onBillingSubmit={handleBillingSubmit}

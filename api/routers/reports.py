@@ -11,6 +11,7 @@ from models.usuario import Usuario
 from schemas.report import (
     ActiveUsersByActivityReportResponse,
     BillingReportResponse,
+    ClassCancellationsRankingResponse,
     ClassCancellationsReportResponse,
     ReportClassOption,
     UserRegistrationsReportResponse,
@@ -76,6 +77,16 @@ async def list_report_classes(
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
     return await ReportService(db).list_report_classes()
+
+
+@router.get("/class-cancellations", response_model=ClassCancellationsRankingResponse)
+async def get_class_cancellations_ranking_report(
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
+):
+    return await ReportService(db).get_class_cancellations_ranking_report(start_date, end_date)
 
 
 @router.get("/class-cancellations/{clase_template_id}", response_model=ClassCancellationsReportResponse)

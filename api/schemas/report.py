@@ -63,3 +63,15 @@ class ClassCancellationsReportResponse(BaseModel):
     granularity_label: str
     clase: ReportClassOption
     points: list[ClassCancellationsPoint]
+
+
+class ClassCancellationRankingItem(BaseModel):
+    clase: ReportClassOption
+    total_count: int
+
+
+class ClassCancellationsRankingResponse(BaseModel):
+    start_date: date
+    end_date: date
+    total_count: int
+    items: list[ClassCancellationRankingItem]

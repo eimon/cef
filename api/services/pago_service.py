@@ -22,6 +22,7 @@ from repositories.configuracion_repository import ConfiguracionRepository
 from schemas.inscripcion import InscripcionIndividualCreate
 from schemas.pago import DeudaPendienteResponse, MiPagoResponse
 from schemas.suscripcion import SuscripcionCreate
+from services.email_service import EmailService
 from services.inscripcion_service import InscripcionService
 from services.suscripcion_service import SuscripcionService
 from services.waitlist_service import WaitlistService
@@ -53,6 +54,26 @@ class PagoService:
         if not self._sdk:
             self._sdk = mercadopago.SDK(settings.MP_ACCESS_TOKEN)
         return self._sdk
+
+    async def _send_payment_notification(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+        payment: dict,
+        descripcion: str,
+    ) -> None:
+        if payment.get("status") != "approved":
+            return
+
+        monto = Decimal(str(payment.get("transaction_amount") or 0))
+        await EmailService().send_payment_notification(
+            to_email=current_user.email,
+            nombre=current_user.nombre,
+            monto=monto,
+            descripcion=descripcion,
+            payment_id=str(payment_id),
+            fecha_pago=datetime.now(LOCAL_TZ),
+        )
 
     async def get_mis_pagos(self, current_user: Usuario) -> list[MiPagoResponse]:
         pagos = await self.repo.list_by_usuario(current_user.id)
@@ -352,6 +373,12 @@ class PagoService:
         result = await InscripcionService(self.db).inscribir_individual(
             current_user, data, mp_payment_id=str(payment_id)
         )
+        await self._send_payment_notification(
+            current_user,
+            payment_id,
+            payment,
+            "Inscripcion individual",
+        )
 
         return {"status": "approved", **result.model_dump()}
 
@@ -536,6 +563,12 @@ class PagoService:
         )
         self.db.add(pago)
         await self.db.flush()
+        await self._send_payment_notification(
+            current_user,
+            payment_id,
+            payment,
+            "Pago de saldo pendiente",
+        )
 
         return {"status": "approved", "pago_id": str(pago.id)}
 
@@ -641,6 +674,12 @@ class PagoService:
         await waitlist_service.trigger_promotion_for_slot(
             confirmed_entry.clase_template_id,
             confirmed_entry.fecha,
+        )
+        await self._send_payment_notification(
+            current_user,
+            payment_id,
+            payment,
+            "Inscripcion desde lista de espera",
         )
 
         return {"status": "approved", **result.model_dump()}
@@ -814,6 +853,12 @@ class PagoService:
         result = await SuscripcionService(self.db).suscribirse(
             current_user, data, mp_payment_id=str(payment_id)
         )
+        await self._send_payment_notification(
+            current_user,
+            payment_id,
+            payment,
+            "Suscripcion",
+        )
 
         return {"status": "approved", **result.model_dump()}
 
@@ -867,6 +912,12 @@ class PagoService:
             suscripcion_id,
             monto,
             mp_payment_id=str(payment_id),
+        )
+        await self._send_payment_notification(
+            current_user,
+            payment_id,
+            payment,
+            "Renovacion de suscripcion",
         )
 
         return {"status": "approved", **result.model_dump()}
