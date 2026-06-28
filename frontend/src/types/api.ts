@@ -24,21 +24,34 @@ export interface UserRegistrationsPoint {
 }
 
 export interface UserRegistrationsReport {
+    granularity: string;
+    granularity_label: string;
     points: UserRegistrationsPoint[];
 }
 
 export interface ActiveUsersByActivityPoint {
+    period: string;
     activity: string;
     total_count: number;
 }
 
 export interface ActiveUsersByActivityReport {
+    granularity: string;
+    granularity_label: string;
     points: ActiveUsersByActivityPoint[];
 }
 
+export interface BillingReportPoint {
+    period: string;
+    total_revenue: number;
+}
+
 export interface BillingReport {
+    granularity: string;
+    granularity_label: string;
     total_revenue: number;
     message: string | null;
+    points: BillingReportPoint[];
 }
 
 export interface ReportClassOption {
@@ -51,11 +64,13 @@ export interface ReportClassOption {
 }
 
 export interface ClassCancellationsPoint {
-    class_date: string;
+    period: string;
     total_count: number;
 }
 
 export interface ClassCancellationsReport {
+    granularity: string;
+    granularity_label: string;
     clase: ReportClassOption;
     points: ClassCancellationsPoint[];
 }

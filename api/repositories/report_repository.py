@@ -1,14 +1,15 @@
 import uuid
 from datetime import date, datetime, time
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import and_, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.enums import EstadoPago, UserRole
+from core.enums import EstadoPago, TipoInscripcion, UserRole
 from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.pagos import Pago
+from models.suscripciones import Suscripcion, SuscripcionReserva
 from models.usuario import Usuario
 
 
@@ -16,62 +17,118 @@ class ReportRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def count_present_users_by_month(self, roles: list[UserRole]) -> list[tuple[str, int]]:
-        month_start = func.date_trunc("month", func.coalesce(Usuario.created_at, func.now()))
-        period = func.to_char(month_start, "YYYY-MM").label("period")
-        period_count = func.count(Usuario.id).label("period_count")
-
-        result = await self.db.execute(
-            select(period, period_count)
-            .where(Usuario.role.in_(roles))
-            .group_by(month_start)
-            .order_by(month_start)
-        )
-
-        return [(str(row.period), int(row.period_count)) for row in result.all()]
-
-    async def count_deleted_users_by_month(self) -> list[tuple[str, int]]:
-        month_start = func.date_trunc(
-            "month",
-            func.coalesce(Usuario.updated_at, Usuario.created_at, func.now()),
-        )
-        period = func.to_char(month_start, "YYYY-MM").label("period")
-        period_count = func.count(Usuario.id).label("period_count")
-
-        result = await self.db.execute(
-            select(period, period_count)
-            .where(Usuario.activo.is_(False))
-            .group_by(month_start)
-            .order_by(month_start)
-        )
-
-        return [(str(row.period), int(row.period_count)) for row in result.all()]
-
-    async def count_active_clients_by_activity(
+    async def count_present_users_by_date(
         self,
-        week_start: date,
-        week_end: date,
-    ) -> list[tuple[str, int]]:
-        active_users = func.count(distinct(Asistencia.usuario_id)).label("total_count")
+        roles: list[UserRole],
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[tuple[date, int]]:
+        created_at = func.coalesce(Usuario.created_at, func.now())
+        event_date = func.date(created_at).label("event_date")
+        period_count = func.count(Usuario.id).label("period_count")
 
-        result = await self.db.execute(
-            select(ClaseTemplate.disciplina, active_users)
-            .join(ClaseInstancia, ClaseInstancia.clase_template_id == ClaseTemplate.id)
-            .join(Asistencia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+        query = select(event_date, period_count).where(Usuario.role.in_(roles))
+        if start_date:
+            query = query.where(created_at >= datetime.combine(start_date, time.min))
+        if end_date:
+            query = query.where(created_at <= datetime.combine(end_date, time.max))
+
+        result = await self.db.execute(query.group_by(event_date).order_by(event_date))
+
+        return [(row.event_date, int(row.period_count)) for row in result.all()]
+
+    async def count_deleted_users_by_date(
+        self,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> list[tuple[date, int]]:
+        deleted_at = func.coalesce(Usuario.updated_at, Usuario.created_at, func.now())
+        event_date = func.date(deleted_at).label("event_date")
+        period_count = func.count(Usuario.id).label("period_count")
+
+        query = select(event_date, period_count).where(Usuario.activo.is_(False))
+        if start_date:
+            query = query.where(deleted_at >= datetime.combine(start_date, time.min))
+        if end_date:
+            query = query.where(deleted_at <= datetime.combine(end_date, time.max))
+
+        result = await self.db.execute(query.group_by(event_date).order_by(event_date))
+
+        return [(row.event_date, int(row.period_count)) for row in result.all()]
+
+    async def count_paid_reservations_by_activity(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> list[tuple[date, str, int]]:
+        individual_reservations = (
+            select(
+                ClaseInstancia.fecha.label("event_date"),
+                ClaseTemplate.disciplina.label("activity"),
+                Asistencia.id.label("reservation_id"),
+            )
+            .select_from(Asistencia)
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
             .join(Usuario, Usuario.id == Asistencia.usuario_id)
+            .join(
+                Pago,
+                and_(
+                    Pago.usuario_id == Asistencia.usuario_id,
+                    Pago.clase_instancia_id == Asistencia.clase_instancia_id,
+                ),
+            )
             .where(
                 Usuario.role == UserRole.CLIENTE,
                 Usuario.activo.is_(True),
                 ClaseInstancia.activo.is_(True),
                 ClaseInstancia.cancelada.is_(False),
-                ClaseInstancia.fecha >= week_start,
-                ClaseInstancia.fecha <= week_end,
+                ClaseInstancia.fecha >= start_date,
+                ClaseInstancia.fecha <= end_date,
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                Asistencia.cancelo.is_(False),
+                Pago.activo.is_(True),
+                Pago.estado == EstadoPago.PAGADO,
             )
-            .group_by(ClaseTemplate.disciplina)
-            .order_by(active_users.desc(), ClaseTemplate.disciplina)
+            .distinct()
         )
 
-        return [(str(row.disciplina), int(row.total_count)) for row in result.all()]
+        subscription_reservations = (
+            select(
+                ClaseInstancia.fecha.label("event_date"),
+                ClaseTemplate.disciplina.label("activity"),
+                SuscripcionReserva.id.label("reservation_id"),
+            )
+            .select_from(SuscripcionReserva)
+            .join(Suscripcion, SuscripcionReserva.suscripcion_id == Suscripcion.id)
+            .join(ClaseInstancia, SuscripcionReserva.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .join(Usuario, Usuario.id == Suscripcion.usuario_id)
+            .join(Pago, Pago.suscripcion_id == Suscripcion.id)
+            .where(
+                Usuario.role == UserRole.CLIENTE,
+                Usuario.activo.is_(True),
+                ClaseInstancia.activo.is_(True),
+                ClaseInstancia.cancelada.is_(False),
+                ClaseInstancia.fecha >= start_date,
+                ClaseInstancia.fecha <= end_date,
+                SuscripcionReserva.activa.is_(True),
+                Pago.activo.is_(True),
+                Pago.estado == EstadoPago.PAGADO,
+            )
+            .distinct()
+        )
+
+        reservations = union_all(individual_reservations, subscription_reservations).subquery()
+        total_count = func.count().label("total_count")
+
+        result = await self.db.execute(
+            select(reservations.c.event_date, reservations.c.activity, total_count)
+            .group_by(reservations.c.event_date, reservations.c.activity)
+            .order_by(reservations.c.event_date, reservations.c.activity)
+        )
+
+        return [(row.event_date, str(row.activity), int(row.total_count)) for row in result.all()]
 
     async def sum_paid_revenue_by_period(
         self,
@@ -93,6 +150,30 @@ class ReportRepository:
 
         total = result.scalar_one()
         return float(total) if total is not None else None
+
+    async def sum_paid_revenue_by_date(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> list[tuple[date, float]]:
+        start_datetime = datetime.combine(start_date, time.min)
+        end_datetime = datetime.combine(end_date, time.max)
+        event_date = func.date(Pago.fecha_pago).label("event_date")
+        total_revenue = func.sum(Pago.monto).label("total_revenue")
+
+        result = await self.db.execute(
+            select(event_date, total_revenue)
+            .where(
+                Pago.activo.is_(True),
+                Pago.estado == EstadoPago.PAGADO,
+                Pago.fecha_pago >= start_datetime,
+                Pago.fecha_pago <= end_datetime,
+            )
+            .group_by(event_date)
+            .order_by(event_date)
+        )
+
+        return [(row.event_date, float(row.total_revenue)) for row in result.all()]
 
     async def list_available_classes(self) -> list[ClaseTemplate]:
         result = await self.db.execute(

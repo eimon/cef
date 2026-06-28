@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy.future import select
 
 from core.database import AsyncSessionLocal
-from core.enums import DiaSemana, EstadoPago, TipoInscripcion, UserRole
+from core.enums import DiaSemana, EstadoPago, EstadoSuscripcion, TipoInscripcion, UserRole
 from core.security import get_password_hash
 from models.asistencia import Asistencia
 from models.clase_instancia import ClaseInstancia
@@ -34,6 +34,39 @@ from models.profesor import Profesor
 from models.sala import Sala
 from models.suscripciones import Suscripcion, SuscripcionReserva
 from models.usuario import Usuario
+
+
+WEEKDAY_INDEX_BY_DIA_SEMANA = {
+    DiaSemana.LUNES: 0,
+    DiaSemana.MARTES: 1,
+    DiaSemana.MIERCOLES: 2,
+    DiaSemana.JUEVES: 3,
+    DiaSemana.VIERNES: 4,
+    DiaSemana.SABADO: 5,
+    DiaSemana.DOMINGO: 6,
+}
+
+
+def _first_weekday_on_or_after(start_date: date, dia_semana: DiaSemana) -> date:
+    weekday = WEEKDAY_INDEX_BY_DIA_SEMANA[dia_semana]
+    days_until = (weekday - start_date.weekday()) % 7
+    return start_date + timedelta(days=days_until)
+
+
+def _next_weekday_at_least(start_date: date, dia_semana: DiaSemana, min_days: int = 2) -> date:
+    weekday = WEEKDAY_INDEX_BY_DIA_SEMANA[dia_semana]
+    days_until = (weekday - start_date.weekday()) % 7
+    if days_until < min_days:
+        days_until += 7
+    return start_date + timedelta(days=days_until)
+
+
+def _previous_weekday_before(start_date: date, dia_semana: DiaSemana) -> date:
+    weekday = WEEKDAY_INDEX_BY_DIA_SEMANA[dia_semana]
+    days_since = (start_date.weekday() - weekday) % 7
+    if days_since == 0:
+        days_since = 7
+    return start_date - timedelta(days=days_since)
 
 
 async def _seed_admin(session) -> None:
@@ -92,6 +125,16 @@ async def _seed_cliente(session) -> None:
             "fecha_nacimiento": date(1996, 3, 15),
             "dni": "40123456",
         },
+        {
+            "email": "cliente_abril@cef.ar",
+            "telefono": "1100000009",
+            "password": "cliente123",
+            "nombre": "Sofia",
+            "apellido": "Ruiz",
+            "fecha_nacimiento": date(1991, 4, 8),
+            "dni": "35123456",
+            "created_at": datetime(2026, 4, 10, 10, 0, 0, tzinfo=timezone.utc),
+        },
     ]
 
     for i, data in enumerate(clientes, 1):
@@ -113,8 +156,37 @@ async def _seed_cliente(session) -> None:
         cliente.dni = data["dni"]
         cliente.role = UserRole.CLIENTE
         cliente.activo = True
+        if data.get("created_at"):
+            cliente.created_at = data["created_at"]
         cliente.email_verified_at = cliente.email_verified_at or datetime.now(timezone.utc)
         cliente.registration_completed_at = cliente.registration_completed_at or datetime.now(timezone.utc)
+    await session.flush()
+
+
+async def _seed_personal_abril(session) -> None:
+    email = "personal_abril@cef.ar"
+    personal = (await session.execute(
+        select(Usuario).where(Usuario.email == email)
+    )).scalars().first()
+
+    if personal is None:
+        personal = Usuario(email=email)
+        session.add(personal)
+        print("  [ok]   personal abril")
+    else:
+        print("  [update] personal abril")
+
+    personal.telefono = "1100000010"
+    personal.hashed_password = get_password_hash("personal123")
+    personal.nombre = "Martin"
+    personal.apellido = "Silva"
+    personal.fecha_nacimiento = date(1988, 9, 14)
+    personal.dni = "27123456"
+    personal.role = UserRole.RECEPCION
+    personal.activo = True
+    personal.created_at = datetime(2026, 4, 12, 11, 0, 0, tzinfo=timezone.utc)
+    personal.email_verified_at = personal.email_verified_at or datetime(2026, 4, 12, 11, 5, 0, tzinfo=timezone.utc)
+    personal.registration_completed_at = personal.registration_completed_at or datetime(2026, 4, 12, 11, 10, 0, tzinfo=timezone.utc)
     await session.flush()
 
 
@@ -808,6 +880,412 @@ async def _seed_clases(session, profesores: list[Profesor], salas: list[Sala]) -
     )
 
 
+async def _seed_reservas_pagadas_por_disciplina(session) -> None:
+    cliente = (await session.execute(
+        select(Usuario).where(Usuario.email == "cliente_abril@cef.ar")
+    )).scalars().first()
+    if not cliente:
+        print("  [skip] reservas por disciplina: falta cliente_abril@cef.ar")
+        return
+
+    reservas = [
+        ("yoga", "Yoga", DiaSemana.MARTES, time(9, 0), date(2026, 6, 23)),
+        ("funcional", "Funcional", DiaSemana.MIERCOLES, time(18, 0), date(2026, 6, 24)),
+        ("pilates", "Pilates", DiaSemana.VIERNES, time(10, 0), date(2026, 6, 26)),
+    ]
+
+    for disciplina_nombre, clase_nombre, dia_semana, hora_inicio, fecha_clase in reservas:
+        clase = (await session.execute(
+            select(ClaseTemplate).where(
+                ClaseTemplate.nombre == clase_nombre,
+                ClaseTemplate.disciplina == disciplina_nombre,
+                ClaseTemplate.dia_semana == dia_semana,
+                ClaseTemplate.hora_inicio == hora_inicio,
+                ClaseTemplate.activo == True,
+            )
+        )).scalars().first()
+        if not clase:
+            print(f"  [skip] reserva {disciplina_nombre}: clase no encontrada")
+            continue
+
+        disciplina = (await session.execute(
+            select(DisciplinaModel).where(DisciplinaModel.nombre == disciplina_nombre)
+        )).scalars().first()
+        monto = Decimal(str(disciplina.precio_individual)) if disciplina else Decimal("1500.00")
+
+        instancia = (await session.execute(
+            select(ClaseInstancia).where(
+                ClaseInstancia.clase_template_id == clase.id,
+                ClaseInstancia.fecha == fecha_clase,
+            )
+        )).scalars().first()
+        if instancia is None:
+            instancia = ClaseInstancia(
+                clase_template_id=clase.id,
+                fecha=fecha_clase,
+                cupo=max(0, clase.capacidad_maxima - 1),
+                activo=True,
+            )
+            session.add(instancia)
+            await session.flush()
+            print(f"  [ok]   instancia reserva {disciplina_nombre}")
+        else:
+            instancia.cupo = max(0, clase.capacidad_maxima - 1)
+            instancia.activo = True
+            instancia.cancelada = False
+            instancia.motivo_cancelacion = None
+            print(f"  [update] instancia reserva {disciplina_nombre}")
+
+        asistencia = (await session.execute(
+            select(Asistencia).where(
+                Asistencia.usuario_id == cliente.id,
+                Asistencia.clase_instancia_id == instancia.id,
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+            )
+        )).scalars().first()
+        if asistencia is None:
+            session.add(Asistencia(
+                usuario_id=cliente.id,
+                clase_instancia_id=instancia.id,
+                tipo=TipoInscripcion.INDIVIDUAL,
+                asistio=False,
+                cancelo=False,
+            ))
+            print(f"  [ok]   reserva individual {disciplina_nombre}")
+        else:
+            asistencia.asistio = False
+            asistencia.cancelo = False
+            print(f"  [update] reserva individual {disciplina_nombre}")
+
+        mp_payment_id = f"seed-reserva-pagada-{disciplina_nombre}"
+        pago = (await session.execute(
+            select(Pago).where(Pago.mp_payment_id == mp_payment_id)
+        )).scalars().first()
+        if pago is None:
+            session.add(Pago(
+                usuario_id=cliente.id,
+                clase_instancia_id=instancia.id,
+                monto=monto,
+                fecha_pago=datetime(fecha_clase.year, fecha_clase.month, fecha_clase.day, 12, 0, 0, tzinfo=timezone.utc),
+                estado=EstadoPago.PAGADO,
+                mp_payment_id=mp_payment_id,
+                descripcion=f"Reserva pagada {disciplina_nombre} seed dev",
+                activo=True,
+            ))
+            print(f"  [ok]   pago reserva {disciplina_nombre}")
+        else:
+            pago.usuario_id = cliente.id
+            pago.clase_instancia_id = instancia.id
+            pago.suscripcion_id = None
+            pago.monto = monto
+            pago.fecha_pago = datetime(fecha_clase.year, fecha_clase.month, fecha_clase.day, 12, 0, 0, tzinfo=timezone.utc)
+            pago.estado = EstadoPago.PAGADO
+            pago.activo = True
+            pago.descripcion = f"Reserva pagada {disciplina_nombre} seed dev"
+            print(f"  [update] pago reserva {disciplina_nombre}")
+
+    await session.flush()
+
+
+
+async def _get_active_class_template(
+    session,
+    *,
+    nombre: str,
+    disciplina: str,
+    dia_semana: DiaSemana,
+    hora_inicio: time,
+) -> ClaseTemplate | None:
+    return (await session.execute(
+        select(ClaseTemplate).where(
+            ClaseTemplate.nombre == nombre,
+            ClaseTemplate.disciplina == disciplina,
+            ClaseTemplate.dia_semana == dia_semana,
+            ClaseTemplate.hora_inicio == hora_inicio,
+            ClaseTemplate.activo == True,
+        )
+    )).scalars().first()
+
+
+async def _upsert_clase_instancia_seed(
+    session,
+    *,
+    clase: ClaseTemplate,
+    fecha_clase: date,
+    cupo: int,
+) -> ClaseInstancia:
+    instancia = (await session.execute(
+        select(ClaseInstancia).where(
+            ClaseInstancia.clase_template_id == clase.id,
+            ClaseInstancia.fecha == fecha_clase,
+        )
+    )).scalars().first()
+    if instancia is None:
+        instancia = ClaseInstancia(
+            clase_template_id=clase.id,
+            fecha=fecha_clase,
+            cupo=cupo,
+            activo=True,
+        )
+        session.add(instancia)
+        await session.flush()
+    else:
+        instancia.cupo = cupo
+        instancia.activo = True
+        instancia.cancelada = False
+        instancia.motivo_cancelacion = None
+    return instancia
+
+
+async def _seed_cliente_suscripcion_renovable(session) -> None:
+    cliente = await _get_cliente_principal(session)
+    if not cliente:
+        print("  [skip] suscripcion renovable cliente: falta cliente@cef.ar")
+        return
+
+    clase = await _get_active_class_template(
+        session,
+        nombre="Yoga",
+        disciplina="yoga",
+        dia_semana=DiaSemana.MARTES,
+        hora_inicio=time(9, 0),
+    )
+    if not clase:
+        print("  [skip] suscripcion renovable cliente: no existe Yoga Martes 09:00")
+        return
+
+    disciplina = (await session.execute(
+        select(DisciplinaModel).where(DisciplinaModel.nombre == "yoga")
+    )).scalars().first()
+    precio = Decimal(str(disciplina.precio_suscripcion)) if disciplina else Decimal("1200.00")
+    today = date.today()
+    fecha_pago = today - timedelta(days=31)
+    fecha_inicio = fecha_pago
+    fecha_clase_futura = _next_weekday_at_least(today, clase.dia_semana)
+    fecha_fin = max(fecha_inicio + timedelta(days=30), fecha_clase_futura)
+
+    pago = (await session.execute(
+        select(Pago).where(Pago.mp_payment_id == "seed-cliente-suscripcion-renovable")
+    )).scalars().first()
+    suscripcion = None
+    if pago and pago.suscripcion_id:
+        suscripcion = (await session.execute(
+            select(Suscripcion).where(Suscripcion.id == pago.suscripcion_id)
+        )).scalars().first()
+    if suscripcion is None:
+        suscripcion = (await session.execute(
+            select(Suscripcion).where(
+                Suscripcion.usuario_id == cliente.id,
+                Suscripcion.clase_template_id == clase.id,
+                Suscripcion.fecha_inicio == fecha_inicio,
+            )
+        )).scalars().first()
+
+    if suscripcion is None:
+        suscripcion = Suscripcion(
+            usuario_id=cliente.id,
+            clase_template_id=clase.id,
+            monto=precio,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            fecha_pago=fecha_pago,
+            estado=EstadoSuscripcion.RENOVABLE,
+            activo=True,
+        )
+        session.add(suscripcion)
+        await session.flush()
+        print("  [ok]   suscripcion renovable cliente")
+    else:
+        suscripcion.usuario_id = cliente.id
+        suscripcion.clase_template_id = clase.id
+        suscripcion.monto = precio
+        suscripcion.fecha_inicio = fecha_inicio
+        suscripcion.fecha_fin = fecha_fin
+        suscripcion.fecha_pago = fecha_pago
+        suscripcion.estado = EstadoSuscripcion.RENOVABLE
+        suscripcion.activo = True
+        print("  [update] suscripcion renovable cliente")
+
+    fecha_clase = _first_weekday_on_or_after(fecha_inicio, clase.dia_semana)
+    while fecha_clase <= fecha_fin:
+        instancia = await _upsert_clase_instancia_seed(
+            session,
+            clase=clase,
+            fecha_clase=fecha_clase,
+            cupo=max(0, clase.capacidad_maxima - 1),
+        )
+        reserva = (await session.execute(
+            select(SuscripcionReserva).where(
+                SuscripcionReserva.suscripcion_id == suscripcion.id,
+                SuscripcionReserva.clase_instancia_id == instancia.id,
+            )
+        )).scalars().first()
+        if reserva is None:
+            session.add(SuscripcionReserva(
+                suscripcion_id=suscripcion.id,
+                clase_instancia_id=instancia.id,
+                activa=True,
+            ))
+        else:
+            reserva.activa = True
+
+        asistencia = (await session.execute(
+            select(Asistencia).where(
+                Asistencia.usuario_id == cliente.id,
+                Asistencia.clase_instancia_id == instancia.id,
+                Asistencia.tipo == TipoInscripcion.SUSCRIPCION,
+            )
+        )).scalars().first()
+        if asistencia is None:
+            session.add(Asistencia(
+                usuario_id=cliente.id,
+                clase_instancia_id=instancia.id,
+                tipo=TipoInscripcion.SUSCRIPCION,
+                asistio=fecha_clase < today,
+                cancelo=False,
+            ))
+        else:
+            asistencia.asistio = fecha_clase < today
+            asistencia.cancelo = False
+
+        fecha_clase += timedelta(days=7)
+
+    if pago is not None:
+        await session.delete(pago)
+        print("  [cleanup] pago removido de suscripcion renovable cliente")
+    await session.flush()
+
+
+async def _upsert_inscripcion_deuda_seed(
+    session,
+    *,
+    cliente: Usuario,
+    clase: ClaseTemplate,
+    fecha_clase: date,
+    mp_payment_id: str,
+    descripcion: str,
+    vencida: bool,
+) -> None:
+    disciplina = (await session.execute(
+        select(DisciplinaModel).where(DisciplinaModel.nombre == clase.disciplina)
+    )).scalars().first()
+    precio = Decimal(str(disciplina.precio_individual)) if disciplina else Decimal("1500.00")
+    monto_parcial = (precio / Decimal("2")).quantize(Decimal("0.01"))
+
+    pago = (await session.execute(
+        select(Pago).where(Pago.mp_payment_id == mp_payment_id)
+    )).scalars().first()
+    old_instancia_id = pago.clase_instancia_id if pago else None
+
+    instancia = await _upsert_clase_instancia_seed(
+        session,
+        clase=clase,
+        fecha_clase=fecha_clase,
+        cupo=clase.capacidad_maxima if vencida else max(0, clase.capacidad_maxima - 1),
+    )
+
+    if old_instancia_id and old_instancia_id != instancia.id:
+        old_asistencia = (await session.execute(
+            select(Asistencia).where(
+                Asistencia.usuario_id == cliente.id,
+                Asistencia.clase_instancia_id == old_instancia_id,
+                Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+            )
+        )).scalars().first()
+        if old_asistencia:
+            await session.delete(old_asistencia)
+            await session.flush()
+
+    asistencia = (await session.execute(
+        select(Asistencia).where(
+            Asistencia.usuario_id == cliente.id,
+            Asistencia.clase_instancia_id == instancia.id,
+            Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+        )
+    )).scalars().first()
+    if asistencia is None:
+        session.add(Asistencia(
+            usuario_id=cliente.id,
+            clase_instancia_id=instancia.id,
+            tipo=TipoInscripcion.INDIVIDUAL,
+            asistio=False,
+            cancelo=vencida,
+        ))
+    else:
+        asistencia.asistio = False
+        asistencia.cancelo = vencida
+
+    fecha_pago = datetime.now(timezone.utc)
+    if pago is None:
+        session.add(Pago(
+            usuario_id=cliente.id,
+            clase_instancia_id=instancia.id,
+            suscripcion_id=None,
+            monto=monto_parcial,
+            fecha_pago=fecha_pago,
+            estado=EstadoPago.PAGADO,
+            mp_payment_id=mp_payment_id,
+            descripcion=descripcion,
+            activo=True,
+        ))
+        print(f"  [ok]   {descripcion}")
+    else:
+        pago.usuario_id = cliente.id
+        pago.clase_instancia_id = instancia.id
+        pago.suscripcion_id = None
+        pago.monto = monto_parcial
+        pago.fecha_pago = fecha_pago
+        pago.estado = EstadoPago.PAGADO
+        pago.activo = True
+        pago.descripcion = descripcion
+        print(f"  [update] {descripcion}")
+    await session.flush()
+
+
+async def _seed_cliente_deudas(session) -> None:
+    cliente = await _get_cliente_principal(session)
+    if not cliente:
+        print("  [skip] deudas cliente: falta cliente@cef.ar")
+        return
+
+    today = date.today()
+    clase_activa = await _get_active_class_template(
+        session,
+        nombre="Funcional",
+        disciplina="funcional",
+        dia_semana=DiaSemana.VIERNES,
+        hora_inicio=time(10, 0),
+    )
+    clase_vencida = await _get_active_class_template(
+        session,
+        nombre="Pilates",
+        disciplina="pilates",
+        dia_semana=DiaSemana.VIERNES,
+        hora_inicio=time(10, 0),
+    )
+    if not clase_activa or not clase_vencida:
+        print("  [skip] deudas cliente: faltan clases para generar deudas")
+        return
+
+    await _upsert_inscripcion_deuda_seed(
+        session,
+        cliente=cliente,
+        clase=clase_activa,
+        fecha_clase=_next_weekday_at_least(today, clase_activa.dia_semana),
+        mp_payment_id="seed-cliente-deuda-activa",
+        descripcion="Inscripcion con deuda activa cliente seed dev",
+        vencida=False,
+    )
+    await _upsert_inscripcion_deuda_seed(
+        session,
+        cliente=cliente,
+        clase=clase_vencida,
+        fecha_clase=_previous_weekday_before(today, clase_vencida.dia_semana),
+        mp_payment_id="seed-cliente-deuda-vencida",
+        descripcion="Inscripcion con deuda vencida cliente seed dev",
+        vencida=True,
+    )
+
 
 async def _seed_suscripcion_vencida_funcional(session) -> None:
     cliente = await _get_cliente_principal(session)
@@ -982,11 +1460,15 @@ async def seed_dev() -> None:
     async with AsyncSessionLocal() as session:
         await _seed_admin(session)
         await _seed_cliente(session)
+        await _seed_personal_abril(session)
         profesores = await _seed_profesores(session)
         salas = await _seed_salas(session)
         await _seed_precios(session)
         await _seed_ficha_medica_cliente(session)
         await _seed_clases(session, profesores, salas)
+        await _seed_cliente_suscripcion_renovable(session)
+        await _seed_cliente_deudas(session)
+        await _seed_reservas_pagadas_por_disciplina(session)
         await _seed_suscripcion_vencida_funcional(session)
         # cliente2 (Lucía): ciclo Yoga Martes 9:00 may-19/jun-18, 1 cancelada → 1 cupón 20%
         await _seed_suscripcion_pasada_con_cancelaciones(

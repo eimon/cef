@@ -43,11 +43,13 @@ function statusBadgeClass(isActive: boolean): string {
 function UserCardMenu({
     isDeleting,
     editDisabled,
+    canDelete,
     onEdit,
     onDelete,
 }: {
     isDeleting: boolean;
     editDisabled?: boolean;
+    canDelete: boolean;
     onEdit: () => void;
     onDelete: () => void;
 }) {
@@ -85,7 +87,7 @@ function UserCardMenu({
             {open && (
                 <div className="absolute right-0 top-8 z-30 w-40 glass-modal rounded-xl overflow-hidden py-1">
                     {item("Editar", onEdit, "text-cef-primary", editDisabled)}
-                    {item("Dar de baja", onDelete, "text-cef-danger", isDeleting)}
+                    {canDelete && item("Dar de baja", onDelete, "text-cef-danger", isDeleting)}
                 </div>
             )}
         </div>
@@ -107,6 +109,11 @@ export default function UsersTable({
     const { refresh } = useRouter();
 
     const handleDelete = async (user: User) => {
+        if (!user.activo) {
+            showError("El usuario ya está inactivo");
+            return;
+        }
+
         if (!await confirm(`¿Estás seguro de que deseas dar de baja al usuario ${user.email}? El usuario quedará inactivo y se cancelarán sus clases pendientes.`)) return;
 
         setIsDeleting(user.id);
@@ -158,6 +165,7 @@ export default function UsersTable({
                                 <UserCardMenu
                                     isDeleting={isDeleting === user.id}
                                     editDisabled={currentUserId === user.id}
+                                    canDelete={user.activo}
                                     onEdit={() => setEditingUser(user)}
                                     onDelete={() => handleDelete(user)}
                                 />
@@ -265,14 +273,16 @@ export default function UsersTable({
                                                 >
                                                     <Pencil size={15} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDelete(user)}
-                                                    disabled={isDeleting === user.id}
-                                                    className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
-                                                    title="Dar de baja"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
+                                                {user.activo && (
+                                                    <button
+                                                        onClick={() => handleDelete(user)}
+                                                        disabled={isDeleting === user.id}
+                                                        className="p-1.5 text-cef-danger/70 hover:bg-cef-danger/10 hover:text-cef-danger rounded-lg transition-colors disabled:opacity-40"
+                                                        title="Dar de baja"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                )}
                                             </div>
                                         ) : (
                                             <span className="text-xs text-slate-400">Solo lectura</span>

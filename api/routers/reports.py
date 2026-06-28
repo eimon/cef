@@ -22,40 +22,48 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/clients-registrations", response_model=UserRegistrationsReportResponse)
 async def get_client_registrations_report(
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_client_registrations_report()
+    return await ReportService(db).get_client_registrations_report(start_date, end_date)
 
 
 @router.get("/staff-registrations", response_model=UserRegistrationsReportResponse)
 async def get_staff_registrations_report(
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_staff_registrations_report()
+    return await ReportService(db).get_staff_registrations_report(start_date, end_date)
 
 
 @router.get("/deleted-users", response_model=UserRegistrationsReportResponse)
 async def get_deleted_users_report(
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_deleted_users_report()
+    return await ReportService(db).get_deleted_users_report(start_date, end_date)
 
 
 @router.get("/active-users-by-activity", response_model=ActiveUsersByActivityReportResponse)
 async def get_active_users_by_activity_report(
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_active_users_by_activity_report()
+    return await ReportService(db).get_active_users_by_activity_report(start_date, end_date)
 
 
 @router.get("/billing", response_model=BillingReportResponse)
 async def get_billing_report(
-    start_date: date,
-    end_date: date,
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
@@ -73,7 +81,9 @@ async def list_report_classes(
 @router.get("/class-cancellations/{clase_template_id}", response_model=ClassCancellationsReportResponse)
 async def get_class_cancellations_report(
     clase_template_id: UUID,
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_class_cancellations_report(clase_template_id)
+    return await ReportService(db).get_class_cancellations_report(clase_template_id, start_date, end_date)

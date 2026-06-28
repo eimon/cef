@@ -53,7 +53,7 @@ class RenovableState(SuscripcionState):
 class VencidaState(SuscripcionState):
     estado = EstadoSuscripcion.VENCIDA
 
-    def next_state(self, fecha_pago: date, today: date) -> EstadoSuscripcion:
+    def next_state(self, fecha_pago: date, today: date, renewal_window_days: int = RENEWAL_WINDOW_DAYS) -> EstadoSuscripcion:
         return self.estado
 
     def can_renew(self) -> bool:
