@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Clock, CalendarDays, X, Info, CreditCard, Ban } from "lucide-react";
+import { Clock, CalendarDays, X, Info, CreditCard, Ban, MapPin } from "lucide-react";
 import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
 import { cancelarClase } from "@/actions/mis_clases";
 import { cancelarWaitlist } from "@/actions/inscripciones";
@@ -20,6 +20,7 @@ type MisClasesItem = {
     hora_inicio: string;
     hora_fin: string;
     profesor_nombre: string | null;
+    sala_nombre: string | null;
     cancelada: boolean;
     deuda_vencida?: boolean;
     // individual only
@@ -43,6 +44,7 @@ function buildItems(
             hora_inicio: c.hora_inicio,
             hora_fin: c.hora_fin,
             profesor_nombre: c.profesor_nombre,
+            sala_nombre: c.sala_nombre,
             cancelada: c.cancelo,
             deuda_vencida: c.deuda_vencida,
             asistencia_id: c.asistencia_id,
@@ -60,6 +62,7 @@ function buildItems(
                 hora_inicio: s.hora_inicio,
                 hora_fin: s.hora_fin,
                 profesor_nombre: s.profesor_nombre,
+                sala_nombre: s.sala_nombre,
                 cancelada: inst.cancelada,
                 deuda_vencida: false,
                 asistencia_id: inst.asistencia_id ?? undefined,
@@ -87,11 +90,6 @@ function formatFechaHeader(fechaStr: string): string {
     return fmtFechaHeader.format(new Date(y, m - 1, d));
 }
 
-function formatFechaCorta(fechaStr: string): string {
-    const [, mes, dia] = fechaStr.split("-");
-    return `${parseInt(dia)}/${parseInt(mes)}`;
-}
-
 function isUpcoming(fecha: string, horaInicio: string): boolean {
     const [y, m, d] = fecha.split("-").map(Number);
     const [h, min] = horaInicio.split(":").map(Number);
@@ -104,9 +102,9 @@ function getClassStart(fecha: string, horaInicio: string): Date {
     return new Date(y, m - 1, d, h, min);
 }
 
-function canCompleteDebt(fecha: string, horaInicio: string): boolean {
+function canCompleteDebt(fecha: string, horaInicio: string, nowTimestamp: number): boolean {
     const oneDayMs = 24 * 60 * 60 * 1000;
-    return getClassStart(fecha, horaInicio).getTime() - Date.now() > oneDayMs;
+    return getClassStart(fecha, horaInicio).getTime() - nowTimestamp > oneDayMs;
 }
 
 function getBlockedDebtMessage(item: MisClasesItem): string {
@@ -126,8 +124,9 @@ function CancelDialog({
     const [isPending, startTransition] = useTransition();
     const [result, setResult] = useState<CancelacionResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [nowTimestamp] = useState(() => Date.now());
 
-    const hoursLeft = (getClassStart(item.fecha, item.hora_inicio).getTime() - Date.now()) / 3_600_000;
+    const hoursLeft = (getClassStart(item.fecha, item.hora_inicio).getTime() - nowTimestamp) / 3_600_000;
     const hasRefund = hoursLeft >= 24;
 
     function handleConfirm() {
@@ -246,10 +245,11 @@ function DebtDialog({
     montoRestante: number;
     onClose: () => void;
 }) {
-    const canPay = Boolean(item.asistencia_id) && canCompleteDebt(item.fecha, item.hora_inicio);
+    const [nowTimestamp] = useState(() => Date.now());
+    const canPay = Boolean(item.asistencia_id) && canCompleteDebt(item.fecha, item.hora_inicio, nowTimestamp);
 
     function handleGoToPayments() {
-        window.location.href = "/mis-pagos";
+        window.location.assign("/mis-pagos");
     }
 
     return (
@@ -352,9 +352,17 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                 {/* Name + teacher */}
                 <div className="min-w-0 sm:flex-1">
                     <p className="break-words text-sm font-semibold leading-tight text-slate-800">{item.clase_nombre}</p>
-                    {item.profesor_nombre && (
-                        <p className="mt-1 break-words text-[11px] text-slate-400">{item.profesor_nombre}</p>
-                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+                        {item.profesor_nombre && (
+                            <span className="break-words">{item.profesor_nombre}</span>
+                        )}
+                        {item.sala_nombre && (
+                            <span className="inline-flex min-w-0 items-center gap-1 break-words">
+                                <MapPin size={10} className="shrink-0 text-slate-300" />
+                                {item.sala_nombre}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Time */}
@@ -364,7 +372,7 @@ function MiClaseRow({ item }: { item: MisClasesItem }) {
                 </span>
 
                 {/* Tipo */}
-                <span className={`mt-2 inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:mt-0 ${
+                <span className={`ml-3 mt-2 inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:ml-0 sm:mt-0 ${
                     item.tipo === "individual"
                         ? "bg-slate-100 text-slate-500 border border-slate-200"
                         : "bg-cef-primary/10 text-cef-primary border border-cef-primary/20"
@@ -510,7 +518,7 @@ export default function MisClasesView({
     async function handleConfirmarEspera(waitlistId: string) {
         const result = await crearPreferenciaWaitlistMP(waitlistId);
         if (result.init_point) {
-            window.location.href = result.init_point;
+            window.location.assign(result.init_point);
         }
     }
 
@@ -613,7 +621,6 @@ export default function MisClasesView({
                                 <h2 className="min-w-0 flex-1 break-words text-sm font-bold capitalize tracking-tight text-slate-800">
                                     {formatFechaHeader(fecha)}
                                 </h2>
-                                <span className="text-xs text-slate-400 font-medium">{formatFechaCorta(fecha)}</span>
                                 <span className="ml-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 sm:ml-auto">
                                     {items.length}
                                 </span>
