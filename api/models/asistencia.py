@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from core.database import Base
-from core.enums import TipoInscripcion
+from core.enums import TipoInscripcion, CanceladoPor
 
 
 class Asistencia(Base):
@@ -20,6 +20,11 @@ class Asistencia(Base):
     )
     asistio = Column(Boolean, default=False)
     cancelo = Column(Boolean, default=False)
+    cancelado_por = Column(
+        Enum(CanceladoPor, name="canceladopor", values_callable=lambda e: [i.value for i in e]),
+        nullable=True,
+        default=None,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

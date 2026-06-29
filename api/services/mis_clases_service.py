@@ -7,6 +7,7 @@ from services.pago_service import PagoService
 from services.suscripcion_service import SuscripcionService
 from schemas.mis_clases import (
     MiClaseIndividualResponse,
+    MiCancelacionResponse,
     MiSuscripcionResponse,
     InstanciaEnSuscripcionResponse,
 )
@@ -48,6 +49,25 @@ class MisClasesService:
                 deuda_vencida=deuda_vencida,
             ))
         return result
+
+    async def get_cancelaciones(self, usuario_id: uuid.UUID) -> list[MiCancelacionResponse]:
+        rows = await self.repo.get_cancelaciones(usuario_id)
+        return [
+            MiCancelacionResponse(
+                asistencia_id=row.asistencia_id,
+                tipo=row.tipo,
+                cancelado_por=row.cancelado_por,
+                cancelado_at=row.cancelado_at,
+                clase_nombre=row.clase_nombre,
+                disciplina=row.disciplina,
+                fecha=row.fecha,
+                hora_inicio=row.hora_inicio,
+                hora_fin=row.hora_fin,
+                profesor_nombre=row.profesor_nombre,
+                sala_nombre=row.sala_nombre,
+            )
+            for row in rows
+        ]
 
     async def get_suscripciones(self, usuario_id: uuid.UUID) -> list[MiSuscripcionResponse]:
         suscripciones = await self.repo.get_suscripciones(usuario_id)

@@ -398,6 +398,20 @@ export interface CancelacionResult {
     refund_error: boolean;
 }
 
+export interface MiCancelacion {
+    asistencia_id: string;
+    tipo: "individual" | "suscripcion";
+    cancelado_por: "usuario" | "sistema" | null;
+    cancelado_at: string | null;
+    clase_nombre: string;
+    disciplina: Disciplina;
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    profesor_nombre: string | null;
+    sala_nombre: string | null;
+}
+
 export interface MiSuscripcion {
     id: string;
     clase_template_id: string;

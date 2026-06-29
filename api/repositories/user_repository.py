@@ -11,7 +11,7 @@ from models.clase_instancia import ClaseInstancia
 from models.clase_template import ClaseTemplate
 from models.suscripciones import Suscripcion, SuscripcionReserva
 from schemas.usuario import UsuarioCreate, UsuarioUpdate, PublicSignupRequest
-from core.enums import TipoInscripcion, UserRole
+from core.enums import TipoInscripcion, UserRole, CanceladoPor
 from core.security import get_password_hash
 
 
@@ -154,6 +154,7 @@ class UserRepository:
             ).scalars().all()
             for asistencia in subscription_assistances:
                 asistencia.cancelo = True
+                asistencia.cancelado_por = CanceladoPor.SISTEMA
 
         individual_rows = (
             await self.db.execute(
@@ -174,6 +175,7 @@ class UserRepository:
 
         for asistencia, instancia in individual_rows:
             asistencia.cancelo = True
+            asistencia.cancelado_por = CanceladoPor.SISTEMA
             instancia.cupo += 1
             released_slots.add((instancia.clase_template_id, instancia.fecha))
 

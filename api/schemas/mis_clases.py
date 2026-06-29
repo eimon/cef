@@ -1,8 +1,8 @@
 from pydantic import BaseModel, UUID4
 from typing import Optional
-from datetime import date, time
+from datetime import date, datetime, time
 
-from core.enums import EstadoPago, DiaSemana, EstadoSuscripcion
+from core.enums import EstadoPago, DiaSemana, EstadoSuscripcion, TipoInscripcion, CanceladoPor
 
 
 class MiClaseIndividualResponse(BaseModel):
@@ -30,6 +30,23 @@ class InstanciaEnSuscripcionResponse(BaseModel):
     fecha: date
     cancelada: bool
     asistencia_id: Optional[UUID4] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MiCancelacionResponse(BaseModel):
+    asistencia_id: UUID4
+    tipo: TipoInscripcion
+    cancelado_por: Optional[CanceladoPor] = None
+    cancelado_at: Optional[datetime] = None
+    clase_nombre: str
+    disciplina: str
+    fecha: date
+    hora_inicio: time
+    hora_fin: time
+    profesor_nombre: Optional[str] = None
+    sala_nombre: Optional[str] = None
 
     class Config:
         from_attributes = True
