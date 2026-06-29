@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Clock, CalendarDays, X, Info, CreditCard, Ban, MapPin } from "lucide-react";
-import { MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
+import { Clock, CalendarDays, X, Info, CreditCard, Ban, MapPin, History } from "lucide-react";
+import { MiCancelacion, MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
 import { cancelarClase } from "@/actions/mis_clases";
 import { cancelarWaitlist } from "@/actions/inscripciones";
 import { crearPreferenciaWaitlistMP } from "@/actions/pagos";
@@ -322,6 +322,103 @@ function DebtDialog({
     );
 }
 
+// ─── Cancelaciones Modal ──────────────────────────────────────────────────────
+
+const fmtFechaCancelacion = new Intl.DateTimeFormat("es-AR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+});
+
+function formatFechaCancelacion(fechaStr: string): string {
+    const [y, m, d] = fechaStr.split("-").map(Number);
+    return fmtFechaCancelacion.format(new Date(y, m - 1, d));
+}
+
+function CancelacionesModal({
+    cancelaciones,
+    onClose,
+}: {
+    cancelaciones: MiCancelacion[];
+    onClose: () => void;
+}) {
+    return (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/45 px-0 pb-0 backdrop-blur-sm sm:items-center sm:px-4 sm:pb-6">
+            <div className="glass-modal w-full max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-3 p-5 border-b border-slate-200/60">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-500">
+                            <History size={18} />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800">Cancelaciones</h3>
+                            <p className="text-xs text-slate-400">{cancelaciones.length} clase{cancelaciones.length !== 1 ? "s" : ""} cancelada{cancelaciones.length !== 1 ? "s" : ""}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        aria-label="Cerrar"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {/* List */}
+                <div className="overflow-y-auto flex-1 p-4 space-y-2">
+                    {cancelaciones.length === 0 ? (
+                        <div className="py-10 text-center">
+                            <p className="text-sm text-slate-400">No tenés cancelaciones registradas</p>
+                        </div>
+                    ) : (
+                        cancelaciones.map((c) => {
+                            const accent = DISCIPLINA_ACCENT[c.disciplina] ?? "bg-slate-400";
+                            return (
+                                <div
+                                    key={c.asistencia_id}
+                                    className="glass flex items-stretch overflow-hidden rounded-xl"
+                                >
+                                    <div className={`w-1 flex-shrink-0 ${accent} opacity-50`} />
+                                    <div className="min-w-0 flex-1 px-3 py-3">
+                                        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                                            <p className="text-sm font-semibold text-slate-700">{c.clase_nombre}</p>
+                                            <span className={`inline-flex flex-shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                                c.cancelado_por === "usuario"
+                                                    ? "bg-cef-danger/10 text-cef-danger border border-cef-danger/20"
+                                                    : "bg-cef-warning/10 text-cef-warning border border-cef-warning/20"
+                                            }`}>
+                                                {c.cancelado_por === "usuario" ? "Por vos" : "Por el sistema"}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-400">
+                                            <span className="inline-flex items-center gap-1">
+                                                <CalendarDays size={10} className="text-slate-300" />
+                                                {formatFechaCancelacion(c.fecha)}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1">
+                                                <Clock size={10} className="text-slate-300" />
+                                                {formatTime(c.hora_inicio)}–{formatTime(c.hora_fin)}
+                                            </span>
+                                            {c.sala_nombre && (
+                                                <span className="inline-flex items-center gap-1">
+                                                    <MapPin size={10} className="text-slate-300" />
+                                                    {c.sala_nombre}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function MiClaseRow({ item }: { item: MisClasesItem }) {
@@ -478,15 +575,18 @@ export default function MisClasesView({
     individuales,
     suscripciones,
     waitlistEntries,
+    cancelaciones,
     highlightWaitlistId,
 }: {
     individuales: MiClaseIndividual[];
     suscripciones: MiSuscripcion[];
     waitlistEntries: WaitlistEntry[];
+    cancelaciones: MiCancelacion[];
     highlightWaitlistId?: string | null;
 }) {
     const [tiempoTab, setTiempoTab] = useState<TiempoTab>("proximas");
     const [tipoFiltro, setTipoFiltro] = useState<TipoFiltro>("todas");
+    const [cancelacionesOpen, setCancelacionesOpen] = useState(false);
     const highlightRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -531,6 +631,7 @@ export default function MisClasesView({
     }
 
     return (
+        <>
         <div className="space-y-6">
             {waitlistEntries.length > 0 && (
                 <div className="glass rounded-2xl p-4">
@@ -601,6 +702,19 @@ export default function MisClasesView({
                     active={tipoFiltro}
                     onChange={setTipoFiltro}
                 />
+                <button
+                    type="button"
+                    onClick={() => setCancelacionesOpen(true)}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                    <History size={13} />
+                    Ver cancelaciones
+                    {cancelaciones.length > 0 && (
+                        <span className="ml-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            {cancelaciones.length}
+                        </span>
+                    )}
+                </button>
             </div>
 
             {/* List */}
@@ -633,5 +747,13 @@ export default function MisClasesView({
                 </div>
             )}
         </div>
+
+        {cancelacionesOpen && (
+            <CancelacionesModal
+                cancelaciones={cancelaciones}
+                onClose={() => setCancelacionesOpen(false)}
+            />
+        )}
+        </>
     );
 }

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from core.config import settings
-from core.enums import EstadoPago, TipoInscripcion
+from core.enums import EstadoPago, TipoInscripcion, CanceladoPor
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
@@ -232,6 +232,7 @@ class PagoService:
 
     def _release_partial_debt_reservation(self, asistencia: Asistencia, instancia) -> None:
         asistencia.cancelo = True
+        asistencia.cancelado_por = CanceladoPor.SISTEMA
         instancia.cupo += 1
 
     async def _record_failed_mp_payment(

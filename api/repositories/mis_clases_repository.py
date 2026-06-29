@@ -11,7 +11,7 @@ from models.clase_template import ClaseTemplate
 from models.pagos import Pago
 from models.disciplina import Disciplina as DisciplinaModel
 from models.suscripciones import Suscripcion, SuscripcionReserva
-from core.enums import TipoInscripcion
+from core.enums import TipoInscripcion, CanceladoPor
 
 
 class MisClasesRepository:
@@ -74,6 +74,7 @@ class MisClasesRepository:
             .where(
                 Asistencia.usuario_id == usuario_id,
                 Asistencia.tipo == TipoInscripcion.INDIVIDUAL,
+                Asistencia.cancelo == False,
             )
             .order_by(ClaseInstancia.fecha.desc())
         )
@@ -147,3 +148,37 @@ class MisClasesRepository:
             .order_by(ClaseInstancia.fecha.asc())
         )
         return list(result.scalars().all())
+
+    async def get_cancelaciones(self, usuario_id: uuid.UUID) -> list:
+        from models.profesor import Profesor
+        from models.sala import Sala
+
+        stmt = (
+            select(
+                Asistencia.id.label("asistencia_id"),
+                Asistencia.tipo,
+                Asistencia.cancelado_por,
+                Asistencia.updated_at.label("cancelado_at"),
+                ClaseTemplate.nombre.label("clase_nombre"),
+                ClaseTemplate.disciplina,
+                ClaseTemplate.hora_inicio,
+                ClaseTemplate.hora_fin,
+                ClaseInstancia.fecha,
+                (Profesor.nombre + " " + Profesor.apellido).label("profesor_nombre"),
+                Sala.nombre.label("sala_nombre"),
+            )
+            .join(ClaseInstancia, Asistencia.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .outerjoin(
+                Profesor,
+                func.coalesce(ClaseInstancia.profesor_id, ClaseTemplate.profesor_id) == Profesor.id,
+            )
+            .outerjoin(Sala, ClaseTemplate.sala_id == Sala.id)
+            .where(
+                Asistencia.usuario_id == usuario_id,
+                Asistencia.cancelo == True,
+            )
+            .order_by(ClaseInstancia.fecha.desc())
+        )
+        result = await self.db.execute(stmt)
+        return result.all()
