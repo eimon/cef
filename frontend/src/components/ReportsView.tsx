@@ -901,7 +901,7 @@ function BillingReportPanel({
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
                         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                             <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                                <p className="text-sm font-bold text-slate-800">Detalle por disciplina y tipo</p>
+                                <p className="text-sm font-bold text-slate-800">Detalle de facturación</p>
                             </div>
                             <div className="max-h-[42vh] overflow-auto">
                                 <table className="w-full min-w-[560px] border-collapse text-left">
