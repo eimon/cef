@@ -1,8 +1,10 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.asistencia_repository import AsistenciaRepository
+from repositories.clase_template_repository import ClaseTemplateRepository
+from repositories.inscripcion_repository import InscripcionRepository
 from repositories.user_repository import UserRepository
 from schemas.asistencia import (
     AsistenciaRecepcionResponse,
@@ -11,12 +13,34 @@ from schemas.asistencia import (
     InstanciaHoyItem,
 )
 from exceptions.general import NotFoundException, BadRequestException
+from core.enums import DiaSemana
+
+_WEEKDAY_TO_DIA: dict[int, DiaSemana] = {
+    0: DiaSemana.LUNES,
+    1: DiaSemana.MARTES,
+    2: DiaSemana.MIERCOLES,
+    3: DiaSemana.JUEVES,
+    4: DiaSemana.VIERNES,
+    5: DiaSemana.SABADO,
+    6: DiaSemana.DOMINGO,
+}
 
 
 class AsistenciaService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = AsistenciaRepository(db)
+        self.clase_template_repo = ClaseTemplateRepository(db)
+        self.inscripcion_repo = InscripcionRepository(db)
+
+    async def _ensure_instancias_hoy(self) -> None:
+        today = date.today()
+        dia_semana = _WEEKDAY_TO_DIA[today.weekday()]
+        templates = await self.clase_template_repo.get_activos_by_dia(dia_semana)
+        for template in templates:
+            cupo_reservado = await self.inscripcion_repo.count_active_suscripciones(template.id, today)
+            cupo_disponible = max(template.capacidad_maxima - cupo_reservado, 0)
+            await self.inscripcion_repo.get_or_create_instancia(template.id, today, cupo_disponible)
 
     async def get_for_instancia(self, instancia_id: uuid.UUID) -> list[AsistenciaRecepcionResponse]:
         asistencias = await self.repo.get_by_instancia(instancia_id)
@@ -76,6 +100,7 @@ class AsistenciaService:
         return EscaneoQRResponse(usuario_nombre=nombre, asistencias=items)
 
     async def get_instancias_hoy(self) -> list[InstanciaHoyItem]:
+        await self._ensure_instancias_hoy()
         instancias = await self.repo.get_instancias_hoy()
         return [
             InstanciaHoyItem(

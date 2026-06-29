@@ -141,3 +141,12 @@ class ClaseTemplateRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def get_activos_by_dia(self, dia_semana: DiaSemana) -> list[ClaseTemplate]:
+        result = await self.db.execute(
+            select(ClaseTemplate).where(
+                ClaseTemplate.dia_semana == dia_semana,
+                ClaseTemplate.activo == True,
+            )
+        )
+        return list(result.scalars().all())
