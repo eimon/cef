@@ -68,7 +68,11 @@ class AsistenciaRepository:
         self, instancia_id: uuid.UUID, usuario_id: uuid.UUID
     ) -> Asistencia | None:
         result = await self.db.execute(
-            select(Asistencia).where(
+            select(Asistencia)
+            .options(
+                selectinload(Asistencia.clase_instancia).selectinload(ClaseInstancia.clase_template)
+            )
+            .where(
                 Asistencia.clase_instancia_id == instancia_id,
                 Asistencia.usuario_id == usuario_id,
                 Asistencia.cancelo == False,

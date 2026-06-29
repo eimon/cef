@@ -126,6 +126,11 @@ class AsistenciaService:
         if asistencia.asistio:
             raise BadRequestException("El cliente ya registró la asistencia")
 
+        now = datetime.now().time()
+        ct = asistencia.clase_instancia.clase_template
+        if not (ct.hora_inicio <= now <= ct.hora_fin):
+            raise BadRequestException("No es posible registrar asistencia fuera del horario de la clase")
+
         await self.repo.marcar_presente(asistencia.id)
 
     async def marcar_presente(self, asistencia_id: uuid.UUID) -> None:

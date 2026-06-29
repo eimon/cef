@@ -12,6 +12,8 @@ declare class BarcodeDetector {
 
 type Status = "loading" | "selectClass" | "scanning" | "processing" | "success" | "error";
 
+const CAMERA_ERROR_MESSAGE = "No se pudo activar la cámara. Verificá los permisos del navegador o usá la pestaña de ingreso por DNI.";
+
 export default function EscanearQRView() {
     const [status, setStatus] = useState<Status>("loading");
     const [instancias, setInstancias] = useState<InstanciaHoy[]>([]);
@@ -64,7 +66,7 @@ export default function EscanearQRView() {
 
             if (!("BarcodeDetector" in window)) {
                 stopCamera();
-                setError("Tu navegador no soporta el escáner QR. Usá la pestaña de ingreso por DNI.");
+                setError(CAMERA_ERROR_MESSAGE);
                 setStatus("error");
                 return;
             }
@@ -93,7 +95,7 @@ export default function EscanearQRView() {
                 }
             }, 200);
         } catch {
-            setError("No se pudo acceder a la cámara. Verificá los permisos del navegador.");
+            setError(CAMERA_ERROR_MESSAGE);
             setStatus("error");
         }
     }, [selectedId, stopCamera]);
