@@ -25,50 +25,55 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 async def get_client_registrations_report(
     start_date: date | None = None,
     end_date: date | None = None,
+    granularity: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_client_registrations_report(start_date, end_date)
+    return await ReportService(db).get_client_registrations_report(start_date, end_date, granularity)
 
 
 @router.get("/staff-registrations", response_model=UserRegistrationsReportResponse)
 async def get_staff_registrations_report(
     start_date: date | None = None,
     end_date: date | None = None,
+    granularity: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_staff_registrations_report(start_date, end_date)
+    return await ReportService(db).get_staff_registrations_report(start_date, end_date, granularity)
 
 
 @router.get("/deleted-users", response_model=UserRegistrationsReportResponse)
 async def get_deleted_users_report(
     start_date: date | None = None,
     end_date: date | None = None,
+    granularity: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_deleted_users_report(start_date, end_date)
+    return await ReportService(db).get_deleted_users_report(start_date, end_date, granularity)
 
 
 @router.get("/active-users-by-activity", response_model=ActiveUsersByActivityReportResponse)
 async def get_active_users_by_activity_report(
     start_date: date | None = None,
     end_date: date | None = None,
+    granularity: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_active_users_by_activity_report(start_date, end_date)
+    return await ReportService(db).get_active_users_by_activity_report(start_date, end_date, granularity)
 
 
 @router.get("/billing", response_model=BillingReportResponse)
 async def get_billing_report(
     start_date: date | None = None,
     end_date: date | None = None,
+    granularity: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_billing_report(start_date, end_date)
+    return await ReportService(db).get_billing_report(start_date, end_date, granularity)
 
 
 @router.get("/classes", response_model=list[ReportClassOption])
@@ -94,7 +99,8 @@ async def get_class_cancellations_report(
     clase_template_id: UUID,
     start_date: date | None = None,
     end_date: date | None = None,
+    granularity: str | None = None,
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(has_role(Role.ROLE_ADMIN)),
 ):
-    return await ReportService(db).get_class_cancellations_report(clase_template_id, start_date, end_date)
+    return await ReportService(db).get_class_cancellations_report(clase_template_id, start_date, end_date, granularity)

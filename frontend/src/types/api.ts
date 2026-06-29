@@ -46,12 +46,26 @@ export interface BillingReportPoint {
     total_revenue: number;
 }
 
+export interface BillingBreakdownPoint {
+    label: string;
+    total_revenue: number;
+}
+
+export interface BillingDisciplineTypePoint {
+    discipline: string;
+    payment_type: string;
+    total_revenue: number;
+}
+
 export interface BillingReport {
     granularity: string;
     granularity_label: string;
     total_revenue: number;
     message: string | null;
     points: BillingReportPoint[];
+    breakdown_by_discipline: BillingBreakdownPoint[];
+    breakdown_by_type: BillingBreakdownPoint[];
+    breakdown_by_discipline_type: BillingDisciplineTypePoint[];
 }
 
 export interface ReportClassOption {

@@ -9,6 +9,9 @@ import {
     LabelList,
     Line,
     LineChart,
+    Cell,
+    Pie,
+    PieChart,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -33,9 +36,15 @@ import {
 
 type ReportKind = "clients" | "staff" | "activeByActivity" | "billing" | "classCancellations" | "deletedUsers";
 type ReportData = UserRegistrationsReport | ActiveUsersByActivityReport | BillingReport | ClassCancellationsRankingReport;
+type ReportGranularity = "weekly" | "monthly" | "yearly";
 
 const DATE_INPUT_CLASS = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cef-primary";
 const ARGENTINE_WEEKDAYS = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
+const GRANULARITY_OPTIONS: Array<{ value: ReportGranularity; label: string }> = [
+    { value: "weekly", label: "Semanal" },
+    { value: "monthly", label: "Mensual" },
+    { value: "yearly", label: "Anual" },
+];
 
 type ReportDefinition = {
     kind: ReportKind;
@@ -77,8 +86,8 @@ const reportDefinitions: ReportDefinition[] = [
     },
     {
         kind: "classCancellations",
-        title: "Cancelaciones por clase",
-        modalTitle: "Cancelaciones por clase",
+        title: "Cancelaciones",
+        modalTitle: "Cancelaciones",
         chartLabel: "Cancelaciones",
     },
 ];
@@ -95,18 +104,14 @@ function formatPeriod(period: string, granularity: string): string {
         const [year, semester] = period.split("-S");
         return `Semestre ${semester} ${year}`;
     }
+    if (granularity === "yearly") {
+        return `Año ${period}`;
+    }
 
     const [year, month] = period.split("-");
     const date = new Date(Number(year), Number(month) - 1, 1);
     const monthLabel = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(date);
     return `Mes ${monthLabel}`;
-}
-
-function formatClassDate(value: string): string {
-    if (!isValidIsoDate(value)) return "Fecha invalida";
-    const [year, month, day] = value.split("-").map(Number);
-    const date = new Date(year, month - 1, day);
-    return new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short" }).format(date);
 }
 
 function formatShortDate(value: Date): string {
@@ -340,26 +345,41 @@ function getDefaultPeriod(kind: ReportKind): { startDate: string; endDate: strin
     };
 }
 
+function getDefaultGranularity(startDate: string, endDate: string): ReportGranularity {
+    const start = isoDateToLocalDate(startDate);
+    const end = isoDateToLocalDate(endDate);
+    if (!start || !end) return "monthly";
+
+    const totalDays = Math.floor((end.getTime() - start.getTime()) / 86400000) + 1;
+    return totalDays <= 31 ? "weekly" : "monthly";
+}
+
 function PeriodFilterPanel({
     startDate,
     endDate,
+    granularity,
     error,
     isLoading,
+    showGranularity = false,
     onStartDateChange,
     onEndDateChange,
+    onGranularityChange,
     onSubmit,
 }: {
     startDate: string;
     endDate: string;
+    granularity: ReportGranularity;
     error?: string | null;
     isLoading: boolean;
+    showGranularity?: boolean;
     onStartDateChange: (value: string) => void;
     onEndDateChange: (value: string) => void;
+    onGranularityChange: (value: ReportGranularity) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
     return (
         <form onSubmit={onSubmit} className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <div className={`grid items-end gap-3 ${showGranularity ? "sm:grid-cols-[1fr_1fr_1fr_auto]" : "sm:grid-cols-[1fr_1fr_auto]"}`}>
                 <div className="space-y-1.5">
                     <label htmlFor="report-start-date" className="text-xs font-semibold uppercase tracking-wider text-slate-500">Inicio</label>
                     <ArgentineDateInput
@@ -376,6 +396,23 @@ function PeriodFilterPanel({
                         onChange={onEndDateChange}
                     />
                 </div>
+                {showGranularity && (
+                    <div className="space-y-1.5">
+                        <label htmlFor="report-granularity" className="text-xs font-semibold uppercase tracking-wider text-slate-500">Agrupar por</label>
+                        <select
+                            id="report-granularity"
+                            value={granularity}
+                            onChange={(event) => onGranularityChange(event.target.value as ReportGranularity)}
+                            className={DATE_INPUT_CLASS}
+                        >
+                            {GRANULARITY_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
                 <button
                     type="submit"
                     disabled={isLoading}
@@ -411,6 +448,14 @@ function classSubtitle(clase: ReportClassOption): string {
     return `${formatDay(clase.dia_semana)} ${clase.hora_inicio} - ${clase.hora_fin}`;
 }
 
+function NoDataReportMessage() {
+    return (
+        <div className="grid h-80 place-items-center rounded-xl border border-slate-200 bg-white px-4 text-center">
+            <p className="text-sm font-semibold text-slate-600">No hay datos disponibles para mostrar</p>
+        </div>
+    );
+}
+
 function UsersChart({
     report,
     title,
@@ -424,12 +469,9 @@ function UsersChart({
     lineColor?: string;
     activeLineColor?: string;
 }) {
+    const hasData = report.points.some((point) => point.total_count > 0);
     const chartData = useMemo(
         () => {
-            if (report.points.length === 0) {
-                return [{ period: "Sin datos", total: 0 }];
-            }
-
             return report.points.map((point) => ({
                 period: formatPeriod(point.period, report.granularity),
                 total: point.total_count,
@@ -442,6 +484,10 @@ function UsersChart({
         const maxTotal = Math.max(...chartData.map((point) => point.total), 0);
         return Array.from({ length: maxTotal + 2 }, (_, index) => index);
     }, [chartData]);
+
+    if (!hasData) {
+        return <NoDataReportMessage />;
+    }
 
     return (
         <div>
@@ -509,6 +555,7 @@ function ActivityUsersBarChart({
     title: string;
     seriesLabel: string;
 }) {
+    const hasData = report.points.some((point) => point.total_count > 0);
     const activities = useMemo(
         () => {
             const values = Array.from(new Set(report.points.map((point) => point.activity))).sort();
@@ -545,6 +592,10 @@ function ActivityUsersBarChart({
         );
         return Array.from({ length: maxTotal + 2 }, (_, index) => index);
     }, [activities, chartData]);
+
+    if (!hasData) {
+        return <NoDataReportMessage />;
+    }
 
     return (
         <div>
@@ -607,19 +658,23 @@ function ClassCancellationsRankingPanel({
     report,
     startDate,
     endDate,
+    granularity,
     error,
     isLoading,
     onStartDateChange,
     onEndDateChange,
+    onGranularityChange,
     onSubmit,
 }: {
     report: ClassCancellationsRankingReport | null;
     startDate: string;
     endDate: string;
+    granularity: ReportGranularity;
     error: string | null;
     isLoading: boolean;
     onStartDateChange: (value: string) => void;
     onEndDateChange: (value: string) => void;
+    onGranularityChange: (value: ReportGranularity) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
     return (
@@ -627,10 +682,13 @@ function ClassCancellationsRankingPanel({
             <PeriodFilterPanel
                 startDate={startDate}
                 endDate={endDate}
+                granularity={granularity}
                 error={error}
                 isLoading={isLoading}
+                showGranularity={false}
                 onStartDateChange={onStartDateChange}
                 onEndDateChange={onEndDateChange}
+                onGranularityChange={onGranularityChange}
                 onSubmit={onSubmit}
             />
 
@@ -638,14 +696,13 @@ function ClassCancellationsRankingPanel({
                 <div className="grid h-80 place-items-center">
                     <Loader2 className="h-8 w-8 animate-spin text-cef-primary" />
                 </div>
+            ) : report && report.total_count === 0 ? (
+                <NoDataReportMessage />
             ) : report ? (
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
                         <div>
                             <p className="text-sm font-semibold text-slate-800">Ranking de clases</p>
-                            <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-cef-primary">
-                                {formatClassDate(startDate)} - {formatClassDate(endDate)}
-                            </p>
                         </div>
                         <div className="rounded-lg bg-cef-danger/10 px-3 py-2 text-right">
                             <p className="text-[11px] font-bold uppercase tracking-wider text-cef-danger">Total</p>
@@ -695,99 +752,196 @@ function ClassCancellationsRankingPanel({
     );
 }
 
+const pieColors = ["#0f766e", "#2563eb", "#c2410c", "#7c3aed", "#be123c", "#4d7c0f", "#0891b2", "#b45309"];
+
+function formatPaymentType(value: string): string {
+    return value === "suscripcion" ? "Suscripción" : "Inscripción";
+}
+
+function BillingPieChart({
+    title,
+    data,
+}: {
+    title: string;
+    data: Array<{ label: string; total_revenue: number }>;
+}) {
+    const chartData = data.length > 0 && data.some((item) => item.total_revenue > 0)
+        ? data
+        : [{ label: "Sin datos", total_revenue: 0 }];
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-sm font-bold text-slate-800">{title}</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+                <div className="h-64 min-w-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={chartData}
+                                dataKey="total_revenue"
+                                nameKey="label"
+                                innerRadius={54}
+                                outerRadius={92}
+                                paddingAngle={2}
+                                isAnimationActive={false}
+                            >
+                                {chartData.map((item, index) => (
+                                    <Cell
+                                        key={item.label}
+                                        fill={item.total_revenue > 0 ? pieColors[index % pieColors.length] : "#cbd5e1"}
+                                    />
+                                ))}
+                            </Pie>
+                            <Tooltip
+                                formatter={(value) => [formatCurrency(Number(value)), "Facturación"]}
+                                contentStyle={{
+                                    borderRadius: 10,
+                                    border: "1px solid rgba(15, 118, 110, 0.28)",
+                                    color: "#0f172a",
+                                }}
+                            />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="space-y-2">
+                    {chartData.map((item, index) => (
+                        <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                            <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-700">
+                                <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: item.total_revenue > 0 ? pieColors[index % pieColors.length] : "#cbd5e1" }}
+                                />
+                                <span className="truncate">{item.label}</span>
+                            </span>
+                            <span className="shrink-0 text-sm font-black text-slate-950">{formatCurrency(item.total_revenue)}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function BillingReportPanel({
     report,
     error,
     startDate,
     endDate,
+    granularity,
     isLoading,
     onStartDateChange,
     onEndDateChange,
+    onGranularityChange,
     onSubmit,
 }: {
     report: BillingReport | null;
     error: string | null;
     startDate: string;
     endDate: string;
+    granularity: ReportGranularity;
     isLoading: boolean;
     onStartDateChange: (value: string) => void;
     onEndDateChange: (value: string) => void;
+    onGranularityChange: (value: ReportGranularity) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-    const chartData = useMemo(
-        () => {
-            if (!report || report.points.length === 0) {
-                return [{ period: "Sin datos", total: 0 }];
-            }
-
-            return report.points.map((point) => ({
-                period: formatPeriod(point.period, report.granularity),
-                total: point.total_revenue,
-            }));
-        },
+    const periodRows = useMemo(
+        () => report?.points.map((point) => ({
+            period: formatPeriod(point.period, report.granularity),
+            total: point.total_revenue,
+        })) ?? [],
         [report]
     );
+    const disciplineRows = report?.breakdown_by_discipline_type.length
+        ? report.breakdown_by_discipline_type
+        : [{ discipline: "Sin datos", payment_type: "inscripcion", total_revenue: 0 }];
+    const hasBillingData = Boolean(report && report.total_revenue > 0);
 
     return (
-        <div className="mx-auto w-full max-w-4xl space-y-4">
+        <div className="mx-auto w-full max-w-5xl space-y-4">
             <PeriodFilterPanel
                 startDate={startDate}
                 endDate={endDate}
+                granularity={granularity}
                 error={error}
                 isLoading={isLoading}
+                showGranularity
                 onStartDateChange={onStartDateChange}
                 onEndDateChange={onEndDateChange}
+                onGranularityChange={onGranularityChange}
                 onSubmit={onSubmit}
             />
 
-            {report ? (
-                <div className="rounded-xl border border-slate-200 bg-white p-5">
-                    <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Ganancia total</p>
-                    <p className="mt-2 text-3xl font-black text-slate-950">{formatCurrency(report.total_revenue)}</p>
-                    <div className="mt-3 h-[360px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 pb-2 pt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 20, right: 28, bottom: 12, left: 0 }}>
-                                <CartesianGrid stroke="rgba(15, 23, 42, 0.12)" vertical={false} />
-                                <XAxis
-                                    dataKey="period"
-                                    tick={{ fill: "#064e3b", fontSize: 12, fontWeight: 700 }}
-                                    tickLine={false}
-                                    axisLine={{ stroke: "#0f766e" }}
-                                    interval={0}
-                                />
-                                <YAxis
-                                    tickFormatter={(value) => formatCurrency(Number(value))}
-                                    tick={{ fill: "#0f172a", fontSize: 12, fontWeight: 700 }}
-                                    tickLine={false}
-                                    axisLine={{ stroke: "#0f766e" }}
-                                />
-                                <Tooltip
-                                    formatter={(value) => [formatCurrency(Number(value)), "Facturacion"]}
-                                    labelStyle={{ color: "#0f172a", fontWeight: 700 }}
-                                    contentStyle={{
-                                        borderRadius: 10,
-                                        border: "1px solid rgba(15, 118, 110, 0.28)",
-                                        color: "#0f172a",
-                                    }}
-                                />
-                                <Bar
-                                    name="Facturacion"
-                                    dataKey="total"
-                                    fill="#0f766e"
-                                    radius={[10, 10, 0, 0]}
-                                    isAnimationActive={false}
-                                >
-                                    <LabelList
-                                        dataKey="total"
-                                        position="top"
-                                        offset={8}
-                                        fill="#0f172a"
-                                        fontSize={14}
-                                        fontWeight={800}
-                                    />
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+            {report && !hasBillingData ? (
+                <NoDataReportMessage />
+            ) : report ? (
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-white p-5">
+                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Facturación total</p>
+                        <p className="mt-2 text-3xl font-black text-slate-950">{formatCurrency(report.total_revenue)}</p>
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <BillingPieChart
+                            title="Por disciplina"
+                            data={report.breakdown_by_discipline.map((item) => ({
+                                label: item.label,
+                                total_revenue: item.total_revenue,
+                            }))}
+                        />
+                        <BillingPieChart
+                            title="Por tipo"
+                            data={report.breakdown_by_type.map((item) => ({
+                                label: formatPaymentType(item.label),
+                                total_revenue: item.total_revenue,
+                            }))}
+                        />
+                    </div>
+
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                <p className="text-sm font-bold text-slate-800">Detalle por disciplina y tipo</p>
+                            </div>
+                            <div className="max-h-[42vh] overflow-auto">
+                                <table className="w-full min-w-[560px] border-collapse text-left">
+                                    <thead className="sticky top-0 z-10 bg-white">
+                                        <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                            <th className="px-4 py-3">Disciplina</th>
+                                            <th className="px-4 py-3">Tipo</th>
+                                            <th className="px-4 py-3 text-right">Facturación</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {disciplineRows.map((row) => (
+                                            <tr key={`${row.discipline}-${row.payment_type}`} className="border-b border-slate-100 last:border-0">
+                                                <td className="px-4 py-3 text-sm font-semibold text-slate-900">{row.discipline}</td>
+                                                <td className="px-4 py-3 text-sm font-medium text-slate-600">{formatPaymentType(row.payment_type)}</td>
+                                                <td className="px-4 py-3 text-right text-sm font-black text-slate-950">{formatCurrency(row.total_revenue)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                <p className="text-sm font-bold text-slate-800">Facturación por periodo</p>
+                            </div>
+                            <div className="max-h-[42vh] overflow-auto">
+                                <table className="w-full border-collapse text-left">
+                                    <tbody>
+                                        {(periodRows.length > 0 ? periodRows : [{ period: "Sin datos", total: 0 }]).map((row) => (
+                                            <tr key={row.period} className="border-b border-slate-100 last:border-0">
+                                                <td className="px-4 py-3 text-sm font-semibold text-slate-700">{row.period}</td>
+                                                <td className="px-4 py-3 text-right text-sm font-black text-slate-950">{formatCurrency(row.total)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             ) : null}
@@ -802,9 +956,11 @@ function ReportModal({
     billingError,
     billingStartDate,
     billingEndDate,
+    reportGranularity,
     onClose,
     onBillingStartDateChange,
     onBillingEndDateChange,
+    onReportGranularityChange,
     onBillingSubmit,
 }: {
     definition: ReportDefinition;
@@ -813,12 +969,14 @@ function ReportModal({
     billingError: string | null;
     billingStartDate: string;
     billingEndDate: string;
+    reportGranularity: ReportGranularity;
     onClose: () => void;
     onBillingStartDateChange: (value: string) => void;
     onBillingEndDateChange: (value: string) => void;
+    onReportGranularityChange: (value: ReportGranularity) => void;
     onBillingSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-    const modalWidth = definition.kind === "billing" ? "max-w-4xl" : "max-w-5xl";
+    const modalWidth = definition.kind === "billing" ? "max-w-6xl" : "max-w-5xl";
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -844,9 +1002,11 @@ function ReportModal({
                             error={billingError}
                             startDate={billingStartDate}
                             endDate={billingEndDate}
+                            granularity={reportGranularity}
                             isLoading={isLoading}
                             onStartDateChange={onBillingStartDateChange}
                             onEndDateChange={onBillingEndDateChange}
+                            onGranularityChange={onReportGranularityChange}
                             onSubmit={onBillingSubmit}
                         />
                     ) : definition.kind === "classCancellations" ? (
@@ -854,10 +1014,12 @@ function ReportModal({
                             report={report as ClassCancellationsRankingReport | null}
                             startDate={billingStartDate}
                             endDate={billingEndDate}
+                            granularity={reportGranularity}
                             error={billingError}
                             isLoading={isLoading}
                             onStartDateChange={onBillingStartDateChange}
                             onEndDateChange={onBillingEndDateChange}
+                            onGranularityChange={onReportGranularityChange}
                             onSubmit={onBillingSubmit}
                         />
                     ) : (
@@ -865,10 +1027,13 @@ function ReportModal({
                             <PeriodFilterPanel
                                 startDate={billingStartDate}
                                 endDate={billingEndDate}
+                                granularity={reportGranularity}
                                 error={billingError}
                                 isLoading={isLoading}
+                                showGranularity
                                 onStartDateChange={onBillingStartDateChange}
                                 onEndDateChange={onBillingEndDateChange}
+                                onGranularityChange={onReportGranularityChange}
                                 onSubmit={onBillingSubmit}
                             />
                             {isLoading ? (
@@ -909,12 +1074,14 @@ export default function ReportsView() {
     const [activeReport, setActiveReport] = useState<ReportDefinition>(reportDefinitions[0]);
     const [billingStartDate, setBillingStartDate] = useState("");
     const [billingEndDate, setBillingEndDate] = useState("");
+    const [reportGranularity, setReportGranularity] = useState<ReportGranularity>("monthly");
     const [billingError, setBillingError] = useState<string | null>(null);
 
     const loadReportData = async (
         definition: ReportDefinition,
         startDate: string,
         endDate: string,
+        granularity: ReportGranularity,
     ) => {
         const periodError = validatePeriod(startDate, endDate);
         if (periodError) {
@@ -928,7 +1095,7 @@ export default function ReportsView() {
         setReport(null);
 
         if (definition.kind === "billing") {
-            const result = await getBillingReport(startDate, endDate);
+            const result = await getBillingReport(startDate, endDate, granularity);
             if (result.error) {
                 setBillingError(result.error);
             } else {
@@ -946,12 +1113,12 @@ export default function ReportsView() {
         }
 
         const data = definition.kind === "clients"
-            ? await getClientRegistrationsReport(startDate, endDate)
+            ? await getClientRegistrationsReport(startDate, endDate, granularity)
             : definition.kind === "staff"
-                ? await getStaffRegistrationsReport(startDate, endDate)
+                ? await getStaffRegistrationsReport(startDate, endDate, granularity)
                 : definition.kind === "deletedUsers"
-                    ? await getDeletedUsersReport(startDate, endDate)
-                    : await getActiveUsersByActivityReport(startDate, endDate);
+                    ? await getDeletedUsersReport(startDate, endDate, granularity)
+                    : await getActiveUsersByActivityReport(startDate, endDate, granularity);
         setReport(data);
         setIsLoading(false);
     };
@@ -964,18 +1131,20 @@ export default function ReportsView() {
         setBillingError(null);
         setBillingStartDate(defaultPeriod.startDate);
         setBillingEndDate(defaultPeriod.endDate);
+        const defaultGranularity = getDefaultGranularity(defaultPeriod.startDate, defaultPeriod.endDate);
+        setReportGranularity(defaultGranularity);
 
         if (definition.kind === "billing") {
-            await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate);
+            await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate, defaultGranularity);
             return;
         }
 
-        await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate);
+        await loadReportData(definition, defaultPeriod.startDate, defaultPeriod.endDate, defaultGranularity);
     };
 
     const handleBillingSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        await loadReportData(activeReport, billingStartDate, billingEndDate);
+        await loadReportData(activeReport, billingStartDate, billingEndDate, reportGranularity);
     };
 
     return (
@@ -1026,9 +1195,11 @@ export default function ReportsView() {
                     billingError={billingError}
                     billingStartDate={billingStartDate}
                     billingEndDate={billingEndDate}
+                    reportGranularity={reportGranularity}
                     onClose={() => setIsOpen(false)}
                     onBillingStartDateChange={setBillingStartDate}
                     onBillingEndDateChange={setBillingEndDate}
+                    onReportGranularityChange={setReportGranularity}
                     onBillingSubmit={handleBillingSubmit}
                 />
             )}

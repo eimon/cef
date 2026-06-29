@@ -8,10 +8,11 @@ import {
     UserRegistrationsReport,
 } from "@/types/api";
 
-function periodParams(startDate?: string, endDate?: string): Record<string, string> {
+function periodParams(startDate?: string, endDate?: string, granularity?: string): Record<string, string> {
     return {
         ...(startDate ? { start_date: startDate } : {}),
         ...(endDate ? { end_date: endDate } : {}),
+        ...(granularity ? { granularity } : {}),
     };
 }
 
@@ -19,9 +20,10 @@ async function getRegistrationsReport(
     endpoint: string,
     startDate?: string,
     endDate?: string,
+    granularity?: string,
 ): Promise<UserRegistrationsReport | null> {
     try {
-        const res = await serverApi(endpoint, { params: periodParams(startDate, endDate) });
+        const res = await serverApi(endpoint, { params: periodParams(startDate, endDate, granularity) });
         if (!res.ok) return null;
         return res.json();
     } catch (error) {
@@ -33,31 +35,35 @@ async function getRegistrationsReport(
 export async function getClientRegistrationsReport(
     startDate?: string,
     endDate?: string,
+    granularity?: string,
 ): Promise<UserRegistrationsReport | null> {
-    return getRegistrationsReport("/reports/clients-registrations", startDate, endDate);
+    return getRegistrationsReport("/reports/clients-registrations", startDate, endDate, granularity);
 }
 
 export async function getStaffRegistrationsReport(
     startDate?: string,
     endDate?: string,
+    granularity?: string,
 ): Promise<UserRegistrationsReport | null> {
-    return getRegistrationsReport("/reports/staff-registrations", startDate, endDate);
+    return getRegistrationsReport("/reports/staff-registrations", startDate, endDate, granularity);
 }
 
 export async function getDeletedUsersReport(
     startDate?: string,
     endDate?: string,
+    granularity?: string,
 ): Promise<UserRegistrationsReport | null> {
-    return getRegistrationsReport("/reports/deleted-users", startDate, endDate);
+    return getRegistrationsReport("/reports/deleted-users", startDate, endDate, granularity);
 }
 
 export async function getActiveUsersByActivityReport(
     startDate?: string,
     endDate?: string,
+    granularity?: string,
 ): Promise<ActiveUsersByActivityReport | null> {
     try {
         const res = await serverApi("/reports/active-users-by-activity", {
-            params: periodParams(startDate, endDate),
+            params: periodParams(startDate, endDate, granularity),
         });
         if (!res.ok) return null;
         return res.json();
@@ -70,13 +76,11 @@ export async function getActiveUsersByActivityReport(
 export async function getBillingReport(
     startDate: string,
     endDate: string,
+    granularity?: string,
 ): Promise<{ data?: BillingReport; error?: string }> {
     try {
         const res = await serverApi("/reports/billing", {
-            params: {
-                start_date: startDate,
-                end_date: endDate,
-            },
+            params: periodParams(startDate, endDate, granularity),
         });
 
         if (!res.ok) {

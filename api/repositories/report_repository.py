@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, time
 
-from sqlalchemy import and_, func, select, union_all
+from sqlalchemy import and_, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.enums import EstadoPago, TipoInscripcion, UserRole
@@ -174,6 +174,67 @@ class ReportRepository:
         )
 
         return [(row.event_date, float(row.total_revenue)) for row in result.all()]
+
+    async def sum_paid_revenue_by_discipline_and_type(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> list[tuple[str, str, float]]:
+        start_datetime = datetime.combine(start_date, time.min)
+        end_datetime = datetime.combine(end_date, time.max)
+
+        individual_revenue = (
+            select(
+                ClaseTemplate.disciplina.label("discipline"),
+                literal("inscripcion").label("payment_type"),
+                func.sum(Pago.monto).label("total_revenue"),
+            )
+            .select_from(Pago)
+            .join(ClaseInstancia, Pago.clase_instancia_id == ClaseInstancia.id)
+            .join(ClaseTemplate, ClaseInstancia.clase_template_id == ClaseTemplate.id)
+            .where(
+                Pago.activo.is_(True),
+                Pago.estado == EstadoPago.PAGADO,
+                Pago.fecha_pago >= start_datetime,
+                Pago.fecha_pago <= end_datetime,
+                Pago.clase_instancia_id.is_not(None),
+                Pago.suscripcion_id.is_(None),
+            )
+            .group_by(ClaseTemplate.disciplina)
+        )
+
+        subscription_revenue = (
+            select(
+                ClaseTemplate.disciplina.label("discipline"),
+                literal("suscripcion").label("payment_type"),
+                func.sum(Pago.monto).label("total_revenue"),
+            )
+            .select_from(Pago)
+            .join(Suscripcion, Pago.suscripcion_id == Suscripcion.id)
+            .join(ClaseTemplate, Suscripcion.clase_template_id == ClaseTemplate.id)
+            .where(
+                Pago.activo.is_(True),
+                Pago.estado == EstadoPago.PAGADO,
+                Pago.fecha_pago >= start_datetime,
+                Pago.fecha_pago <= end_datetime,
+                Pago.suscripcion_id.is_not(None),
+            )
+            .group_by(ClaseTemplate.disciplina)
+        )
+
+        revenue = union_all(individual_revenue, subscription_revenue).subquery()
+        total_revenue = func.sum(revenue.c.total_revenue).label("total_revenue")
+
+        result = await self.db.execute(
+            select(revenue.c.discipline, revenue.c.payment_type, total_revenue)
+            .group_by(revenue.c.discipline, revenue.c.payment_type)
+            .order_by(total_revenue.desc(), revenue.c.discipline, revenue.c.payment_type)
+        )
+
+        return [
+            (str(row.discipline), str(row.payment_type), float(row.total_revenue))
+            for row in result.all()
+        ]
 
     async def list_available_classes(self) -> list[ClaseTemplate]:
         result = await self.db.execute(

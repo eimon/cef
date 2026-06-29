@@ -9,11 +9,13 @@ from core.enums import UserRole
 from exceptions.general import BadRequestException, NotFoundException
 from repositories.report_repository import ReportRepository
 from schemas.report import (
-    ClassCancellationRankingItem,
     ActiveUsersByActivityPoint,
     ActiveUsersByActivityReportResponse,
+    BillingBreakdownPoint,
+    BillingDisciplineTypePoint,
     BillingReportPoint,
     BillingReportResponse,
+    ClassCancellationRankingItem,
     ClassCancellationsRankingResponse,
     ClassCancellationsPoint,
     ClassCancellationsReportResponse,
@@ -27,9 +29,11 @@ LOCAL_TZ = ZoneInfo("America/Argentina/Buenos_Aires")
 GRANULARITY_LABELS = {
     "weekly": "Semanal",
     "monthly": "Mensual",
+    "yearly": "Anual",
     "quarterly": "Trimestral",
     "semester": "Semestral",
 }
+CHART_GRANULARITIES = {"weekly", "monthly", "yearly"}
 
 
 class ReportService:
@@ -41,35 +45,39 @@ class ReportService:
         self,
         start_date: date | None = None,
         end_date: date | None = None,
+        granularity: str | None = None,
     ) -> UserRegistrationsReportResponse:
         start_date, end_date = self._resolve_period(start_date, end_date, default_start=self._year_start())
-        return await self._get_registrations_report([UserRole.CLIENTE], start_date, end_date)
+        return await self._get_registrations_report([UserRole.CLIENTE], start_date, end_date, granularity)
 
     async def get_staff_registrations_report(
         self,
         start_date: date | None = None,
         end_date: date | None = None,
+        granularity: str | None = None,
     ) -> UserRegistrationsReportResponse:
         start_date, end_date = self._resolve_period(start_date, end_date, default_start=self._year_start())
-        return await self._get_registrations_report([UserRole.ADMIN, UserRole.RECEPCION], start_date, end_date)
+        return await self._get_registrations_report([UserRole.ADMIN, UserRole.RECEPCION], start_date, end_date, granularity)
 
     async def get_deleted_users_report(
         self,
         start_date: date | None = None,
         end_date: date | None = None,
+        granularity: str | None = None,
     ) -> UserRegistrationsReportResponse:
         start_date, end_date = self._resolve_period(start_date, end_date, default_start=self._year_start())
         dated_counts = await self.repo.count_deleted_users_by_date(start_date, end_date)
-        return self._cumulative_user_report(dated_counts, start_date, end_date)
+        return self._cumulative_user_report(dated_counts, start_date, end_date, granularity)
 
     async def get_active_users_by_activity_report(
         self,
         start_date: date | None = None,
         end_date: date | None = None,
+        granularity: str | None = None,
     ) -> ActiveUsersByActivityReportResponse:
         start_date, end_date = self._resolve_period(start_date, end_date)
         activity_counts = await self.repo.count_paid_reservations_by_activity(start_date, end_date)
-        granularity = self._granularity_for(start_date, end_date)
+        granularity = self._resolve_granularity(start_date, end_date, granularity)
         grouped: dict[tuple[str, str], int] = {}
         for event_date, activity, total_count in activity_counts:
             period = self._period_key(event_date, granularity)
@@ -95,6 +103,7 @@ class ReportService:
         self,
         start_date: date | None = None,
         end_date: date | None = None,
+        granularity: str | None = None,
     ) -> BillingReportResponse:
         today = datetime.now(LOCAL_TZ).date()
         start_date, end_date = self._resolve_period(
@@ -104,16 +113,25 @@ class ReportService:
             default_end=today,
         )
 
-        granularity = self._granularity_for(start_date, end_date)
+        granularity = self._resolve_granularity(start_date, end_date, granularity)
         revenue_counts = await self.repo.sum_paid_revenue_by_date(start_date, end_date)
         grouped = self._bucket_sum(revenue_counts, start_date, end_date, granularity)
+        discipline_type_totals = await self.repo.sum_paid_revenue_by_discipline_and_type(start_date, end_date)
         total_revenue = sum(grouped.values())
+        discipline_totals: dict[str, float] = {}
+        type_totals: dict[str, float] = {"inscripcion": 0, "suscripcion": 0}
+        for discipline, payment_type, revenue in discipline_type_totals:
+            discipline_totals[discipline] = discipline_totals.get(discipline, 0) + revenue
+            type_totals[payment_type] = type_totals.get(payment_type, 0) + revenue
         if total_revenue is None:
             return BillingReportResponse(
                 granularity=granularity,
                 granularity_label=GRANULARITY_LABELS[granularity],
                 total_revenue=0,
                 points=[],
+                breakdown_by_discipline=[],
+                breakdown_by_type=[],
+                breakdown_by_discipline_type=[],
                 message="No se registraron pagos en el período seleccionado",
             )
 
@@ -128,6 +146,22 @@ class ReportService:
                     total_revenue=total,
                 )
                 for period, total in grouped.items()
+            ],
+            breakdown_by_discipline=[
+                BillingBreakdownPoint(label=discipline, total_revenue=total)
+                for discipline, total in sorted(discipline_totals.items(), key=lambda item: (-item[1], item[0]))
+            ],
+            breakdown_by_type=[
+                BillingBreakdownPoint(label=payment_type, total_revenue=total)
+                for payment_type, total in type_totals.items()
+            ],
+            breakdown_by_discipline_type=[
+                BillingDisciplineTypePoint(
+                    discipline=discipline,
+                    payment_type=payment_type,
+                    total_revenue=total,
+                )
+                for discipline, payment_type, total in discipline_type_totals
             ],
         )
 
@@ -161,13 +195,14 @@ class ReportService:
         clase_template_id: uuid.UUID,
         start_date: date | None = None,
         end_date: date | None = None,
+        granularity: str | None = None,
     ) -> ClassCancellationsReportResponse:
         clase = await self.repo.get_available_class_by_id(clase_template_id)
         if not clase:
             raise NotFoundException("Clase no encontrada")
 
         start_date, end_date = self._resolve_period(start_date, end_date)
-        granularity = self._granularity_for(start_date, end_date)
+        granularity = self._resolve_granularity(start_date, end_date, granularity)
         cancellation_counts = await self.repo.count_class_cancellations_by_date(
             clase_template_id,
             start_date,
@@ -193,9 +228,10 @@ class ReportService:
         roles: list[UserRole],
         start_date: date | None,
         end_date: date | None,
+        granularity: str | None = None,
     ) -> UserRegistrationsReportResponse:
         dated_counts = await self.repo.count_present_users_by_date(roles, start_date, end_date)
-        return self._cumulative_user_report(dated_counts, start_date, end_date)
+        return self._cumulative_user_report(dated_counts, start_date, end_date, granularity)
 
     def _resolve_period(
         self,
@@ -224,13 +260,21 @@ class ReportService:
             return "weekly"
         return "monthly"
 
+    def _resolve_granularity(self, start_date: date, end_date: date, granularity: str | None) -> str:
+        if granularity is None:
+            return self._granularity_for(start_date, end_date)
+        if granularity not in CHART_GRANULARITIES:
+            raise BadRequestException("Agrupacion de reporte invalida")
+        return granularity
+
     def _cumulative_user_report(
         self,
         dated_counts: list[tuple[date, int]],
         start_date: date,
         end_date: date,
+        granularity: str | None = None,
     ) -> UserRegistrationsReportResponse:
-        granularity = self._granularity_for(start_date, end_date)
+        granularity = self._resolve_granularity(start_date, end_date, granularity)
         grouped = self._bucket_sum(dated_counts, start_date, end_date, granularity)
         cumulative = 0
         points: list[UserRegistrationsPoint] = []
@@ -278,6 +322,8 @@ class ReportService:
             return self._period_start(value, granularity).isoformat()
         if granularity == "monthly":
             return f"{value.year:04d}-{value.month:02d}"
+        if granularity == "yearly":
+            return f"{value.year:04d}"
         if granularity == "quarterly":
             quarter = ((value.month - 1) // 3) + 1
             return f"{value.year:04d}-Q{quarter}"
@@ -291,6 +337,8 @@ class ReportService:
             return value - timedelta(days=value.weekday())
         if granularity == "monthly":
             return value.replace(day=1)
+        if granularity == "yearly":
+            return value.replace(month=1, day=1)
         if granularity == "quarterly":
             first_month = ((value.month - 1) // 3) * 3 + 1
             return value.replace(month=first_month, day=1)
@@ -304,6 +352,8 @@ class ReportService:
             return value + timedelta(days=7)
         if granularity == "monthly":
             return self._add_months(value, 1)
+        if granularity == "yearly":
+            return value.replace(year=value.year + 1, month=1, day=1)
         if granularity == "quarterly":
             return self._add_months(value, 3)
         if granularity == "semester":

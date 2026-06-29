@@ -36,12 +36,26 @@ class BillingReportPoint(BaseModel):
     total_revenue: float
 
 
+class BillingBreakdownPoint(BaseModel):
+    label: str
+    total_revenue: float
+
+
+class BillingDisciplineTypePoint(BaseModel):
+    discipline: str
+    payment_type: str
+    total_revenue: float
+
+
 class BillingReportResponse(BaseModel):
     granularity: str
     granularity_label: str
     total_revenue: float
     message: str | None = None
     points: list[BillingReportPoint]
+    breakdown_by_discipline: list[BillingBreakdownPoint]
+    breakdown_by_type: list[BillingBreakdownPoint]
+    breakdown_by_discipline_type: list[BillingDisciplineTypePoint]
 
 
 class ReportClassOption(BaseModel):
