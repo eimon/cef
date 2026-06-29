@@ -41,9 +41,9 @@ type ReportGranularity = "weekly" | "monthly" | "yearly";
 const DATE_INPUT_CLASS = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cef-primary";
 const ARGENTINE_WEEKDAYS = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
 const GRANULARITY_OPTIONS: Array<{ value: ReportGranularity; label: string }> = [
-    { value: "weekly", label: "Semanal" },
-    { value: "monthly", label: "Mensual" },
-    { value: "yearly", label: "Anual" },
+    { value: "weekly", label: "Semana" },
+    { value: "monthly", label: "Mes" },
+    { value: "yearly", label: "Año" },
 ];
 
 type ReportDefinition = {
@@ -377,6 +377,8 @@ function PeriodFilterPanel({
     onGranularityChange: (value: ReportGranularity) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+    const isSubmitDisabled = isLoading || !startDate.trim() || !endDate.trim();
+
     return (
         <form onSubmit={onSubmit} className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className={`grid items-end gap-3 ${showGranularity ? "sm:grid-cols-[1fr_1fr_1fr_auto]" : "sm:grid-cols-[1fr_1fr_auto]"}`}>
@@ -415,7 +417,7 @@ function PeriodFilterPanel({
                 )}
                 <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isSubmitDisabled}
                     className="inline-flex h-10 items-center justify-center rounded-lg bg-cef-primary px-4 text-sm font-semibold text-white transition hover:bg-cef-primary/80 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Consultar"}
@@ -743,7 +745,7 @@ function ClassCancellationsRankingPanel({
                         </table>
                     </div>
                 </div>
-            ) : (
+            ) : error ? null : (
                 <div className="grid h-80 place-items-center">
                     <p className="text-sm text-cef-danger">No se pudo cargar el reporte.</p>
                 </div>
@@ -1054,7 +1056,7 @@ function ReportModal({
                                     lineColor={definition.kind === "deletedUsers" ? "#be123c" : undefined}
                                     activeLineColor={definition.kind === "deletedUsers" ? "#881337" : undefined}
                                 />
-                            ) : (
+                            ) : billingError ? null : (
                                 <div className="grid h-80 place-items-center">
                                     <p className="text-sm text-cef-danger">No se pudo cargar el reporte.</p>
                                 </div>
@@ -1086,6 +1088,7 @@ export default function ReportsView() {
         const periodError = validatePeriod(startDate, endDate);
         if (periodError) {
             setBillingError(periodError);
+            setReport(null);
             setIsLoading(false);
             return;
         }
