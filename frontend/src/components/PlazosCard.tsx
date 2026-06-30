@@ -69,7 +69,6 @@ function DiasSetting({
                         <input
                             name="valor"
                             type="number"
-                            min="1"
                             step="1"
                             required
                             value={inputValue}
