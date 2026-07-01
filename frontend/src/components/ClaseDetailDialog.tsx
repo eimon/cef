@@ -80,6 +80,10 @@ function hasClaseTerminado(fechaStr: string, horaFinStr: string): boolean {
     return new Date(y, m - 1, d, h, min) < new Date();
 }
 
+function normalizeDateKey(value: string): string {
+    return value.slice(0, 10);
+}
+
 // ── Sub-components ───────────────────────────────────────────────────────────
 
 interface PaymentAmountStepProps {
@@ -273,7 +277,7 @@ export default function ClaseDetailDialog({
             const current = entries.find(
                 (entry) =>
                     entry.clase_template_id === clase.id &&
-                    entry.fecha === clase.fecha_en_semana,
+                    normalizeDateKey(entry.fecha) === normalizeDateKey(clase.fecha_en_semana),
             );
 
             const entriesSuscripcion = await getMisWaitlistSuscripcion();
@@ -282,7 +286,7 @@ export default function ClaseDetailDialog({
             const currentSuscripcion = entriesSuscripcion.find(
                 (entry) =>
                     entry.clase_template_id === clase.id &&
-                    entry.fecha === clase.fecha_en_semana,
+                    normalizeDateKey(entry.fecha) === normalizeDateKey(clase.fecha_en_semana),
             );
 
             setWaitlistEntryId(current?.id ?? null);
@@ -301,6 +305,51 @@ export default function ClaseDetailDialog({
         loadMyWaitlist();
         return () => {
             mounted = false;
+        };
+    }, [isOpen, clase, userRole]);
+
+    // Refresh waitlist membership every 30 seconds while dialog is open.
+    // This ensures newly promoted entries become visible even if they were not present on initial load.
+    useEffect(() => {
+        if (!isOpen || !clase || userRole !== "cliente") return;
+
+        let mounted = true;
+
+        const refreshMyWaitlists = async () => {
+            const entries = await getMisWaitlist();
+            if (!mounted) return;
+
+            const current = entries.find(
+                (entry) =>
+                    entry.clase_template_id === clase.id &&
+                    normalizeDateKey(entry.fecha) === normalizeDateKey(clase.fecha_en_semana),
+            );
+
+            const entriesSuscripcion = await getMisWaitlistSuscripcion();
+            if (!mounted) return;
+
+            const currentSuscripcion = entriesSuscripcion.find(
+                (entry) =>
+                    entry.clase_template_id === clase.id &&
+                    normalizeDateKey(entry.fecha) === normalizeDateKey(clase.fecha_en_semana),
+            );
+
+            setWaitlistEntryId(current?.id ?? null);
+            setWaitlistPosition(current?.posicion ?? null);
+            setWaitlistEstado(current?.estado ?? null);
+            setWaitlistExpiraAt(current?.expira_at ?? null);
+
+            setWaitlistSuscripcionEntryId(currentSuscripcion?.id ?? null);
+            setWaitlistSuscripcionPosition(currentSuscripcion?.posicion ?? null);
+            setWaitlistSuscripcionEstado(currentSuscripcion?.estado ?? null);
+            setWaitlistSuscripcionExpiraAt(currentSuscripcion?.expira_at ?? null);
+        };
+
+        refreshMyWaitlists();
+        const interval = setInterval(refreshMyWaitlists, 30000);
+        return () => {
+            mounted = false;
+            clearInterval(interval);
         };
     }, [isOpen, clase, userRole]);
 
@@ -851,52 +900,61 @@ export default function ClaseDetailDialog({
                                             <button type="button" disabled className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed flex items-center justify-center gap-1.5">
                                                 Ya tenés inscripción
                                             </button>
-                                        ) : !canSubscribe ? (
+                                        ) : hasWaitlistSuscripcionEntry ? (
                                             <div className="space-y-2">
-                                                {hasWaitlistSuscripcionEntry ? (
-                                                    <>
-                                                        <div className={`w-full py-2.5 px-3 rounded-lg border text-xs font-semibold text-center leading-tight ${
-                                                            waitlistSuscripcionNotificado
-                                                                ? "bg-cef-warning/10 border-cef-warning/20 text-cef-warning"
-                                                                : "bg-cef-success/10 border-cef-success/20 text-cef-success"
-                                                        }`}>
-                                                            {waitlistSuscripcionNotificado
-                                                                ? `¡Se liberó tu cupo de suscripción! ${renderVencimiento(waitlistSuscripcionExpiraAt) ?? "Confirmá tu lugar"}`
-                                                                : `Estás en lista de espera de suscripción${waitlistSuscripcionPosition ? ` · Posición #${waitlistSuscripcionPosition}` : ""}`}
-                                                        </div>
-                                                        {waitlistSuscripcionNotificado && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleConfirmarWaitlistSuscripcionPago}
-                                                                disabled={waitlistSuscripcionLoading}
-                                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                                                            >
-                                                                {waitlistSuscripcionLoading ? "Redirigiendo..." : "Confirmar Suscripción"}
-                                                            </button>
-                                                        )}
+                                                <>
+                                                    <div className={`w-full py-2.5 px-3 rounded-lg border text-xs font-semibold text-center leading-tight ${
+                                                        waitlistSuscripcionNotificado
+                                                            ? "bg-cef-warning/10 border-cef-warning/20 text-cef-warning"
+                                                            : "bg-cef-success/10 border-cef-success/20 text-cef-success"
+                                                    }`}>
+                                                        {waitlistSuscripcionNotificado
+                                                            ? `¡Se liberó tu cupo de suscripción! ${renderVencimiento(waitlistSuscripcionExpiraAt) ?? "Confirmá tu lugar"}`
+                                                            : `Estás en lista de espera de suscripción${waitlistSuscripcionPosition ? ` · Posición #${waitlistSuscripcionPosition}` : ""}`}
+                                                    </div>
+                                                    {waitlistSuscripcionNotificado && (
                                                         <button
                                                             type="button"
-                                                            onClick={handleCancelarWaitlistSuscripcion}
+                                                            onClick={handleConfirmarWaitlistSuscripcionPago}
                                                             disabled={waitlistSuscripcionLoading}
-                                                            className="w-full py-2.5 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                            className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                                                         >
-                                                            {waitlistSuscripcionLoading ? "Cancelando..." : "Cancelar espera"}
+                                                            {waitlistSuscripcionLoading ? "Redirigiendo..." : "Confirmar Suscripción"}
                                                         </button>
-                                                    </>
-                                                ) : (
+                                                    )}
                                                     <button
                                                         type="button"
-                                                        onClick={handleAnotarseWaitlistSuscripcion}
+                                                        onClick={handleCancelarWaitlistSuscripcion}
                                                         disabled={waitlistSuscripcionLoading}
-                                                        className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                        className="w-full py-2.5 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                                                     >
-                                                        {waitlistSuscripcionLoading ? "Anotando..." : "Anotarme en lista de espera"}
+                                                        {waitlistSuscripcionLoading ? "Cancelando..." : "Cancelar espera"}
                                                     </button>
-                                                )}
+                                                </>
                                                 <p className="text-[11px] text-slate-400 text-center">
                                                     {waitlistSuscripcionNotificado
                                                         ? "Tu suscripción se confirma únicamente con pago aprobado"
                                                         : "No hay cupo de suscripción disponible para este período"}
+                                                </p>
+                                                {waitlistSuscripcionError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{waitlistSuscripcionError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : !canSubscribe ? (
+                                            <div className="space-y-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAnotarseWaitlistSuscripcion}
+                                                    disabled={waitlistSuscripcionLoading}
+                                                    className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                >
+                                                    {waitlistSuscripcionLoading ? "Anotando..." : "Anotarme en lista de espera"}
+                                                </button>
+                                                <p className="text-[11px] text-slate-400 text-center">
+                                                    No hay cupo de suscripción disponible para este período
                                                 </p>
                                                 {waitlistSuscripcionError && (
                                                     <div className="flex items-start gap-1.5">

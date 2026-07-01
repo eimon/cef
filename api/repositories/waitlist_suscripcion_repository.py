@@ -164,6 +164,24 @@ class WaitlistSuscripcionRepository:
         )
         return result.scalars().first()
 
+    async def list_pending_entries_until_slot(
+        self,
+        clase_template_id: uuid.UUID,
+        slot_fecha: date,
+    ) -> list[WaitlistSuscripcionEntry]:
+        result = await self.db.execute(
+            select(WaitlistSuscripcionEntry)
+            .where(
+                WaitlistSuscripcionEntry.clase_template_id == clase_template_id,
+                WaitlistSuscripcionEntry.fecha <= slot_fecha,
+                WaitlistSuscripcionEntry.activo == True,
+                WaitlistSuscripcionEntry.estado == EstadoWaitlist.EN_ESPERA,
+            )
+            .order_by(WaitlistSuscripcionEntry.fecha.asc(), WaitlistSuscripcionEntry.posicion.asc())
+            .with_for_update(skip_locked=True)
+        )
+        return list(result.scalars().all())
+
     async def expire_due_notified_entries(self, now: datetime) -> list[WaitlistSuscripcionEntry]:
         result = await self.db.execute(
             select(WaitlistSuscripcionEntry)

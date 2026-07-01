@@ -88,34 +88,61 @@ class WaitlistSuscripcionService:
         if await self.repo.has_active_notified_for_slot(clase_template_id, fecha):
             return "blocked"
 
-        entry = await self.repo.get_next_pending_for_slot(clase_template_id, fecha)
-        if not entry:
-            return "fallback"
-
         template = await self.repo.get_template(clase_template_id)
         if not template:
             return "fallback"
 
-        if not await self._is_entry_eligible_for_subscription(entry, template):
-            return "fallback"
+        entry = await self.repo.get_next_pending_for_slot(clase_template_id, fecha)
+        if entry and await self._is_entry_eligible_for_subscription(entry, template):
+            entry.estado = EstadoWaitlist.NOTIFICADO
+            entry.notificado_at = datetime.now(LOCAL_TZ)
+            entry.expira_at = datetime.combine(fecha, template.hora_fin, tzinfo=LOCAL_TZ)
+            await self.db.flush()
 
-        entry.estado = EstadoWaitlist.NOTIFICADO
-        entry.notificado_at = datetime.now(LOCAL_TZ)
-        entry.expira_at = datetime.combine(fecha, template.hora_fin, tzinfo=LOCAL_TZ)
-        await self.db.flush()
+            usuario = await self.repo.get_usuario(entry.usuario_id)
+            if usuario and usuario.email:
+                await EmailService().send_waitlist_slot_available(
+                    to_email=usuario.email,
+                    clase_nombre=f"{template.nombre} (suscripcion)",
+                    fecha=entry.fecha.isoformat(),
+                    expira_at=entry.expira_at,
+                    waitlist_id=str(entry.id),
+                    nombre=usuario.nombre,
+                )
 
-        usuario = await self.repo.get_usuario(entry.usuario_id)
-        if usuario and usuario.email:
-            await EmailService().send_waitlist_slot_available(
-                to_email=usuario.email,
-                clase_nombre=f"{template.nombre} (suscripcion)",
-                fecha=entry.fecha.isoformat(),
-                expira_at=entry.expira_at,
-                waitlist_id=str(entry.id),
-                nombre=usuario.nombre,
-            )
+            return "promoted"
 
-        return "promoted"
+        # Re-evaluate older pending starts that include this freed slot in their period.
+        pending_entries = await self.repo.list_pending_entries_until_slot(clase_template_id, fecha)
+        for candidate in pending_entries:
+            candidate_fecha_fin = _calcular_fecha_fin(candidate.fecha)
+            if not (candidate.fecha <= fecha <= candidate_fecha_fin):
+                continue
+
+            if await self.repo.has_active_notified_for_slot(clase_template_id, candidate.fecha):
+                continue
+
+            if not await self._is_entry_eligible_for_subscription(candidate, template):
+                continue
+
+            candidate.estado = EstadoWaitlist.NOTIFICADO
+            candidate.notificado_at = datetime.now(LOCAL_TZ)
+            candidate.expira_at = datetime.combine(candidate.fecha, template.hora_fin, tzinfo=LOCAL_TZ)
+            await self.db.flush()
+
+            usuario = await self.repo.get_usuario(candidate.usuario_id)
+            if usuario and usuario.email:
+                await EmailService().send_waitlist_slot_available(
+                    to_email=usuario.email,
+                    clase_nombre=f"{template.nombre} (suscripcion)",
+                    fecha=candidate.fecha.isoformat(),
+                    expira_at=candidate.expira_at,
+                    waitlist_id=str(candidate.id),
+                    nombre=usuario.nombre,
+                )
+            return "promoted"
+
+        return "fallback"
 
     async def join_waitlist(
         self,
