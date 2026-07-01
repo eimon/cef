@@ -6,7 +6,7 @@ import { X, Home, LogOut, UserCog, BookOpen, CalendarCheck, GraduationCap, UserR
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/actions/auth";
-import { getMisWaitlist } from "@/actions/inscripciones";
+import { getMisWaitlist, getMisWaitlistSuscripcion } from "@/actions/inscripciones";
 import { EstadoWaitlist } from "@/types/api";
 import type { LucideIcon } from "lucide-react";
 
@@ -73,9 +73,14 @@ export default function Sidebar({ userRole }: { userRole: string | null }) {
 
         let cancelled = false;
         async function checkPendingWaitlist() {
-            const entries = await getMisWaitlist();
+            const [entries, entriesSuscripcion] = await Promise.all([
+                getMisWaitlist(),
+                getMisWaitlistSuscripcion(),
+            ]);
             if (!cancelled) {
-                setHasPendingWaitlist(entries.some((entry) => entry.estado === EstadoWaitlist.NOTIFICADO));
+                const hasIndividualNotificado = entries.some((entry) => entry.estado === EstadoWaitlist.NOTIFICADO);
+                const hasSuscripcionNotificado = entriesSuscripcion.some((entry) => entry.estado === EstadoWaitlist.NOTIFICADO);
+                setHasPendingWaitlist(hasIndividualNotificado || hasSuscripcionNotificado);
             }
         }
 

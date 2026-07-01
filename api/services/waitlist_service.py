@@ -17,6 +17,7 @@ from schemas.inscripcion import (
     WaitlistStatusResponse,
 )
 from services.email_service import EmailService
+from services.waitlist_suscripcion_service import WaitlistSuscripcionService
 
 
 class WaitlistService:
@@ -49,7 +50,7 @@ class WaitlistService:
         cupo_reservado = await self.repo.count_active_suscripciones(clase_template_id, fecha)
         return (template.capacidad_maxima - cupo_reservado) > 0
 
-    async def trigger_promotion_for_slot(self, clase_template_id: uuid.UUID, fecha: date) -> None:
+    async def _trigger_individual_promotion_for_slot(self, clase_template_id: uuid.UUID, fecha: date) -> None:
         await self._expire_due_entries()
 
         if not await self._slot_has_capacity(clase_template_id, fecha):
@@ -81,6 +82,17 @@ class WaitlistService:
                 waitlist_id=str(entry.id),
                 nombre=usuario.nombre,
             )
+
+    async def trigger_promotion_for_slot(self, clase_template_id: uuid.UUID, fecha: date) -> None:
+        # Priority rule: subscription queue first, then individual fallback.
+        suscripcion_result = await WaitlistSuscripcionService(self.db).trigger_promotion_for_slot(
+            clase_template_id,
+            fecha,
+        )
+        if suscripcion_result in ("promoted", "blocked"):
+            return
+
+        await self._trigger_individual_promotion_for_slot(clase_template_id, fecha)
 
     async def join_waitlist(self, current_user: Usuario, data: WaitlistJoinCreate) -> WaitlistJoinResponse:
         clase_template_id = uuid.UUID(str(data.clase_template_id))

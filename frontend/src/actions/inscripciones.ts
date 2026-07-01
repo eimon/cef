@@ -116,3 +116,60 @@ export async function getWaitlistStatus(waitlistId: string): Promise<WaitlistSta
         return null;
     }
 }
+
+export async function anotarseWaitlistSuscripcion(
+    claseTemplateId: string,
+    fecha: string,
+): Promise<WaitlistState> {
+    const res = await serverApi("/inscripciones/waitlist-suscripcion", {
+        method: "POST",
+        body: JSON.stringify({ clase_template_id: claseTemplateId, fecha }),
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        return { error: errorData.detail || "No se pudo completar la inscripción en lista de espera de suscripción" };
+    }
+
+    const data: WaitlistJoinResponse = await res.json();
+    revalidatePath("/clases");
+    revalidatePath("/mis-clases");
+    return { success: true, data };
+}
+
+export async function getMisWaitlistSuscripcion(): Promise<WaitlistEntry[]> {
+    try {
+        const res = await serverApi("/inscripciones/waitlist-suscripcion/mias");
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
+
+export async function cancelarWaitlistSuscripcion(
+    waitlistId: string,
+): Promise<{ success?: boolean; error?: string }> {
+    try {
+        const res = await serverApi(`/inscripciones/waitlist-suscripcion/${waitlistId}`, { method: "DELETE" });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            return { error: err.detail || "No se pudo cancelar la espera de suscripción" };
+        }
+        revalidatePath("/clases");
+        revalidatePath("/mis-clases");
+        return { success: true };
+    } catch {
+        return { error: "Error de conexión al cancelar la espera de suscripción" };
+    }
+}
+
+export async function getWaitlistSuscripcionStatus(waitlistId: string): Promise<WaitlistStatus | null> {
+    try {
+        const res = await serverApi(`/inscripciones/waitlist-suscripcion/${waitlistId}/status`);
+        if (!res.ok) return null;
+        return res.json();
+    } catch {
+        return null;
+    }
+}

@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Clock, CalendarDays, X, Info, CreditCard, Ban, MapPin, History } from "lucide-react";
 import { MiCancelacion, MiClaseIndividual, MiSuscripcion, Disciplina, CancelacionResult, WaitlistEntry, EstadoWaitlist } from "@/types/api";
 import { cancelarClase } from "@/actions/mis_clases";
-import { cancelarWaitlist } from "@/actions/inscripciones";
-import { crearPreferenciaWaitlistMP } from "@/actions/pagos";
+import { cancelarWaitlist, cancelarWaitlistSuscripcion } from "@/actions/inscripciones";
+import { crearPreferenciaWaitlistMP, crearPreferenciaWaitlistSuscripcionMP } from "@/actions/pagos";
 
 // ─── Unified item ─────────────────────────────────────────────────────────────
 
@@ -575,12 +575,14 @@ export default function MisClasesView({
     individuales,
     suscripciones,
     waitlistEntries,
+    waitlistSuscripcionEntries,
     cancelaciones,
     highlightWaitlistId,
 }: {
     individuales: MiClaseIndividual[];
     suscripciones: MiSuscripcion[];
     waitlistEntries: WaitlistEntry[];
+    waitlistSuscripcionEntries: WaitlistEntry[];
     cancelaciones: MiCancelacion[];
     highlightWaitlistId?: string | null;
 }) {
@@ -617,6 +619,18 @@ export default function MisClasesView({
 
     async function handleConfirmarEspera(waitlistId: string) {
         const result = await crearPreferenciaWaitlistMP(waitlistId);
+        if (result.init_point) {
+            window.location.assign(result.init_point);
+        }
+    }
+
+    async function handleCancelarEsperaSuscripcion(waitlistId: string) {
+        await cancelarWaitlistSuscripcion(waitlistId);
+        window.location.reload();
+    }
+
+    async function handleConfirmarEsperaSuscripcion(waitlistId: string) {
+        const result = await crearPreferenciaWaitlistSuscripcionMP(waitlistId);
         if (result.init_point) {
             window.location.assign(result.init_point);
         }
@@ -671,6 +685,56 @@ export default function MisClasesView({
                                     <button
                                         type="button"
                                         onClick={() => handleCancelarEspera(entry.id)}
+                                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                    >
+                                        Cancelar espera
+                                    </button>
+                                </div>
+                            </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {waitlistSuscripcionEntries.length > 0 && (
+                <div className="glass rounded-2xl p-4">
+                    <h2 className="text-sm font-bold text-slate-800">Mis Esperas de Suscripción ({waitlistSuscripcionEntries.length})</h2>
+                    <div className="mt-3 space-y-2">
+                        {waitlistSuscripcionEntries.map((entry) => {
+                            const isHighlighted = entry.id === highlightWaitlistId;
+                            return (
+                            <div
+                                key={entry.id}
+                                ref={isHighlighted ? highlightRef : undefined}
+                                className={`rounded-xl border p-3 ${
+                                    isHighlighted
+                                        ? "border-cef-primary ring-2 ring-cef-primary/30 bg-cef-primary/5"
+                                        : "border-slate-200 bg-white/60"
+                                }`}
+                            >
+                                <p className="text-sm font-semibold text-slate-800">{entry.clase_nombre}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {entry.fecha} · Posición #{entry.posicion}
+                                </p>
+                                <p className={`text-xs mt-1 ${entry.estado === EstadoWaitlist.NOTIFICADO ? "text-cef-warning" : "text-slate-500"}`}>
+                                    {entry.estado === EstadoWaitlist.NOTIFICADO
+                                        ? "¡Se liberó un cupo para suscripción! Confirmá y pagá dentro de la ventana disponible."
+                                        : "En espera"}
+                                </p>
+                                <div className="mt-2 flex gap-2">
+                                    {entry.estado === EstadoWaitlist.NOTIFICADO && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleConfirmarEsperaSuscripcion(entry.id)}
+                                            className="rounded-lg bg-cef-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-cef-primary/90"
+                                        >
+                                            Confirmar Suscripción
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleCancelarEsperaSuscripcion(entry.id)}
                                         className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
                                     >
                                         Cancelar espera
