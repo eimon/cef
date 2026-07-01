@@ -6,6 +6,7 @@ import {
     confirmarSuscripcionMP,
     confirmarRenovacionSuscripcionMP,
     confirmarWaitlistMP,
+    confirmarWaitlistSuscripcionMP,
 } from "@/actions/pagos";
 
 export default async function PagoRetornoPage({
@@ -30,6 +31,7 @@ export default async function PagoRetornoPage({
         if (tipo === "suscripcion") return confirmarSuscripcionMP(id);
         if (tipo === "renovacion-suscripcion") return confirmarRenovacionSuscripcionMP(id);
         if (tipo === "waitlist") return confirmarWaitlistMP(id);
+        if (tipo === "waitlist-suscripcion") return confirmarWaitlistSuscripcionMP(id);
         return confirmarPagoMP(id);
     }
 
@@ -42,8 +44,8 @@ export default async function PagoRetornoPage({
                     icon={<AlertCircle size={40} className="text-cef-warning" />}
                     title="Ocurrió un error en el pago"
                     message={result.error}
-                    linkHref={tipo === "deuda" ? "/mis-pagos" : tipo === "waitlist" ? "/mis-clases" : "/clases"}
-                    linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : tipo === "waitlist" ? "Volver a Mis Clases" : "Volver a clases"}
+                    linkHref={tipo === "deuda" ? "/mis-pagos" : tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "/mis-clases" : "/clases"}
+                    linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "Volver a Mis Clases" : "Volver a clases"}
                 />
             );
         }
@@ -54,8 +56,8 @@ export default async function PagoRetornoPage({
                     icon={<Clock size={40} className="text-cef-warning" />}
                     title="Pago pendiente"
                     message="Tu pago está siendo procesado. Te notificaremos cuando se confirme."
-                    linkHref={tipo === "waitlist" ? "/mis-clases" : "/clases"}
-                    linkLabel={tipo === "waitlist" ? "Volver a Mis Clases" : "Volver a clases"}
+                    linkHref={tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "/mis-clases" : "/clases"}
+                    linkLabel={tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "Volver a Mis Clases" : "Volver a clases"}
                 />
             );
         }
@@ -71,6 +73,8 @@ export default async function PagoRetornoPage({
                         ? "Tu suscripción fue renovada. Ya podés verla en Mis Clases."
                         : esSuscripcion
                         ? "Tu suscripción fue activada. Ya podés verla en Mis Clases."
+                        : tipo === "waitlist-suscripcion"
+                        ? "Tu suscripción quedó confirmada desde la lista de espera. Ya podés verla en Mis Clases."
                         : tipo === "waitlist"
                         ? "Tu lugar quedó confirmado desde la lista de espera. Ya podés ver tu clase en Mis Clases."
                         : tipo === "deuda"
@@ -89,8 +93,8 @@ export default async function PagoRetornoPage({
                 icon={<Clock size={40} className="text-cef-warning" />}
                 title="Pago pendiente"
                 message="Tu pago está siendo procesado. Te notificaremos cuando se confirme."
-                linkHref={tipo === "waitlist" ? "/mis-clases" : "/clases"}
-                linkLabel={tipo === "waitlist" ? "Volver a Mis Clases" : "Volver a clases"}
+                linkHref={tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "/mis-clases" : "/clases"}
+                linkLabel={tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "Volver a Mis Clases" : "Volver a clases"}
             />
         );
     }
@@ -104,8 +108,8 @@ export default async function PagoRetornoPage({
                     icon={<AlertCircle size={40} className="text-cef-warning" />}
                     title="Ocurrió un error en el pago"
                     message={result.error}
-                    linkHref={tipo === "deuda" ? "/mis-pagos" : tipo === "waitlist" ? "/mis-clases" : "/clases"}
-                    linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : tipo === "waitlist" ? "Volver a Mis Clases" : "Volver a clases"}
+                    linkHref={tipo === "deuda" ? "/mis-pagos" : tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "/mis-clases" : "/clases"}
+                    linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "Volver a Mis Clases" : "Volver a clases"}
                 />
             );
         }
@@ -119,9 +123,11 @@ export default async function PagoRetornoPage({
                 ? "No se pudo procesar el pago. Podés intentarlo nuevamente desde Mis Pagos."
                 : tipo === "waitlist"
                 ? "No se pudo confirmar tu lugar desde la lista de espera. Revisá tu estado en Mis Clases."
+                : tipo === "waitlist-suscripcion"
+                ? "No se pudo confirmar tu suscripción desde la lista de espera. Revisá tu estado en Mis Clases."
                 : "No se pudo procesar el pago. Podés intentar nuevamente desde la grilla de clases."}
-            linkHref={tipo === "deuda" ? "/mis-pagos" : tipo === "waitlist" ? "/mis-clases" : "/clases"}
-            linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : tipo === "waitlist" ? "Volver a Mis Clases" : "Volver a clases"}
+            linkHref={tipo === "deuda" ? "/mis-pagos" : tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "/mis-clases" : "/clases"}
+            linkLabel={tipo === "deuda" ? "Volver a Mis Pagos" : tipo === "waitlist" || tipo === "waitlist-suscripcion" ? "Volver a Mis Clases" : "Volver a clases"}
         />
     );
 }

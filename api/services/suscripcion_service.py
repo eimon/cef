@@ -3,11 +3,13 @@ from datetime import date, timedelta, datetime
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from core.enums import DiaSemana, EstadoSuscripcion
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, ConflictException, NotFoundException
 from models.usuario import Usuario
+from models.suscripciones import SuscripcionReserva
 from core.enums import EstadoPago
 from repositories.cupon_descuento_repository import CuponDescuentoRepository
 from repositories.pago_repository import PagoRepository
@@ -635,6 +637,40 @@ class SuscripcionService:
             activo=suscripcion.activo,
         )
 
+    async def _materialize_subscription_reservas(
+        self, suscripcion, template, fechas_clases: list[date]
+    ) -> None:
+        for fecha in fechas_clases:
+            instancia = await self.repo.get_instancia(suscripcion.clase_template_id, fecha)
+            if instancia:
+                existing_reserva = await self.db.execute(
+                    select(SuscripcionReserva).where(
+                        SuscripcionReserva.suscripcion_id == suscripcion.id,
+                        SuscripcionReserva.clase_instancia_id == instancia.id,
+                        SuscripcionReserva.activa == True,
+                    )
+                )
+                if existing_reserva.scalars().first():
+                    continue
+                if instancia.cupo <= 0:
+                    raise BadRequestException(
+                        f"No hay cupo disponible para suscripciones el {fecha.strftime('%d/%m/%Y')}"
+                    )
+                instancia.cupo -= 1
+            else:
+                reservas_count = await self.repo.count_active_reservas_en_fecha(
+                    suscripcion.clase_template_id, fecha
+                )
+                if reservas_count >= template.capacidad_maxima:
+                    raise BadRequestException(
+                        f"No hay cupo disponible para suscripciones el {fecha.strftime('%d/%m/%Y')}"
+                    )
+                cupo = max(0, template.capacidad_maxima - reservas_count - 1)
+                instancia = await self.repo.create_instancia(suscripcion.clase_template_id, fecha, cupo)
+
+            await self.repo.create_reserva(suscripcion.id, instancia.id)
+            await self.repo.create_asistencia(suscripcion.usuario_id, instancia.id)
+
     async def suscribirse(
         self, current_user: Usuario, data: SuscripcionCreate, mp_payment_id: str = "mock"
     ) -> SuscripcionResponse:
@@ -667,18 +703,6 @@ class SuscripcionService:
             fecha_fin=fecha_fin,
             fecha_pago=datetime.now(LOCAL_TZ).date(),
         )
-
-        for fecha in fechas_clases:
-            instancia = await self.repo.get_instancia(clase_template_id, fecha)
-            if instancia:
-                instancia.cupo = max(0, instancia.cupo - 1)
-            else:
-                reservas = await self.repo.count_active_reservas_en_fecha(clase_template_id, fecha)
-                cupo = max(0, template.capacidad_maxima - reservas - 1)
-                instancia = await self.repo.create_instancia(clase_template_id, fecha, cupo)
-
-            await self.repo.create_reserva(suscripcion.id, instancia.id)
-            await self.repo.create_asistencia(current_user.id, instancia.id)
 
         pago = await self.repo.create_pago(
             usuario_id=current_user.id,

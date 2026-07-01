@@ -77,6 +77,24 @@ async def confirmar_waitlist_mp(
     return await PagoService(db).confirmar_waitlist_mp(current_user, payment_id)
 
 
+@router.post("/mp/preferencia-waitlist-suscripcion")
+async def crear_preferencia_waitlist_suscripcion_mp(
+    waitlist_id: UUID = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).crear_preferencia_waitlist_suscripcion_mp(current_user, waitlist_id)
+
+
+@router.post("/mp/confirmar-waitlist-suscripcion")
+async def confirmar_waitlist_suscripcion_mp(
+    payment_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await PagoService(db).confirmar_waitlist_suscripcion_mp(current_user, payment_id)
+
+
 @router.post("/mp/preferencia-deuda")
 async def crear_preferencia_deuda_mp(
     asistencia_id: UUID = Query(...),

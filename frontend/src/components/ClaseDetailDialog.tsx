@@ -4,10 +4,25 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Clock, MapPin, User, Users, DollarSign, CalendarDays, ChevronRight, AlertCircle, ClipboardList, Calendar, Loader2, CheckCircle2 } from "lucide-react";
 import { ClaseSemana, EstadoWaitlist, SuscripcionCheckResponse, AsistenciaRecepcion, TipoInscripcion } from "@/types/api";
-import { anotarseWaitlist, cancelarWaitlist, checkElegibilidadIndividual, getMisWaitlist, getWaitlistStatus } from "@/actions/inscripciones";
+import {
+    anotarseWaitlist,
+    anotarseWaitlistSuscripcion,
+    cancelarWaitlist,
+    cancelarWaitlistSuscripcion,
+    checkElegibilidadIndividual,
+    getMisWaitlist,
+    getMisWaitlistSuscripcion,
+    getWaitlistStatus,
+    getWaitlistSuscripcionStatus,
+} from "@/actions/inscripciones";
 import { checkElegibilidadSuscripcion } from "@/actions/suscripciones";
 import { getAsistenciasClase } from "@/actions/asistencias";
-import { crearPreferenciaMP, crearPreferenciaSuscripcionMP, crearPreferenciaWaitlistMP } from "@/actions/pagos";
+import {
+    crearPreferenciaMP,
+    crearPreferenciaSuscripcionMP,
+    crearPreferenciaWaitlistMP,
+    crearPreferenciaWaitlistSuscripcionMP,
+} from "@/actions/pagos";
 
 const DIA_LABELS: Record<string, string> = {
     lunes: "Lunes",
@@ -239,6 +254,13 @@ export default function ClaseDetailDialog({
     const [waitlistEstado, setWaitlistEstado] = useState<EstadoWaitlist | null>(null);
     const [waitlistExpiraAt, setWaitlistExpiraAt] = useState<string | null>(null);
 
+    const [waitlistSuscripcionLoading, setWaitlistSuscripcionLoading] = useState(false);
+    const [waitlistSuscripcionError, setWaitlistSuscripcionError] = useState("");
+    const [waitlistSuscripcionEntryId, setWaitlistSuscripcionEntryId] = useState<string | null>(null);
+    const [waitlistSuscripcionPosition, setWaitlistSuscripcionPosition] = useState<number | null>(null);
+    const [waitlistSuscripcionEstado, setWaitlistSuscripcionEstado] = useState<EstadoWaitlist | null>(null);
+    const [waitlistSuscripcionExpiraAt, setWaitlistSuscripcionExpiraAt] = useState<string | null>(null);
+
     // Load waitlist entries on open
     useEffect(() => {
         let mounted = true;
@@ -254,11 +276,26 @@ export default function ClaseDetailDialog({
                     entry.fecha === clase.fecha_en_semana,
             );
 
+            const entriesSuscripcion = await getMisWaitlistSuscripcion();
+            if (!mounted) return;
+
+            const currentSuscripcion = entriesSuscripcion.find(
+                (entry) =>
+                    entry.clase_template_id === clase.id &&
+                    entry.fecha === clase.fecha_en_semana,
+            );
+
             setWaitlistEntryId(current?.id ?? null);
             setWaitlistPosition(current?.posicion ?? null);
             setWaitlistEstado(current?.estado ?? null);
             setWaitlistExpiraAt(current?.expira_at ?? null);
             setWaitlistError("");
+
+            setWaitlistSuscripcionEntryId(currentSuscripcion?.id ?? null);
+            setWaitlistSuscripcionPosition(currentSuscripcion?.posicion ?? null);
+            setWaitlistSuscripcionEstado(currentSuscripcion?.estado ?? null);
+            setWaitlistSuscripcionExpiraAt(currentSuscripcion?.expira_at ?? null);
+            setWaitlistSuscripcionError("");
         }
 
         loadMyWaitlist();
@@ -291,6 +328,29 @@ export default function ClaseDetailDialog({
         return () => clearInterval(interval);
     }, [isOpen, waitlistEntryId]);
 
+    useEffect(() => {
+        if (!isOpen || !waitlistSuscripcionEntryId) return;
+
+        const refreshStatus = async () => {
+            const status = await getWaitlistSuscripcionStatus(waitlistSuscripcionEntryId);
+            if (!status) return;
+            setWaitlistSuscripcionEstado(status.estado);
+            setWaitlistSuscripcionPosition(status.posicion);
+            setWaitlistSuscripcionExpiraAt(status.expira_at);
+            if (status.estado === EstadoWaitlist.EXPIRADO) {
+                setWaitlistSuscripcionError("Tu aviso de cupo de suscripción expiró. Podés volver a anotarte en espera.");
+                setWaitlistSuscripcionEntryId(null);
+                setWaitlistSuscripcionEstado(null);
+                setWaitlistSuscripcionExpiraAt(null);
+                setWaitlistSuscripcionPosition(null);
+            }
+        };
+
+        refreshStatus();
+        const interval = setInterval(refreshStatus, 30000);
+        return () => clearInterval(interval);
+    }, [isOpen, waitlistSuscripcionEntryId]);
+
     // Early return after all hooks
     if (!isOpen || !clase) return null;
 
@@ -301,6 +361,8 @@ export default function ClaseDetailDialog({
     const canSubscribe = clase.cupo_suscripcion_disponible;
     const hasWaitlistEntry = waitlistEntryId !== null;
     const waitlistNotificado = waitlistEstado === EstadoWaitlist.NOTIFICADO;
+    const hasWaitlistSuscripcionEntry = waitlistSuscripcionEntryId !== null;
+    const waitlistSuscripcionNotificado = waitlistSuscripcionEstado === EstadoWaitlist.NOTIFICADO;
 
     const precioActual = step === "amount-suscripcion"
         ? (suscripcionData?.precio_total ?? clase.precio_suscripcion)
@@ -342,6 +404,12 @@ export default function ClaseDetailDialog({
         setWaitlistPosition(null);
         setWaitlistEstado(null);
         setWaitlistExpiraAt(null);
+        setWaitlistSuscripcionLoading(false);
+        setWaitlistSuscripcionError("");
+        setWaitlistSuscripcionEntryId(null);
+        setWaitlistSuscripcionPosition(null);
+        setWaitlistSuscripcionEstado(null);
+        setWaitlistSuscripcionExpiraAt(null);
         onClose();
     }
 
@@ -472,9 +540,65 @@ export default function ClaseDetailDialog({
         }
     }
 
-    function renderVencimiento() {
-        if (!waitlistExpiraAt) return null;
-        const expireDate = new Date(waitlistExpiraAt);
+    async function handleAnotarseWaitlistSuscripcion() {
+        if (!clase) return;
+        setWaitlistSuscripcionLoading(true);
+        setWaitlistSuscripcionError("");
+
+        const result = await anotarseWaitlistSuscripcion(clase.id, clase.fecha_en_semana);
+        setWaitlistSuscripcionLoading(false);
+
+        if (result.error || !result.data) {
+            setWaitlistSuscripcionError(result.error || "No se pudo completar la espera de suscripción");
+            return;
+        }
+
+        setWaitlistSuscripcionEntryId(result.data.waitlist_id);
+        setWaitlistSuscripcionPosition(result.data.posicion);
+        setWaitlistSuscripcionEstado(result.data.estado);
+        setWaitlistSuscripcionExpiraAt(null);
+    }
+
+    async function handleCancelarWaitlistSuscripcion() {
+        if (!waitlistSuscripcionEntryId) return;
+        setWaitlistSuscripcionLoading(true);
+        setWaitlistSuscripcionError("");
+
+        const result = await cancelarWaitlistSuscripcion(waitlistSuscripcionEntryId);
+        setWaitlistSuscripcionLoading(false);
+
+        if (result.error) {
+            setWaitlistSuscripcionError(result.error);
+            return;
+        }
+
+        setWaitlistSuscripcionEntryId(null);
+        setWaitlistSuscripcionPosition(null);
+        setWaitlistSuscripcionEstado(null);
+        setWaitlistSuscripcionExpiraAt(null);
+    }
+
+    async function handleConfirmarWaitlistSuscripcionPago() {
+        if (!waitlistSuscripcionEntryId) return;
+        setWaitlistSuscripcionLoading(true);
+        setWaitlistSuscripcionError("");
+
+        const result = await crearPreferenciaWaitlistSuscripcionMP(waitlistSuscripcionEntryId);
+        setWaitlistSuscripcionLoading(false);
+
+        if (result.error) {
+            setWaitlistSuscripcionError(result.error);
+            return;
+        }
+
+        if (result.init_point) {
+            window.location.href = result.init_point;
+        }
+    }
+
+    function renderVencimiento(expiraAt: string | null) {
+        if (!expiraAt) return null;
+        const expireDate = new Date(expiraAt);
         const diffMs = expireDate.getTime() - Date.now();
         if (diffMs <= 0) return "Expirando";
         const mins = Math.floor(diffMs / 60000);
@@ -645,7 +769,7 @@ export default function ClaseDetailDialog({
                                                                 : "bg-cef-success/10 border-cef-success/20 text-cef-success"
                                                         }`}>
                                                             {waitlistNotificado
-                                                                ? `¡Se liberó tu cupo! ${renderVencimiento() ?? "Confirmá tu lugar"}`
+                                                                ? `¡Se liberó tu cupo! ${renderVencimiento(waitlistExpiraAt) ?? "Confirmá tu lugar"}`
                                                                 : `Estás en lista de espera${waitlistPosition ? ` · Posición #${waitlistPosition}` : ""}`}
                                                         </div>
                                                         {waitlistNotificado && (
@@ -728,13 +852,59 @@ export default function ClaseDetailDialog({
                                                 Ya tenés inscripción
                                             </button>
                                         ) : !canSubscribe ? (
-                                            <button
-                                                type="button"
-                                                disabled
-                                                className="w-full py-2.5 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-400 cursor-not-allowed group-hover:border-slate-300 transition-all flex items-center justify-center gap-1.5 text-center leading-tight"
-                                            >
-                                                Entrar a lista de espera para una mensualidad en esta clase
-                                            </button>
+                                            <div className="space-y-2">
+                                                {hasWaitlistSuscripcionEntry ? (
+                                                    <>
+                                                        <div className={`w-full py-2.5 px-3 rounded-lg border text-xs font-semibold text-center leading-tight ${
+                                                            waitlistSuscripcionNotificado
+                                                                ? "bg-cef-warning/10 border-cef-warning/20 text-cef-warning"
+                                                                : "bg-cef-success/10 border-cef-success/20 text-cef-success"
+                                                        }`}>
+                                                            {waitlistSuscripcionNotificado
+                                                                ? `¡Se liberó tu cupo de suscripción! ${renderVencimiento(waitlistSuscripcionExpiraAt) ?? "Confirmá tu lugar"}`
+                                                                : `Estás en lista de espera de suscripción${waitlistSuscripcionPosition ? ` · Posición #${waitlistSuscripcionPosition}` : ""}`}
+                                                        </div>
+                                                        {waitlistSuscripcionNotificado && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleConfirmarWaitlistSuscripcionPago}
+                                                                disabled={waitlistSuscripcionLoading}
+                                                                className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                            >
+                                                                {waitlistSuscripcionLoading ? "Redirigiendo..." : "Confirmar Suscripción"}
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleCancelarWaitlistSuscripcion}
+                                                            disabled={waitlistSuscripcionLoading}
+                                                            className="w-full py-2.5 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                        >
+                                                            {waitlistSuscripcionLoading ? "Cancelando..." : "Cancelar espera"}
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleAnotarseWaitlistSuscripcion}
+                                                        disabled={waitlistSuscripcionLoading}
+                                                        className="w-full py-2.5 px-3 rounded-lg bg-cef-primary text-white text-xs font-semibold hover:bg-cef-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    >
+                                                        {waitlistSuscripcionLoading ? "Anotando..." : "Anotarme en lista de espera"}
+                                                    </button>
+                                                )}
+                                                <p className="text-[11px] text-slate-400 text-center">
+                                                    {waitlistSuscripcionNotificado
+                                                        ? "Tu suscripción se confirma únicamente con pago aprobado"
+                                                        : "No hay cupo de suscripción disponible para este período"}
+                                                </p>
+                                                {waitlistSuscripcionError && (
+                                                    <div className="flex items-start gap-1.5">
+                                                        <AlertCircle size={13} className="text-cef-danger mt-0.5 flex-shrink-0" />
+                                                        <p className="text-[11px] text-cef-danger leading-tight">{waitlistSuscripcionError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         ) : (
                                             <div className="space-y-2">
                                                 <button
