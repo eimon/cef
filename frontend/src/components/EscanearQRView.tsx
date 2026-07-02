@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CheckCircle2, AlertCircle, ArrowLeft, Camera, ChevronDown, Loader2 } from "lucide-react";
 import { getInstanciasHoy, marcarAsistenciaQR } from "@/actions/asistencias";
+import { esClaseActiva } from "@/lib/utils";
 import type { InstanciaHoy } from "@/types/api";
 
 declare class BarcodeDetector {
@@ -30,7 +31,7 @@ export default function EscanearQRView() {
             if (error || !data) {
                 setLoadError(error ?? "Error al cargar clases");
             } else {
-                setInstancias(data);
+                setInstancias(data.filter((i) => esClaseActiva(i.hora_inicio, i.hora_fin)));
             }
             setStatus("selectClass");
         });
@@ -126,7 +127,7 @@ export default function EscanearQRView() {
                     {loadError ? (
                         <p className="text-sm text-red-500">{loadError}</p>
                     ) : instancias.length === 0 ? (
-                        <p className="text-sm text-slate-500">No hay clases programadas para hoy.</p>
+                        <p className="text-sm text-slate-500">No hay clases activas en este momento.</p>
                     ) : (
                         <div className="relative">
                             <select

@@ -15,3 +15,8 @@ export function formatPriceCompact(value: number | string): string {
     if (n >= 1_000) return `${Math.round(n / 100) / 10}k`;
     return n.toString();
 }
+
+export function esClaseActiva(horaInicio: string, horaFin: string): boolean {
+    const ahora = new Date().toTimeString().slice(0, 5);
+    return horaInicio <= ahora && ahora <= horaFin;
+}

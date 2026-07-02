@@ -59,6 +59,7 @@ class AsistenciaRepository:
                 ClaseInstancia.fecha == today,
                 ClaseInstancia.activo == True,
                 ClaseInstancia.cancelada == False,
+                ClaseTemplate.activo == True,
             )
             .order_by(ClaseTemplate.hora_inicio)
         )

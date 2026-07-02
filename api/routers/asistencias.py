@@ -22,10 +22,11 @@ async def get_instancias_hoy(
 @router.get("/escanear/{dni}", response_model=EscaneoQRResponse)
 async def escanear_qr(
     dni: str,
+    instancia_id: UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
-    return await AsistenciaService(db).get_hoy_por_dni(dni)
+    return await AsistenciaService(db).get_hoy_por_dni(dni, instancia_id)
 
 
 @router.post("/instancia/{instancia_id}/qr")

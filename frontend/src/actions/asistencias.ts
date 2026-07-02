@@ -8,9 +8,13 @@ export type AsistenciasClaseState = {
     error?: string;
 };
 
-export async function escanearQR(dni: string): Promise<{ data?: EscaneoQRResult; error?: string }> {
+export async function escanearQR(
+    dni: string,
+    instanciaId?: string,
+): Promise<{ data?: EscaneoQRResult; error?: string }> {
     try {
-        const res = await serverApi(`/asistencias/escanear/${encodeURIComponent(dni)}`);
+        const qs = instanciaId ? `?instancia_id=${encodeURIComponent(instanciaId)}` : "";
+        const res = await serverApi(`/asistencias/escanear/${encodeURIComponent(dni)}${qs}`);
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             return { error: (err as { detail?: string }).detail || "No se encontró el cliente" };

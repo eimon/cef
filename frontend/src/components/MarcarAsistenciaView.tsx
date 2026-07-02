@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Loader2, CheckCircle2, AlertCircle, ArrowLeft, UserCheck } from "lucide-react";
-import { escanearQR, marcarPresente } from "@/actions/asistencias";
-import type { EscaneoQRResult } from "@/types/api";
+import { useState, useRef, useEffect } from "react";
+import { Loader2, CheckCircle2, AlertCircle, ArrowLeft, UserCheck, ChevronDown } from "lucide-react";
+import { escanearQR, marcarPresente, getInstanciasHoy } from "@/actions/asistencias";
+import { esClaseActiva } from "@/lib/utils";
+import type { EscaneoQRResult, InstanciaHoy } from "@/types/api";
 
 type Status = "idle" | "loading" | "confirming" | "marking" | "success" | "error";
 
@@ -16,7 +17,16 @@ export default function MarcarAsistenciaView() {
     const [result, setResult] = useState<EscaneoQRResult | null>(null);
     const [error, setError] = useState("");
     const [successName, setSuccessName] = useState("");
+    const [instancias, setInstancias] = useState<InstanciaHoy[] | null>(null);
+    const [selectedInstanciaId, setSelectedInstanciaId] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        getInstanciasHoy().then(({ data }) => {
+            const activas = (data ?? []).filter((i) => esClaseActiva(i.hora_inicio, i.hora_fin));
+            setInstancias(activas);
+        });
+    }, []);
 
     const buscar = async () => {
         const trimmed = dni.trim();
@@ -24,7 +34,7 @@ export default function MarcarAsistenciaView() {
         setStatus("loading");
         setError("");
 
-        const { data, error } = await escanearQR(trimmed);
+        const { data, error } = await escanearQR(trimmed, selectedInstanciaId || undefined);
         if (error || !data) {
             setError(error ?? "Error al buscar el cliente");
             setStatus("error");
@@ -60,38 +70,81 @@ export default function MarcarAsistenciaView() {
         setTimeout(() => inputRef.current?.focus(), 0);
     };
 
+    if (instancias === null) {
+        return (
+            <div className="max-w-md glass rounded-2xl p-8 flex items-center justify-center gap-3">
+                <Loader2 className="animate-spin text-cef-primary" size={20} />
+                <span className="text-sm text-slate-500">Cargando clases de hoy…</span>
+            </div>
+        );
+    }
+
+    if (instancias.length === 0) {
+        return (
+            <div className="max-w-md glass rounded-2xl p-5">
+                <p className="text-sm text-slate-500">No hay clases activas en este momento.</p>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-md space-y-4">
             {/* Ingreso de DNI */}
             {(status === "idle" || status === "loading") && (
-                <div className="glass rounded-2xl p-5">
-                    <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
-                        DNI del cliente
-                    </label>
-                    <div className="flex gap-2">
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={dni}
-                            onChange={(e) => setDni(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && buscar()}
-                            placeholder="Ej: 43245445"
-                            disabled={status === "loading"}
-                            className={inputCls}
-                            autoFocus
-                        />
-                        <button
-                            onClick={buscar}
-                            disabled={!dni.trim() || status === "loading"}
-                            className="flex items-center gap-2 px-4 py-2 bg-cef-primary text-white rounded-lg text-sm font-medium hover:bg-cef-primary/80 disabled:opacity-50 transition-colors whitespace-nowrap"
-                        >
-                            {status === "loading" ? (
-                                <Loader2 size={15} className="animate-spin" />
-                            ) : (
-                                <UserCheck size={15} />
-                            )}
-                            Confirmar asistencia
-                        </button>
+                <div className="glass rounded-2xl p-5 space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
+                            Clase a registrar
+                        </label>
+                        <div className="relative">
+                            <select
+                                value={selectedInstanciaId}
+                                onChange={(e) => setSelectedInstanciaId(e.target.value)}
+                                disabled={status === "loading"}
+                                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-slate-800 focus:border-cef-primary/60 focus:ring-2 focus:ring-cef-primary/15 outline-none transition-all text-sm appearance-none pr-8 disabled:opacity-50"
+                            >
+                                <option value="">Seleccionar clase...</option>
+                                {instancias.map((i) => (
+                                    <option key={i.instancia_id} value={i.instancia_id}>
+                                        {i.clase_nombre} — {i.hora_inicio}hs ({i.sala_nombre})
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown
+                                size={14}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
+                            DNI del cliente
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={dni}
+                                onChange={(e) => setDni(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && buscar()}
+                                placeholder="Ej: 43245445"
+                                disabled={status === "loading"}
+                                className={inputCls}
+                                autoFocus
+                            />
+                            <button
+                                onClick={buscar}
+                                disabled={!dni.trim() || status === "loading" || !selectedInstanciaId}
+                                className="flex items-center gap-2 px-4 py-2 bg-cef-primary text-white rounded-lg text-sm font-medium hover:bg-cef-primary/80 disabled:opacity-50 transition-colors whitespace-nowrap"
+                            >
+                                {status === "loading" ? (
+                                    <Loader2 size={15} className="animate-spin" />
+                                ) : (
+                                    <UserCheck size={15} />
+                                )}
+                                Confirmar asistencia
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

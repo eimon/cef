@@ -55,12 +55,16 @@ class AsistenciaService:
             for a in asistencias
         ]
 
-    async def get_hoy_por_dni(self, dni: str) -> EscaneoQRResponse:
+    async def get_hoy_por_dni(
+        self, dni: str, instancia_id: uuid.UUID | None = None
+    ) -> EscaneoQRResponse:
         usuario = await UserRepository(self.db).get_by_dni(dni)
         if not usuario:
             raise NotFoundException("No se encontró ningún cliente con el DNI ingresado")
 
         asistencias = await self.repo.get_hoy_por_usuario(usuario.id)
+        if instancia_id is not None:
+            asistencias = [a for a in asistencias if a.clase_instancia_id == instancia_id]
         nombre = f"{usuario.nombre or ''} {usuario.apellido or ''}".strip() or usuario.email
 
         if not asistencias:
