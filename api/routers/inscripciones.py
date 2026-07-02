@@ -13,10 +13,15 @@ from schemas.inscripcion import (
     WaitlistEntryResponse,
     WaitlistJoinCreate,
     WaitlistJoinResponse,
+    WaitlistSuscripcionEntryResponse,
+    WaitlistSuscripcionJoinCreate,
+    WaitlistSuscripcionJoinResponse,
+    WaitlistSuscripcionStatusResponse,
     WaitlistStatusResponse,
 )
 from services.inscripcion_service import InscripcionService
 from services.waitlist_service import WaitlistService
+from services.waitlist_suscripcion_service import WaitlistSuscripcionService
 
 router = APIRouter(prefix="/inscripciones", tags=["inscripciones"])
 
@@ -74,3 +79,46 @@ async def estado_waitlist(
     current_user: Usuario = Depends(get_current_user),
 ):
     return await WaitlistService(db).get_status(current_user, waitlist_id)
+
+
+@router.post("/waitlist-suscripcion", response_model=WaitlistSuscripcionJoinResponse, status_code=201)
+async def anotarse_waitlist_suscripcion(
+    data: WaitlistSuscripcionJoinCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await WaitlistSuscripcionService(db).join_waitlist(current_user, data)
+
+
+@router.get(
+    "/waitlist-suscripcion/mias",
+    response_model=list[WaitlistSuscripcionEntryResponse],
+    status_code=200,
+)
+async def listar_mis_waitlist_suscripcion(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await WaitlistSuscripcionService(db).list_my_waitlist(current_user)
+
+
+@router.delete("/waitlist-suscripcion/{waitlist_id}", status_code=204)
+async def cancelar_waitlist_suscripcion(
+    waitlist_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    await WaitlistSuscripcionService(db).cancel_waitlist(current_user, waitlist_id)
+
+
+@router.get(
+    "/waitlist-suscripcion/{waitlist_id}/status",
+    response_model=WaitlistSuscripcionStatusResponse,
+    status_code=200,
+)
+async def estado_waitlist_suscripcion(
+    waitlist_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    return await WaitlistSuscripcionService(db).get_status(current_user, waitlist_id)

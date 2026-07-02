@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from core.config import settings
-from core.enums import EstadoPago, TipoInscripcion
+from core.enums import EstadoPago, TipoInscripcion, CanceladoPor
 from core.timezone import LOCAL_TZ
 from exceptions.general import BadRequestException, NotFoundException
 from models.asistencia import Asistencia
@@ -24,8 +24,9 @@ from schemas.pago import DeudaPendienteResponse, MiPagoResponse
 from schemas.suscripcion import SuscripcionCreate
 from services.email_service import EmailService
 from services.inscripcion_service import InscripcionService
-from services.suscripcion_service import SuscripcionService
+from services.suscripcion_service import SuscripcionService, _primera_clase_en_periodo, _calcular_fechas_clases
 from services.waitlist_service import WaitlistService
+from services.waitlist_suscripcion_service import WaitlistSuscripcionService
 
 
 async def _get_porcentaje_sena(db) -> float:
@@ -232,6 +233,7 @@ class PagoService:
 
     def _release_partial_debt_reservation(self, asistencia: Asistencia, instancia) -> None:
         asistencia.cancelo = True
+        asistencia.cancelado_por = CanceladoPor.SISTEMA
         instancia.cupo += 1
 
     async def _record_failed_mp_payment(
@@ -341,8 +343,7 @@ class PagoService:
         existing = await self.db.execute(
             select(Pago).where(Pago.mp_payment_id == str(payment_id))
         )
-        if existing.scalars().first():
-            return {"status": "approved", "already_processed": True}
+        existing_pago = existing.scalars().first()
 
         # Prefer metadata; fall back to external_reference
         metadata = payment.get("metadata", {})
@@ -500,8 +501,7 @@ class PagoService:
         existing = await self.db.execute(
             select(Pago).where(Pago.mp_payment_id == str(payment_id))
         )
-        if existing.scalars().first():
-            return {"status": "approved", "already_processed": True}
+        existing_pago = existing.scalars().first()
 
         metadata = payment.get("metadata", {})
         external_ref = payment.get("external_reference", "")
@@ -635,8 +635,7 @@ class PagoService:
         existing = await self.db.execute(
             select(Pago).where(Pago.mp_payment_id == str(payment_id))
         )
-        if existing.scalars().first():
-            return {"status": "approved", "already_processed": True}
+        existing_pago = existing.scalars().first()
 
         metadata = payment.get("metadata", {})
         external_ref = payment.get("external_reference", "")
@@ -680,6 +679,150 @@ class PagoService:
             payment_id,
             payment,
             "Inscripcion desde lista de espera",
+        )
+
+        return {"status": "approved", **result.model_dump()}
+
+    async def crear_preferencia_waitlist_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        waitlist_id: UUID,
+    ) -> dict:
+        waitlist_service = WaitlistSuscripcionService(self.db)
+        entry, template = await waitlist_service.get_entry_for_payment(current_user, waitlist_id)
+
+        precio_disc = await DisciplinaRepository(self.db).get_by_nombre(template.disciplina)
+        if not precio_disc:
+            raise BadRequestException("No hay precio configurado para esta disciplina")
+
+        monto = float(precio_disc.precio_suscripcion)
+        dia = template.dia_semana.value.capitalize()
+        pref_data = self._make_preference(
+            title=f"Cupo liberado suscripcion — {template.nombre} {dia}",
+            monto=round(monto, 2),
+            back_url_suffix="?tipo=waitlist-suscripcion",
+            metadata={
+                "waitlist_suscripcion_id": str(entry.id),
+                "usuario_id": str(current_user.id),
+                "tipo": "waitlist_suscripcion",
+            },
+            external_reference=f"waitlist_suscripcion|{entry.id}|{current_user.id}",
+        )
+
+        response = self.sdk.preference().create(pref_data)
+        if response["status"] not in (200, 201):
+            raise BadRequestException("Error al conectar con MercadoPago")
+
+        pref = response["response"]
+        return {
+            "init_point": self._init_point_from_response(pref),
+            "preference_id": pref["id"],
+            "monto": monto,
+        }
+
+    async def confirmar_waitlist_suscripcion_mp(
+        self,
+        current_user: Usuario,
+        payment_id: str,
+    ) -> dict:
+        payment_response = self.sdk.payment().get(payment_id)
+        if payment_response["status"] != 200:
+            raise NotFoundException("Pago no encontrado en MercadoPago")
+
+        payment = payment_response["response"]
+        if payment.get("status") == "pending":
+            return {"status": "pending"}
+
+        if payment.get("status") != "approved":
+            await self._record_failed_mp_payment(
+                current_user,
+                payment_id,
+                payment,
+                "Pago waitlist suscripcion no completado",
+            )
+            return {"status": payment.get("status")}
+
+        existing = await self.db.execute(
+            select(Pago).where(Pago.mp_payment_id == str(payment_id))
+        )
+        existing_pago = existing.scalars().first()
+
+        metadata = payment.get("metadata", {})
+        external_ref = payment.get("external_reference", "")
+        try:
+            if metadata.get("waitlist_suscripcion_id"):
+                waitlist_id = UUID(str(metadata["waitlist_suscripcion_id"]))
+                usuario_id = str(metadata["usuario_id"])
+            else:
+                parts = external_ref.split("|")
+                waitlist_id = UUID(parts[1])
+                usuario_id = parts[2]
+        except (KeyError, ValueError, IndexError):
+            raise BadRequestException("Metadatos del pago inválidos")
+
+        if str(current_user.id) != usuario_id:
+            raise BadRequestException("Este pago no corresponde a tu usuario")
+
+        suscripcion_service = SuscripcionService(self.db)
+        if existing_pago:
+            if existing_pago.suscripcion_id:
+                suscripcion = await suscripcion_service.repo.get_suscripcion_by_id_for_user(
+                    existing_pago.suscripcion_id,
+                    current_user.id,
+                )
+                if suscripcion:
+                    template = suscripcion.clase_template or await suscripcion_service.repo.get_template(
+                        suscripcion.clase_template_id
+                    )
+                    if template:
+                        primera_clase = _primera_clase_en_periodo(
+                            template.dia_semana,
+                            suscripcion.fecha_inicio,
+                        )
+                        fechas_clases = _calcular_fechas_clases(primera_clase, suscripcion.fecha_fin)
+                        await suscripcion_service._materialize_subscription_reservas(
+                            suscripcion,
+                            template,
+                            fechas_clases,
+                        )
+            return {"status": "approved", "already_processed": True}
+
+        waitlist_service = WaitlistSuscripcionService(self.db)
+        entry, template = await waitlist_service.get_entry_for_payment(current_user, waitlist_id)
+
+        monto = Decimal(str(payment["transaction_amount"]))
+        data = SuscripcionCreate(
+            clase_template_id=entry.clase_template_id,
+            monto=monto,
+            fecha_inicio=entry.fecha,
+        )
+        result = await suscripcion_service.suscribirse(
+            current_user,
+            data,
+            mp_payment_id=str(payment_id),
+        )
+
+        suscripcion = await suscripcion_service.repo.get_suscripcion_by_id_for_user(
+            result.id,
+            current_user.id,
+        )
+        if suscripcion:
+            await suscripcion_service._materialize_subscription_reservas(
+                suscripcion,
+                template,
+                result.fechas_clases,
+            )
+
+        confirmed_entry = await waitlist_service.mark_confirmed_paid(waitlist_id)
+        await WaitlistService(self.db).trigger_promotion_for_slot(
+            confirmed_entry.clase_template_id,
+            confirmed_entry.fecha,
+        )
+        await self._send_payment_notification(
+            current_user,
+            payment_id,
+            payment,
+            "Suscripcion desde lista de espera",
         )
 
         return {"status": "approved", **result.model_dump()}
@@ -827,8 +970,7 @@ class PagoService:
         existing = await self.db.execute(
             select(Pago).where(Pago.mp_payment_id == str(payment_id))
         )
-        if existing.scalars().first():
-            return {"status": "approved", "already_processed": True}
+        existing_pago = existing.scalars().first()
 
         metadata = payment.get("metadata", {})
         external_ref = payment.get("external_reference", "")
@@ -848,11 +990,50 @@ class PagoService:
         if str(current_user.id) != usuario_id:
             raise BadRequestException("Este pago no corresponde a tu usuario")
 
+        suscripcion_service = SuscripcionService(self.db)
+        if existing_pago:
+            if existing_pago.suscripcion_id:
+                suscripcion = await suscripcion_service.repo.get_suscripcion_by_id_for_user(
+                    existing_pago.suscripcion_id,
+                    current_user.id,
+                )
+                if suscripcion:
+                    template = suscripcion.clase_template or await suscripcion_service.repo.get_template(
+                        suscripcion.clase_template_id
+                    )
+                    if template:
+                        primera_clase = _primera_clase_en_periodo(
+                            template.dia_semana,
+                            suscripcion.fecha_inicio,
+                        )
+                        fechas_clases = _calcular_fechas_clases(primera_clase, suscripcion.fecha_fin)
+                        await suscripcion_service._materialize_subscription_reservas(
+                            suscripcion,
+                            template,
+                            fechas_clases,
+                        )
+            return {"status": "approved", "already_processed": True}
+
         monto = Decimal(str(payment["transaction_amount"]))
         data = SuscripcionCreate(clase_template_id=clase_template_id, monto=monto, fecha_inicio=fecha_inicio)
-        result = await SuscripcionService(self.db).suscribirse(
+        result = await suscripcion_service.suscribirse(
             current_user, data, mp_payment_id=str(payment_id)
         )
+        
+        # Materialize subscription reservas now that payment is confirmed
+        template = await suscripcion_service.repo.get_template(clase_template_id)
+        if not template:
+            raise NotFoundException("Clase no encontrada")
+        
+        suscripcion = await suscripcion_service.repo.get_suscripcion_by_id_for_user(
+            result.id,
+            current_user.id,
+        )
+        if suscripcion:
+            await suscripcion_service._materialize_subscription_reservas(
+                suscripcion, template, result.fechas_clases
+            )
+        
         await self._send_payment_notification(
             current_user,
             payment_id,

@@ -16,6 +16,7 @@ from models.disciplina import Disciplina
 from models.licencia import Licencia
 from models.cupon_descuento import CuponDescuento
 from models.waitlist_entry import WaitlistEntry
+from models.waitlist_suscripcion_entry import WaitlistSuscripcionEntry
 
 __all__ = [
     "Usuario",
@@ -37,4 +38,5 @@ __all__ = [
     "Licencia",
     "CuponDescuento",
     "WaitlistEntry",
+    "WaitlistSuscripcionEntry",
 ]

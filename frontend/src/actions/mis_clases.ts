@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { serverApi } from "@/lib/server-api";
-import { CancelacionResult, MiClaseIndividual, MiSuscripcion } from "@/types/api";
+import { CancelacionResult, MiCancelacion, MiClaseIndividual, MiSuscripcion } from "@/types/api";
 
 export async function getMisClasesIndividuales(): Promise<MiClaseIndividual[]> {
     try {
@@ -17,6 +17,16 @@ export async function getMisClasesIndividuales(): Promise<MiClaseIndividual[]> {
 export async function getMisSuscripciones(): Promise<MiSuscripcion[]> {
     try {
         const res = await serverApi("/mis-clases/suscripciones");
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+}
+
+export async function getCancelaciones(): Promise<MiCancelacion[]> {
+    try {
+        const res = await serverApi("/mis-clases/cancelaciones");
         if (!res.ok) return [];
         return res.json();
     } catch {

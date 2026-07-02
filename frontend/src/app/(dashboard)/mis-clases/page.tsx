@@ -1,5 +1,5 @@
-import { getMisClasesIndividuales, getMisSuscripciones } from "@/actions/mis_clases";
-import { getMisWaitlist } from "@/actions/inscripciones";
+import { getMisClasesIndividuales, getMisSuscripciones, getCancelaciones } from "@/actions/mis_clases";
+import { getMisWaitlist, getMisWaitlistSuscripcion } from "@/actions/inscripciones";
 import MisClasesView from "@/components/MisClasesView";
 
 export default async function MisClasesPage({
@@ -7,11 +7,13 @@ export default async function MisClasesPage({
 }: {
     searchParams: Promise<{ waitlist?: string }>;
 }) {
-    const [params, individuales, suscripciones, waitlistEntries] = await Promise.all([
+    const [params, individuales, suscripciones, waitlistEntries, waitlistSuscripcionEntries, cancelaciones] = await Promise.all([
         searchParams,
         getMisClasesIndividuales(),
         getMisSuscripciones(),
         getMisWaitlist(),
+        getMisWaitlistSuscripcion(),
+        getCancelaciones(),
     ]);
 
     return (
@@ -25,6 +27,8 @@ export default async function MisClasesPage({
                 individuales={individuales}
                 suscripciones={suscripciones}
                 waitlistEntries={waitlistEntries}
+                waitlistSuscripcionEntries={waitlistSuscripcionEntries}
+                cancelaciones={cancelaciones}
                 highlightWaitlistId={params.waitlist || null}
             />
         </div>

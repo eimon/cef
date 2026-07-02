@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from core.enums import TipoInscripcion, EstadoPago
+from core.enums import TipoInscripcion, EstadoPago, CanceladoPor
 from exceptions.general import NotFoundException, BadRequestException
 from models.usuario import Usuario
 from repositories.asistencia_repository import AsistenciaRepository
@@ -64,7 +64,8 @@ class CancelacionService:
                 reserva.activa = False
                 suscripcion_id = reserva.suscripcion_id
 
-        await self.db.delete(asistencia)
+        asistencia.cancelo = True
+        asistencia.cancelado_por = CanceladoPor.USUARIO
         await self.db.flush()
         await WaitlistService(self.db).trigger_promotion_for_slot(
             instancia.clase_template_id,
